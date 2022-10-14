@@ -1,0 +1,5 @@
+# Build artifacts
+zig-cache/
+zig-out/
+# Binaries installed by install-deps.py
+thirdparty/SDL2*/
