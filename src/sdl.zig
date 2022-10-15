@@ -29,6 +29,7 @@ pub const SDL_Window = opaque {};
 pub extern fn SDL_CreateWindow(title: [*:0]const u8, x: c_int, y: c_int, w: c_int, h: c_int, flags: u32) ?*SDL_Window;
 // Can take a null window, but sets SDL last error
 pub extern fn SDL_DestroyWindow(window: ?*SDL_Window) void;
+pub extern fn SDL_GetWindowSize(window: *SDL_Window, w: ?*c_int, h: ?*c_int) void;
 
 pub extern fn SDL_GetError() [*:0]const u8;
 
@@ -1236,3 +1237,39 @@ const SDL_GLattr = enum(c_int) {
 };
 
 pub extern fn SDL_GetTicks64() u64;
+
+// Audio bits
+pub const SDL_AudioDeviceID = u32;
+pub const SDL_AudioFormat = u16;
+pub const SDL_AudioSpec = extern struct {
+    freq: c_int,
+    format: SDL_AudioFormat,
+    channels: u8,
+    silence: u8,
+    samples: u16,
+    padding: u16,
+    size: u32,
+    callback: SDL_AudioCallback,
+    userdata: ?*anyopaque,
+};
+pub const SDL_AudioCallback = *const fn (userdata: ?*anyopaque, stream: [*]u8, len: c_int) callconv(.C) void;
+pub const AUDIO_U8 = 0x0008;
+pub const AUDIO_S8 = 0x8008;
+pub const AUDIO_U16LSB = 0x0010;
+pub const AUDIO_S16LSB = 0x8010;
+pub const AUDIO_U16MSB = 0x1010;
+pub const AUDIO_S16MSB = 0x9010;
+pub const AUDIO_U16 = AUDIO_U16LSB;
+pub const AUDIO_S16 = AUDIO_S16LSB;
+
+pub extern fn SDL_OpenAudioDevice(
+    device: ?[*:0]const u8,
+    iscapture: c_int,
+    desired: *const SDL_AudioSpec,
+    obtained: *SDL_AudioSpec,
+    allowed_changes: c_int,
+) SDL_AudioDeviceID;
+pub extern fn SDL_CloseAudioDevice(dev: SDL_AudioDeviceID) void;
+pub extern fn SDL_PauseAudioDevice(dev: SDL_AudioDeviceID, pause_on: c_int) void;
+pub extern fn SDL_LockAudioDevice(dev: SDL_AudioDeviceID) void;
+pub extern fn SDL_UnlockAudioDevice(dev: SDL_AudioDeviceID) void;

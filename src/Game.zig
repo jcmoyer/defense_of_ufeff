@@ -5,6 +5,9 @@ const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl.zig");
 const gl = @import("gl33.zig");
+const ImmRenderer = @import("imm_renderer.zig").ImmRenderer;
+const TextureManager = @import("texture.zig").TextureManager;
+const AudioSystem = @import("audio.zig").AudioSystem;
 
 /// Updates per second
 const UPDATE_RATE = 30;
@@ -18,14 +21,21 @@ window: *sdl.SDL_Window,
 context: sdl.SDL_GLContext,
 running: bool = false,
 
+imm: ImmRenderer,
+texman: TextureManager,
+audio: *AudioSystem,
+
 /// Allocate a Game and initialize core systems.
 pub fn create(allocator: Allocator) !*Game {
     var ptr = try allocator.create(Game);
     ptr.* = .{
         .allocator = allocator,
+        .texman = TextureManager.init(allocator),
         // Initialized below
         .window = undefined,
         .context = undefined,
+        .imm = undefined,
+        .audio = undefined,
     };
 
     if (sdl.SDL_Init(sdl.SDL_INIT_EVERYTHING) != 0) {
@@ -66,12 +76,17 @@ pub fn create(allocator: Allocator) !*Game {
         std.process.exit(1);
     };
 
+    ptr.imm = ImmRenderer.create();
+    ptr.audio = AudioSystem.create(allocator);
+
     // At this point, the game object should be fully constructed and in a valid state.
 
     return ptr;
 }
 
 pub fn destroy(self: *Game) void {
+    self.texman.deinit();
+    self.audio.destroy();
     sdl.SDL_GL_DeleteContext(self.context);
     sdl.SDL_DestroyWindow(self.window);
     sdl.SDL_Quit();
@@ -79,7 +94,15 @@ pub fn destroy(self: *Game) void {
 }
 
 fn init(self: *Game) void {
-    _ = self;
+    self.performLayout();
+
+    // cull backfaces
+    gl.enable(gl.CULL_FACE);
+    gl.cullFace(gl.BACK);
+
+    // enable alpha blending
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 }
 
 /// Initialize game and run main loop.
@@ -132,10 +155,23 @@ pub fn render(self: *Game, alpha: f64) void {
     gl.clearColor(0x64.0 / 255.0, 0x95.0 / 255.0, 0xED.0 / 255.0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
+    const t = self.texman.get("assets/textures/0-ufeff tiles.png");
+    gl.bindTexture(gl.TEXTURE_2D, t.handle);
+
+    self.imm.begin();
+    self.imm.drawQuad(0, 0, t.width, t.height, 1, 0, 0);
+
     sdl.SDL_GL_SwapWindow(self.window);
 }
 
 fn loadExtension(_: void, name: [:0]const u8) ?*const anyopaque {
     log.info("    {s}", .{name});
     return sdl.SDL_GL_GetProcAddress(name);
+}
+
+fn performLayout(self: *Game) void {
+    var window_width: c_int = 0;
+    var window_height: c_int = 0;
+    sdl.SDL_GetWindowSize(self.window, &window_width, &window_height);
+    self.imm.setOutputDimensions(@intCast(u32, window_width), @intCast(u32, window_height));
 }
