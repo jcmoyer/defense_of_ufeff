@@ -6,7 +6,7 @@ pub extern fn stbi_load(
     y: *c_int,
     channels_in_file: *c_int,
     desired_channels: c_int,
-) [*]stbi_uc;
+) ?[*]stbi_uc;
 
 pub extern fn stbi_image_free(
     retval_from_stbi_load: *anyopaque,

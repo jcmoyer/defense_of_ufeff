@@ -6,7 +6,10 @@ const Allocator = std.mem.Allocator;
 const sdl = @import("sdl.zig");
 const gl = @import("gl33.zig");
 const ImmRenderer = @import("imm_renderer.zig").ImmRenderer;
-const TextureManager = @import("texture.zig").TextureManager;
+const texture = @import("texture.zig");
+const Texture = texture.Texture;
+const TextureManager = texture.TextureManager;
+const TextureHandle = texture.TextureHandle;
 const AudioSystem = @import("audio.zig").AudioSystem;
 
 /// Updates per second
@@ -25,17 +28,23 @@ imm: ImmRenderer,
 texman: TextureManager,
 audio: *AudioSystem,
 
+scene_framebuf: gl.GLuint = 0,
+scene_renderbuf: gl.GLuint = 0,
+// Texture containing color information
+scene_color: TextureHandle,
+
 /// Allocate a Game and initialize core systems.
 pub fn create(allocator: Allocator) !*Game {
     var ptr = try allocator.create(Game);
     ptr.* = .{
         .allocator = allocator,
-        .texman = TextureManager.init(allocator),
         // Initialized below
+        .texman = undefined,
         .window = undefined,
         .context = undefined,
         .imm = undefined,
         .audio = undefined,
+        .scene_color = undefined,
     };
 
     if (sdl.SDL_Init(sdl.SDL_INIT_EVERYTHING) != 0) {
@@ -76,8 +85,11 @@ pub fn create(allocator: Allocator) !*Game {
         std.process.exit(1);
     };
 
+    ptr.texman = TextureManager.init(allocator);
     ptr.imm = ImmRenderer.create();
     ptr.audio = AudioSystem.create(allocator);
+
+    ptr.init();
 
     // At this point, the game object should be fully constructed and in a valid state.
 
@@ -103,11 +115,12 @@ fn init(self: *Game) void {
     // enable alpha blending
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    self.initFramebuffer();
 }
 
 /// Initialize game and run main loop.
 pub fn run(self: *Game) void {
-    self.init();
     self.running = true;
     var last: f64 = @intToFloat(f64, sdl.SDL_GetTicks64());
     var acc: f64 = 0;
@@ -152,14 +165,24 @@ pub fn update(self: *Game) void {
 pub fn render(self: *Game, alpha: f64) void {
     _ = alpha;
 
+    self.beginRenderToScene();
+
     gl.clearColor(0x64.0 / 255.0, 0x95.0 / 255.0, 0xED.0 / 255.0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    const t = self.texman.get("assets/textures/0-ufeff tiles.png");
-    gl.bindTexture(gl.TEXTURE_2D, t.handle);
+    const t = self.texman.getNamedTexture("0-ufeff tiles.png");
+    t.bind(gl.TEXTURE_2D);
 
     self.imm.begin();
-    self.imm.drawQuad(0, 0, t.width, t.height, 1, 0, 0);
+    self.imm.drawQuad(0, 0, 128, 128, 1, 0, 0);
+
+    self.endRenderToScene();
+
+    self.scene_color.bind(gl.TEXTURE_2D);
+    self.imm.setOutputDimensions(1, 1);
+    self.imm.begin();
+    self.imm.drawQuad(0, 0, 1, 1, 1, 1, 1);
+    gl.bindTexture(gl.TEXTURE_2D, 0);
 
     sdl.SDL_GL_SwapWindow(self.window);
 }
@@ -174,4 +197,55 @@ fn performLayout(self: *Game) void {
     var window_height: c_int = 0;
     sdl.SDL_GetWindowSize(self.window, &window_width, &window_height);
     self.imm.setOutputDimensions(@intCast(u32, window_width), @intCast(u32, window_height));
+}
+
+fn initFramebuffer(self: *Game) void {
+    gl.genFramebuffers(1, &self.scene_framebuf);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, self.scene_framebuf);
+
+    // allocate storage for framebuffer color
+    self.scene_color = self.texman.createInMemory();
+    const scene_color = self.scene_color.raw_handle;
+
+    gl.bindTexture(gl.TEXTURE_2D, scene_color);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, INTERNAL_WIDTH, INTERNAL_HEIGHT, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.bindTexture(gl.TEXTURE_2D, 0);
+
+    // attach to framebuffer
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, scene_color, 0);
+
+    // allocate renderbuffer
+    gl.genRenderbuffers(1, &self.scene_renderbuf);
+    gl.bindRenderbuffer(gl.RENDERBUFFER, self.scene_renderbuf);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH24_STENCIL8, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+    gl.bindRenderbuffer(gl.RENDERBUFFER, 0);
+
+    // attach to framebuffer
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, self.scene_renderbuf);
+
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
+        log.err("could not construct framebuffer", .{});
+        std.process.exit(1);
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, 0);
+}
+
+fn beginRenderToScene(self: *Game) void {
+    gl.viewport(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, self.scene_framebuf);
+    self.imm.setOutputDimensions(INTERNAL_WIDTH, INTERNAL_HEIGHT);
+}
+
+/// After this call, `self.scene_color` is the texture containing color information.
+fn endRenderToScene(self: *Game) void {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, 0);
+
+    var window_width: c_int = 0;
+    var window_height: c_int = 0;
+    sdl.SDL_GetWindowSize(self.window, &window_width, &window_height);
+    self.imm.setOutputDimensions(@intCast(u32, window_width), @intCast(u32, window_height));
+    gl.viewport(0, 0, window_width, window_height);
 }

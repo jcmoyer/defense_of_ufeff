@@ -611,8 +611,8 @@ pub const SDL_Event = extern union {
 };
 
 comptime {
-    if (@sizeOf(SDL_Event) != 56) {
-        @compileError("Expected SDL_Event to have size 56! This platform is probably unsupported.");
+    if (@sizeOf(SDL_Event) != SDL_Event.padding_size) {
+        @compileError("@sizeOf(SDL_Event) != SDL_Event.padding_size");
     }
 }
 
