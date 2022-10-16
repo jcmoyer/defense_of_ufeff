@@ -1,8 +1,8 @@
 const gl = @import("gl33.zig");
 const zm = @import("zmath");
 
-const vssrc = @embedFile("imm_renderer_vs.glsl");
-const fssrc = @embedFile("imm_renderer_fs.glsl");
+const vssrc = @embedFile("imm_renderer.vert");
+const fssrc = @embedFile("imm_renderer.frag");
 const Vertex = extern struct {
     x: f32,
     y: f32,
