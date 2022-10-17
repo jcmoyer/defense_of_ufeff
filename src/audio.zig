@@ -231,42 +231,54 @@ pub const AudioSystem = struct {
         buffer.sample_count.store(@intCast(u32, sample_count), .SeqCst);
     }
 
-    fn audioCallback(sys: ?*anyopaque, stream: [*]u8, len: c_int) callconv(.C) void {
-        std.mem.set(u8, stream[0..@intCast(usize, len)], 0);
-        var self = @ptrCast(*AudioSystem, @alignCast(@alignOf(*AudioSystem), sys));
+    fn fillBuffer(self: *AudioSystem, buffer: []i16) void {
+        // buffer is uninitialized; zero to silence
+        std.mem.set(i16, buffer, 0);
+
         self.tracks_m.lock();
         defer self.tracks_m.unlock();
 
-        const data_base = @ptrCast([*]i16, @alignCast(2, stream));
-
         for (self.tracks.items) |*track| {
-            const buffer = track.buffer;
+            const input_buffer = track.buffer;
             const volume = track.parameters.volume.load(.SeqCst);
 
             if (track.parameters.paused.load(.SeqCst)) {
                 continue;
             }
 
-            if (buffer.sample_count.load(.SeqCst) == 0) {
+            if (input_buffer.sample_count.load(.SeqCst) == 0) {
                 continue;
             }
 
-            var output = data_base;
+            // Next loop is hot, so hoist the atomic load out to this point.
+            // NOTE: We always multiply by 2 because we assume all sounds are
+            // stereo. This may need to change in the future.
+            const buffer_sample_count = 2 * input_buffer.sample_count.load(.SeqCst);
 
-            var samp: usize = 0;
-            while (samp < @divExact(len, 2)) : (samp += 1) {
+            for (buffer) |*output| {
                 if (track.done) {
                     break;
                 }
 
-                output[samp] = @intCast(i16, std.math.clamp(
-                    @intCast(i32, @intCast(i32, output[samp]) + @floatToInt(i32, @intToFloat(f32, buffer.samples.?[track.cursor]) * volume)),
+                // Here we do the math using 32-bit integers and then clamp the
+                // result to 16-bits. This is not really correct since we can "clip"
+                // the sample in this track and continue adding/subtracting
+                // the pre-clipped value in the next. It would be more correct to
+                // clamp once at the end, but then we would need another buffer.
+                const sample_to_mix = @floatToInt(
+                    i32,
+                    @intToFloat(f32, input_buffer.samples.?[track.cursor]) * volume,
+                );
+                const sample_in_mix = @intCast(i32, output.*);
+                const mixed = sample_to_mix + sample_in_mix;
+                output.* = @intCast(i16, std.math.clamp(
+                    mixed,
                     std.math.minInt(i16),
                     std.math.maxInt(i16),
                 ));
-                track.cursor += 1;
 
-                if (track.cursor == 2 * buffer.sample_count.load(.SeqCst)) {
+                track.cursor += 1;
+                if (track.cursor == buffer_sample_count) {
                     if (track.loop) {
                         track.cursor = 0;
                     } else {
@@ -285,6 +297,14 @@ pub const AudioSystem = struct {
                 t.deinit();
             }
         }
+    }
+
+    fn audioCallback(sys: ?*anyopaque, stream: [*]u8, len: c_int) callconv(.C) void {
+        var self = @ptrCast(*AudioSystem, @alignCast(@alignOf(*AudioSystem), sys));
+        const stream_bytes = stream[0..@intCast(usize, len)];
+        self.fillBuffer(
+            std.mem.bytesAsSlice(i16, @alignCast(@sizeOf(i16), stream_bytes)),
+        );
     }
 
     pub fn playMusic(self: *AudioSystem, filename: [:0]const u8) *AudioParameters {
