@@ -1236,6 +1236,11 @@ const SDL_GLattr = enum(c_int) {
     SDL_GL_FLOATBUFFERS,
 };
 
+pub const SDL_GLprofile = c_int;
+pub const SDL_GL_CONTEXT_PROFILE_CORE = 0x0001;
+pub const SDL_GL_CONTEXT_PROFILE_COMPATIBILITY = 0x0002;
+pub const SDL_GL_CONTEXT_PROFILE_ES = 0x0004;
+
 pub extern fn SDL_GetTicks64() u64;
 
 // Audio bits

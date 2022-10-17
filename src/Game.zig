@@ -52,6 +52,11 @@ pub fn create(allocator: Allocator) !*Game {
         std.process.exit(1);
     }
 
+    if (sdl.SDL_GL_SetAttribute(.SDL_GL_CONTEXT_PROFILE_MASK, sdl.SDL_GL_CONTEXT_PROFILE_CORE) != 0) {
+        log.err("SDL_GL_SetAttribute failed: {s}", .{sdl.SDL_GetError()});
+        std.process.exit(1);
+    }
+
     if (sdl.SDL_GL_SetAttribute(.SDL_GL_CONTEXT_MAJOR_VERSION, 3) != 0) {
         log.err("SDL_GL_SetAttribute failed: {s}", .{sdl.SDL_GetError()});
         std.process.exit(1);
