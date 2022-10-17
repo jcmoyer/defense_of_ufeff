@@ -3,14 +3,10 @@ const zm = @import("zmath");
 
 const vssrc = @embedFile("imm_renderer.vert");
 const fssrc = @embedFile("imm_renderer.frag");
+
 const Vertex = extern struct {
-    x: f32,
-    y: f32,
-    u: f32,
-    v: f32,
-    r: f32,
-    g: f32,
-    b: f32,
+    xyuv: zm.F32x4,
+    rgba: zm.F32x4,
 };
 
 const shader = @import("shader.zig");
@@ -31,8 +27,8 @@ pub const ImmRenderer = struct {
         gl.genBuffers(1, &self.buffer);
         gl.bindVertexArray(self.vao);
         gl.bindBuffer(gl.ARRAY_BUFFER, self.buffer);
-        gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "x")));
-        gl.vertexAttribPointer(1, 3, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "r")));
+        gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "xyuv")));
+        gl.vertexAttribPointer(1, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "rgba")));
         gl.enableVertexAttribArray(0);
         gl.enableVertexAttribArray(1);
         return self;
@@ -60,12 +56,13 @@ pub const ImmRenderer = struct {
         const right = @intToFloat(f32, x + @intCast(i32, w));
         const top = @intToFloat(f32, y);
         const bottom = @intToFloat(f32, y + @intCast(i32, h));
+        const rgba = zm.f32x4(r, g, b, 1);
 
         const vertices = [4]Vertex{
-            Vertex{ .x = left, .y = top, .u = 0, .v = 0, .r = r, .g = g, .b = b },
-            Vertex{ .x = left, .y = bottom, .u = 0, .v = 1, .r = r, .g = g, .b = b },
-            Vertex{ .x = right, .y = bottom, .u = 1, .v = 1, .r = r, .g = g, .b = b },
-            Vertex{ .x = right, .y = top, .u = 1, .v = 0, .r = r, .g = g, .b = b },
+            Vertex{ .xyuv = zm.f32x4(left, top, 0, 0), .rgba = rgba },
+            Vertex{ .xyuv = zm.f32x4(left, bottom, 0, 1), .rgba = rgba },
+            Vertex{ .xyuv = zm.f32x4(right, bottom, 1, 1), .rgba = rgba },
+            Vertex{ .xyuv = zm.f32x4(right, top, 1, 0), .rgba = rgba },
         };
 
         gl.bindBuffer(gl.ARRAY_BUFFER, self.buffer);
