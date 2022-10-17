@@ -59,10 +59,10 @@ pub fn drawQuad(self: ImmRenderer, x: i32, y: i32, w: u32, h: u32, r: f32, g: f3
     const rgba = zm.f32x4(r, g, b, 1);
 
     const vertices = [4]Vertex{
-        Vertex{ .xyuv = zm.f32x4(left, top, 0, 0), .rgba = rgba },
-        Vertex{ .xyuv = zm.f32x4(left, bottom, 0, 1), .rgba = rgba },
-        Vertex{ .xyuv = zm.f32x4(right, bottom, 1, 1), .rgba = rgba },
-        Vertex{ .xyuv = zm.f32x4(right, top, 1, 0), .rgba = rgba },
+        Vertex{ .xyuv = zm.f32x4(left, top, 0, 1), .rgba = rgba },
+        Vertex{ .xyuv = zm.f32x4(left, bottom, 0, 0), .rgba = rgba },
+        Vertex{ .xyuv = zm.f32x4(right, bottom, 1, 0), .rgba = rgba },
+        Vertex{ .xyuv = zm.f32x4(right, top, 1, 1), .rgba = rgba },
     };
 
     gl.bindBuffer(gl.ARRAY_BUFFER, self.buffer);

@@ -8,6 +8,6 @@ uniform sampler2D uSampler;
 out vec4 FragColor;
 
 void main() {
-    vec2 invTexCoord = vec2(fTex.x, 1.0 - fTex.y);
+    vec2 invTexCoord = vec2(fTex.x, fTex.y);
     FragColor = texture(uSampler, invTexCoord) * fColor.rgba;
 }
