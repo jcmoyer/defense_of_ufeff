@@ -11,6 +11,7 @@ const Texture = texture.Texture;
 const TextureManager = texture.TextureManager;
 const TextureHandle = texture.TextureHandle;
 const AudioSystem = @import("audio.zig").AudioSystem;
+const PlayState = @import("PlayState.zig");
 
 /// Updates per second
 const UPDATE_RATE = 30;
@@ -33,6 +34,13 @@ scene_renderbuf: gl.GLuint = 0,
 // Texture containing color information
 scene_color: TextureHandle,
 
+current_state: ?StateId = null,
+st_play: *PlayState,
+
+pub const StateId = enum {
+    play,
+};
+
 /// Allocate a Game and initialize core systems.
 pub fn create(allocator: Allocator) !*Game {
     var ptr = try allocator.create(Game);
@@ -45,6 +53,7 @@ pub fn create(allocator: Allocator) !*Game {
         .imm = undefined,
         .audio = undefined,
         .scene_color = undefined,
+        .st_play = undefined,
     };
 
     if (sdl.SDL_Init(sdl.SDL_INIT_EVERYTHING) != 0) {
@@ -96,12 +105,18 @@ pub fn create(allocator: Allocator) !*Game {
 
     ptr.init();
 
+    ptr.st_play = PlayState.create(ptr) catch |err| {
+        log.err("Could not create PlayState: {!}", .{err});
+        std.process.exit(1);
+    };
+
     // At this point, the game object should be fully constructed and in a valid state.
 
     return ptr;
 }
 
 pub fn destroy(self: *Game) void {
+    self.st_play.destroy();
     self.texman.deinit();
     self.audio.destroy();
     sdl.SDL_GL_DeleteContext(self.context);
@@ -127,6 +142,8 @@ fn init(self: *Game) void {
 /// Initialize game and run main loop.
 pub fn run(self: *Game) void {
     self.running = true;
+    self.changeState(.play);
+
     var last: f64 = @intToFloat(f64, sdl.SDL_GetTicks64());
     var acc: f64 = 0;
     const DELAY = 1000 / @intToFloat(f64, UPDATE_RATE);
@@ -164,22 +181,13 @@ pub fn handleEvent(self: *Game, ev: sdl.SDL_Event) void {
 }
 
 pub fn update(self: *Game) void {
-    _ = self;
+    self.stateDispatchUpdate(self.current_state.?);
 }
 
 pub fn render(self: *Game, alpha: f64) void {
-    _ = alpha;
-
     self.beginRenderToScene();
 
-    gl.clearColor(0x64.0 / 255.0, 0x95.0 / 255.0, 0xED.0 / 255.0, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-
-    const t = self.texman.getNamedTexture("0-ufeff tiles.png");
-    t.bind(gl.TEXTURE_2D);
-
-    self.imm.begin();
-    self.imm.drawQuad(0, 0, 128, 128, 1, 0, 0);
+    self.stateDispatchRender(self.current_state.?, alpha);
 
     self.endRenderToScene();
 
@@ -253,4 +261,38 @@ fn endRenderToScene(self: *Game) void {
     sdl.SDL_GetWindowSize(self.window, &window_width, &window_height);
     self.imm.setOutputDimensions(@intCast(u32, window_width), @intCast(u32, window_height));
     gl.viewport(0, 0, window_width, window_height);
+}
+
+fn stateDispatchUpdate(self: *Game, id: StateId) void {
+    switch (id) {
+        .play => self.st_play.update(),
+    }
+}
+
+fn stateDispatchRender(self: *Game, id: StateId, alpha: f64) void {
+    switch (id) {
+        .play => self.st_play.render(alpha),
+    }
+}
+
+fn stateDispatchEnter(self: *Game, id: StateId, from: ?StateId) void {
+    switch (id) {
+        .play => self.st_play.enter(from),
+    }
+}
+
+fn stateDispatchLeave(self: *Game, id: StateId, to: ?StateId) void {
+    switch (id) {
+        .play => self.st_play.leave(to),
+    }
+}
+
+pub fn changeState(self: *Game, to: StateId) void {
+    const old = self.current_state;
+    if (self.current_state) |old_val| {
+        self.stateDispatchLeave(old_val, to);
+    }
+    self.current_state = to;
+    self.stateDispatchEnter(to, old);
+    log.debug("State change: {any} -> {any}", .{ old, to });
 }
