@@ -98,6 +98,8 @@ pub fn loadTilemapFromJson(allocator: Allocator, filename: []const u8) !Tilemap 
                 .id = if (bank != .none) t_tid - 1 else 0,
             };
         }
+        // only load one layer for now
+        break;
     }
 
     return tm;

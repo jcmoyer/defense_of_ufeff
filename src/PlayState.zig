@@ -4,6 +4,7 @@ const std = @import("std");
 const Game = @import("Game.zig");
 const gl = @import("gl33.zig");
 const tilemap = @import("tilemap.zig");
+const Rect = @import("Rect.zig");
 
 game: *Game,
 map: tilemap.Tilemap,
@@ -46,8 +47,37 @@ pub fn render(self: *PlayState, alpha: f64) void {
     gl.clearColor(0x64.0 / 255.0, 0x95.0 / 255.0, 0xED.0 / 255.0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    const t = self.game.texman.getNamedTexture("terrain.png");
-    t.bind(gl.TEXTURE_2D);
+    const terrain_h = self.game.texman.getNamedTexture("terrain.png");
+    const terrain_s = self.game.texman.getTextureState(terrain_h);
+    terrain_h.bind(gl.TEXTURE_2D);
     self.game.imm.begin();
-    self.game.imm.drawQuad(0, 0, 128, 128, 1, 0, 0);
+
+    var y: usize = 0;
+    var x: usize = 0;
+    while (y < self.map.height) : (y += 1) {
+        x = 0;
+        while (x < self.map.width) : (x += 1) {
+            const t = self.map.at2DPtr(x, y);
+            if (t.bank == .terrain) {
+                const nx = @intCast(u16, terrain_s.width / 16);
+                const ny = @intCast(u16, terrain_s.height / 16);
+
+                const src = Rect{
+                    .x = (t.id % nx) * 16,
+                    .y = (t.id / ny) * 16,
+                    .w = 16,
+                    .h = 16,
+                };
+
+                const dest = Rect{
+                    .x = @intCast(i32, x) * 16,
+                    .y = @intCast(i32, y) * 16,
+                    .w = 16,
+                    .h = 16,
+                };
+
+                self.game.imm.drawQuadTextured(terrain_s.*, src, dest);
+            }
+        }
+    }
 }

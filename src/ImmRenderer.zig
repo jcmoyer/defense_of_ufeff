@@ -3,6 +3,8 @@ const ImmRenderer = @This();
 const gl = @import("gl33.zig");
 const zm = @import("zmath");
 const shader = @import("shader.zig");
+const texture = @import("texture.zig");
+const Rect = @import("Rect.zig");
 
 const vssrc = @embedFile("ImmRenderer.vert");
 const fssrc = @embedFile("ImmRenderer.frag");
@@ -63,6 +65,30 @@ pub fn drawQuad(self: ImmRenderer, x: i32, y: i32, w: u32, h: u32, r: f32, g: f3
         Vertex{ .xyuv = zm.f32x4(left, bottom, 0, 0), .rgba = rgba },
         Vertex{ .xyuv = zm.f32x4(right, bottom, 1, 0), .rgba = rgba },
         Vertex{ .xyuv = zm.f32x4(right, top, 1, 1), .rgba = rgba },
+    };
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, self.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, 4 * @sizeOf(Vertex), &vertices, gl.STREAM_DRAW);
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+}
+
+pub fn drawQuadTextured(self: ImmRenderer, t: texture.TextureState, src: Rect, dest: Rect) void {
+    const uv_left = @intToFloat(f32, src.x) / @intToFloat(f32, t.width);
+    const uv_right = @intToFloat(f32, src.right()) / @intToFloat(f32, t.width);
+    const uv_top = 1 - @intToFloat(f32, src.y) / @intToFloat(f32, t.height);
+    const uv_bottom = 1 - @intToFloat(f32, src.bottom()) / @intToFloat(f32, t.height);
+
+    const left = @intToFloat(f32, dest.x);
+    const right = @intToFloat(f32, dest.right());
+    const top = @intToFloat(f32, dest.y);
+    const bottom = @intToFloat(f32, dest.bottom());
+    const rgba = zm.f32x4(1, 1, 1, 1);
+
+    const vertices = [4]Vertex{
+        Vertex{ .xyuv = zm.f32x4(left, top, uv_left, uv_top), .rgba = rgba },
+        Vertex{ .xyuv = zm.f32x4(left, bottom, uv_left, uv_bottom), .rgba = rgba },
+        Vertex{ .xyuv = zm.f32x4(right, bottom, uv_right, uv_bottom), .rgba = rgba },
+        Vertex{ .xyuv = zm.f32x4(right, top, uv_right, uv_top), .rgba = rgba },
     };
 
     gl.bindBuffer(gl.ARRAY_BUFFER, self.buffer);
