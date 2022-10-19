@@ -110,10 +110,10 @@ pub fn loadTilemapFromJson(allocator: Allocator, filename: []const u8) !Tilemap 
         }
 
         for (layer_ints) |t_tid, i| {
-            const bank = classifier.classify(@intCast(u16, t_tid));
+            const result = classifier.classify(@intCast(u16, t_tid));
             tm.atScalarPtr(i).* = .{
-                .bank = bank,
-                .id = if (bank != .none) @intCast(u16, t_tid) - 1 else 0,
+                .bank = result.bank,
+                .id = result.adjusted_tile_id,
             };
         }
         // only load one layer for now
@@ -155,6 +155,11 @@ const BankClassifier = struct {
         }
     };
 
+    const ClassifyResult = struct {
+        bank: TileBank,
+        adjusted_tile_id: u16,
+    };
+
     ranges: std.ArrayListUnmanaged(Range) = .{},
 
     fn addRange(self: *BankClassifier, allocator: Allocator, bank: TileBank, firstgid: u16) !void {
@@ -175,13 +180,19 @@ const BankClassifier = struct {
         return &self.ranges.items[self.ranges.items.len - 1];
     }
 
-    fn classify(self: BankClassifier, id: u16) TileBank {
+    fn classify(self: BankClassifier, id: u16) ClassifyResult {
         if (id == 0) {
-            return .none;
+            return ClassifyResult{
+                .bank = .none,
+                .adjusted_tile_id = 0,
+            };
         }
         for (self.ranges.items) |r| {
             if (r.contains(id)) {
-                return r.bank;
+                return ClassifyResult{
+                    .bank = r.bank,
+                    .adjusted_tile_id = id - r.first,
+                };
             }
         }
         std.log.err("No tile bank for tile {d}", .{id});
