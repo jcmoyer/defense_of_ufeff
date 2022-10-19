@@ -44,7 +44,12 @@ pub fn loadTilemapFromJson(allocator: Allocator, filename: []const u8) !Tilemap 
     };
     const TiledLayer = struct {
         name: []const u8,
-        data: []u16,
+        // Fields for base64 + zlib compressed layers. std.json.parse will fail
+        // for uncompressed documents because tile IDs will overflow u8.
+        // Need to do manual parsing to support both formats I guess?
+        data: []const u8,
+        compression: ?[]const u8 = null,
+        encoding: ?[]const u8 = null,
     };
     const TiledDoc = struct {
         width: usize,
@@ -72,8 +77,8 @@ pub fn loadTilemapFromJson(allocator: Allocator, filename: []const u8) !Tilemap 
     };
     errdefer tm.deinit(allocator);
 
-    // goes in arena, no need to free
     var classifier = BankClassifier{};
+    defer classifier.deinit(arena_allocator);
 
     for (doc.tilesets) |t_tileset| {
         if (std.mem.eql(u8, t_tileset.source, "terrain.tsx")) {
@@ -87,15 +92,28 @@ pub fn loadTilemapFromJson(allocator: Allocator, filename: []const u8) !Tilemap 
     }
 
     for (doc.layers) |t_layer| {
-        if (t_layer.data.len != tm.tileCount()) {
-            std.log.err("Map layer has wrong tile count; got {d} expected {d}", .{ t_layer.data.len, tm.tileCount() });
+        if (t_layer.encoding == null or !std.mem.eql(u8, t_layer.encoding.?, "base64")) {
+            std.log.err("Map layer is not encoded using base64", .{});
             std.process.exit(1);
         }
-        for (t_layer.data) |t_tid, i| {
-            const bank = classifier.classify(t_tid);
+        if (t_layer.compression == null or !std.mem.eql(u8, t_layer.compression.?, "zlib")) {
+            std.log.err("Map layer is not compressed using zlib", .{});
+            std.process.exit(1);
+        }
+
+        const layer_ints = try b64decompressLayer(arena_allocator, t_layer.data);
+        defer arena_allocator.free(layer_ints);
+
+        if (layer_ints.len != tm.tileCount()) {
+            std.log.err("Map layer has wrong tile count; got {d} expected {d}", .{ layer_ints, tm.tileCount() });
+            std.process.exit(1);
+        }
+
+        for (layer_ints) |t_tid, i| {
+            const bank = classifier.classify(@intCast(u16, t_tid));
             tm.atScalarPtr(i).* = .{
                 .bank = bank,
-                .id = if (bank != .none) t_tid - 1 else 0,
+                .id = if (bank != .none) @intCast(u16, t_tid) - 1 else 0,
             };
         }
         // only load one layer for now
@@ -103,6 +121,25 @@ pub fn loadTilemapFromJson(allocator: Allocator, filename: []const u8) !Tilemap 
     }
 
     return tm;
+}
+
+fn b64decompressLayer(allocator: Allocator, data: []const u8) ![]u32 {
+    const b64_decode_size = try std.base64.standard.Decoder.calcSizeForSlice(data);
+    var b64_decode_buffer = try allocator.alloc(u8, b64_decode_size);
+    defer allocator.free(b64_decode_buffer);
+
+    try std.base64.standard.Decoder.decode(b64_decode_buffer, data);
+
+    var fbs = std.io.fixedBufferStream(b64_decode_buffer);
+    var b64_reader = fbs.reader();
+
+    var zstream = try std.compress.zlib.zlibStream(allocator, b64_reader);
+    var zreader = zstream.reader();
+
+    // enough for a 512x512 map
+    const layer_bytes = try zreader.readAllAlloc(allocator, 1024 * 1024);
+    // TODO: looks weird, maybe we should explicitly allocate an aligned buffer instead of using readAllAlloc?
+    return std.mem.bytesAsSlice(u32, @alignCast(4, layer_bytes));
 }
 
 // for tiled tilesets
@@ -120,11 +157,11 @@ const BankClassifier = struct {
 
     ranges: std.ArrayListUnmanaged(Range) = .{},
 
-    fn addRange(self: *BankClassifier, a: Allocator, bank: TileBank, firstgid: u16) !void {
+    fn addRange(self: *BankClassifier, allocator: Allocator, bank: TileBank, firstgid: u16) !void {
         if (self.getLastRange()) |ptr| {
             ptr.last = firstgid;
         }
-        try self.ranges.append(a, Range{
+        try self.ranges.append(allocator, Range{
             .bank = bank,
             .first = firstgid,
             .last = std.math.maxInt(u16),
@@ -149,5 +186,9 @@ const BankClassifier = struct {
         }
         std.log.err("No tile bank for tile {d}", .{id});
         std.process.exit(1);
+    }
+
+    fn deinit(self: *BankClassifier, allocator: Allocator) void {
+        self.ranges.deinit(allocator);
     }
 };
