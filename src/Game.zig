@@ -15,8 +15,8 @@ const PlayState = @import("PlayState.zig");
 
 /// Updates per second
 const UPDATE_RATE = 30;
-const INTERNAL_WIDTH = 512;
-const INTERNAL_HEIGHT = 256;
+pub const INTERNAL_WIDTH = 512;
+pub const INTERNAL_HEIGHT = 256;
 
 const log = std.log.scoped(.Game);
 

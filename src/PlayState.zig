@@ -5,15 +5,21 @@ const Game = @import("Game.zig");
 const gl = @import("gl33.zig");
 const tilemap = @import("tilemap.zig");
 const Rect = @import("Rect.zig");
+const Camera = @import("Camera.zig");
+
+const DEFAULT_CAMERA = Camera{
+    .view = Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT),
+};
 
 game: *Game,
-map: tilemap.Tilemap,
+map: tilemap.Tilemap = .{},
+camera: Camera = DEFAULT_CAMERA,
+prev_camera: Camera = DEFAULT_CAMERA,
 
 pub fn create(game: *Game) !*PlayState {
     var self = try game.allocator.create(PlayState);
     self.* = .{
         .game = game,
-        .map = .{},
     };
     return self;
 }
@@ -30,6 +36,13 @@ pub fn enter(self: *PlayState, from: ?Game.StateId) void {
         std.log.err("failed to load tilemap {!}", .{err});
         std.process.exit(1);
     };
+    self.camera.bounds = Rect.init(
+        0,
+        0,
+        @intCast(i32, self.map.width * 16),
+        @intCast(i32, self.map.height * 16),
+    );
+    self.prev_camera = self.camera;
 }
 
 pub fn leave(self: *PlayState, to: ?Game.StateId) void {
@@ -38,12 +51,12 @@ pub fn leave(self: *PlayState, to: ?Game.StateId) void {
 }
 
 pub fn update(self: *PlayState) void {
-    _ = self;
+    self.prev_camera = self.camera;
+    self.camera.view.x += 1;
+    self.camera.view.y += 1;
 }
 
 pub fn render(self: *PlayState, alpha: f64) void {
-    _ = alpha;
-
     gl.clearColor(0x64.0 / 255.0, 0x95.0 / 255.0, 0xED.0 / 255.0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -52,11 +65,25 @@ pub fn render(self: *PlayState, alpha: f64) void {
     terrain_h.bind(gl.TEXTURE_2D);
     self.game.imm.begin();
 
-    var y: usize = 0;
+    var cam_interp = Camera.lerp(self.prev_camera, self.camera, alpha);
+    cam_interp.clampToBounds();
+
+    const min_tile_x = @intCast(usize, cam_interp.view.left()) / 16;
+    const min_tile_y = @intCast(usize, cam_interp.view.top()) / 16;
+    const max_tile_x = std.math.min(
+        self.map.width,
+        1 + @intCast(usize, cam_interp.view.right()) / 16,
+    );
+    const max_tile_y = std.math.min(
+        self.map.height,
+        1 + @intCast(usize, cam_interp.view.bottom()) / 16,
+    );
+
+    var y: usize = min_tile_y;
     var x: usize = 0;
-    while (y < self.map.height) : (y += 1) {
-        x = 0;
-        while (x < self.map.width) : (x += 1) {
+    while (y < max_tile_y) : (y += 1) {
+        x = min_tile_x;
+        while (x < max_tile_x) : (x += 1) {
             const t = self.map.at2DPtr(x, y);
             if (t.bank == .terrain) {
                 const nx = @intCast(u16, terrain_s.width / 16);
@@ -70,8 +97,8 @@ pub fn render(self: *PlayState, alpha: f64) void {
                 };
 
                 const dest = Rect{
-                    .x = @intCast(i32, x) * 16,
-                    .y = @intCast(i32, y) * 16,
+                    .x = @intCast(i32, x) * 16 - cam_interp.view.left(),
+                    .y = @intCast(i32, y) * 16 - cam_interp.view.top(),
                     .w = 16,
                     .h = 16,
                 };
