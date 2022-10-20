@@ -14,17 +14,20 @@ const Vertex = extern struct {
     rgba: zm.F32x4,
 };
 
+const Uniforms = struct {
+    uTransform: gl.GLint,
+};
+
 prog: shader.Program,
 vao: gl.GLuint,
 buffer: gl.GLuint,
 transform: zm.Mat,
-
-uTransform: gl.GLint,
+uniforms: Uniforms,
 
 pub fn create() ImmRenderer {
     var self: ImmRenderer = undefined;
     self.prog = shader.createProgramFromSource(vssrc, fssrc);
-    self.uTransform = gl.getUniformLocation(self.prog.handle, "uTransform");
+    self.uniforms = shader.getUniformLocations(Uniforms, self.prog);
     gl.genVertexArrays(1, &self.vao);
     gl.genBuffers(1, &self.buffer);
     gl.bindVertexArray(self.vao);
@@ -50,7 +53,7 @@ pub fn setOutputDimensions(self: *ImmRenderer, w: u32, h: u32) void {
 pub fn begin(self: ImmRenderer) void {
     gl.useProgram(self.prog.handle);
     gl.bindVertexArray(self.vao);
-    gl.uniformMatrix4fv(self.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
+    gl.uniformMatrix4fv(self.uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
 }
 
 pub fn drawQuad(self: ImmRenderer, x: i32, y: i32, w: u32, h: u32, r: f32, g: f32, b: f32) void {

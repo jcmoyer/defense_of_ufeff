@@ -191,6 +191,7 @@ pub fn render(self: *Game, alpha: f64) void {
 
     self.endRenderToScene();
 
+    gl.activeTexture(gl.TEXTURE0);
     self.scene_color.bind(gl.TEXTURE_2D);
     self.imm.setOutputDimensions(1, 1);
     self.imm.begin();

@@ -107,3 +107,16 @@ pub fn createProgramFromSource(vssrc: []const u8, fssrc: []const u8) Program {
 
     return Program.create(vs, fs);
 }
+
+pub fn getUniformLocations(comptime T: type, p: Program) T {
+    var uniforms: T = undefined;
+    inline for (std.meta.fields(T)) |field| {
+        if (field.field_type != gl.GLint) {
+            @compileError("type of " ++ @typeName(T) ++ "." ++ @typeName(field.field_type) ++ " must be GLint");
+        }
+        // field.name has no sentinel
+        const field_name_z: [:0]const u8 = field.name ++ "";
+        @field(uniforms, field.name) = gl.getUniformLocation(p.handle, field_name_z.ptr);
+    }
+    return uniforms;
+}
