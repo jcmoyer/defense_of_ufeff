@@ -7,6 +7,11 @@ pub const TileBank = enum(u8) {
     special,
 };
 
+pub const TileLayer = enum {
+    base,
+    detail,
+};
+
 pub const Tile = struct {
     id: u16,
     bank: TileBank,
@@ -22,6 +27,15 @@ pub const Tilemap = struct {
     height: usize = 0,
     tiles: []Tile = &[_]Tile{},
 
+    pub fn init(allocator: Allocator, width: usize, height: usize) !Tilemap {
+        var tiles = try allocator.alloc(Tile, 2 * width * height);
+        return Tilemap{
+            .width = width,
+            .height = height,
+            .tiles = tiles,
+        };
+    }
+
     pub fn deinit(self: *Tilemap, allocator: Allocator) void {
         if (self.tiles.len != 0) {
             allocator.free(self.tiles);
@@ -32,12 +46,16 @@ pub const Tilemap = struct {
         return self.width * self.height;
     }
 
-    pub fn at2DPtr(self: Tilemap, x: usize, y: usize) *Tile {
-        return &self.tiles[y * self.width + x];
+    pub fn at2DPtr(self: Tilemap, layer: TileLayer, x: usize, y: usize) *Tile {
+        return &self.tiles[self.layerStart(layer) + y * self.width + x];
     }
 
-    pub fn atScalarPtr(self: Tilemap, i: usize) *Tile {
-        return &self.tiles[i];
+    pub fn atScalarPtr(self: Tilemap, layer: TileLayer, i: usize) *Tile {
+        return &self.tiles[self.layerStart(layer) + i];
+    }
+
+    fn layerStart(self: Tilemap, layer: TileLayer) usize {
+        return self.tileCount() * @enumToInt(layer);
     }
 };
 
@@ -74,11 +92,7 @@ pub fn loadTilemapFromJson(allocator: Allocator, filename: []const u8) !Tilemap 
     var tokens = std.json.TokenStream.init(buffer);
     var doc = try std.json.parse(TiledDoc, &tokens, .{ .allocator = arena_allocator, .ignore_unknown_fields = true });
 
-    var tm = Tilemap{
-        .width = doc.width,
-        .height = doc.height,
-        .tiles = try allocator.alloc(Tile, doc.width * doc.height),
-    };
+    var tm = try Tilemap.init(allocator, doc.width, doc.height);
     errdefer tm.deinit(allocator);
 
     var classifier = BankClassifier{};
@@ -113,15 +127,18 @@ pub fn loadTilemapFromJson(allocator: Allocator, filename: []const u8) !Tilemap 
             std.process.exit(1);
         }
 
+        const layer_id = std.meta.stringToEnum(TileLayer, t_layer.name) orelse {
+            std.log.err("Map layer has unknown name; got '{s}'", .{t_layer.name});
+            std.process.exit(1);
+        };
+
         for (layer_ints) |t_tid, i| {
             const result = classifier.classify(@intCast(u16, t_tid));
-            tm.atScalarPtr(i).* = .{
+            tm.atScalarPtr(layer_id, i).* = .{
                 .bank = result.bank,
                 .id = result.adjusted_tile_id,
             };
         }
-        // only load one layer for now
-        break;
     }
 
     return tm;

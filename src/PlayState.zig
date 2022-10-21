@@ -27,6 +27,7 @@ prev_camera: Camera = DEFAULT_CAMERA,
 r_batch: SpriteBatch,
 r_water: WaterRenderer,
 water_buf: []WaterDraw,
+n_water: usize = 0,
 
 pub fn create(game: *Game) !*PlayState {
     var self = try game.allocator.create(PlayState);
@@ -83,42 +84,44 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.renderTilemap(cam_interp);
 }
 
-fn renderTilemap(self: *PlayState, cam: Camera) void {
-    var n_water: usize = 0;
-    const min_tile_x = @intCast(usize, cam.view.left()) / 16;
-    const min_tile_y = @intCast(usize, cam.view.top()) / 16;
-    const max_tile_x = std.math.min(
-        self.map.width,
-        1 + @intCast(usize, cam.view.right()) / 16,
-    );
-    const max_tile_y = std.math.min(
-        self.map.height,
-        1 + @intCast(usize, cam.view.bottom()) / 16,
-    );
-
-    var y: usize = min_tile_y;
-    var x: usize = 0;
-
+fn renderTilemapLayer(
+    self: *PlayState,
+    layer: tilemap.TileLayer,
+    bank: tilemap.TileBank,
+    min_tile_x: usize,
+    max_tile_x: usize,
+    min_tile_y: usize,
+    max_tile_y: usize,
+    translate_x: i32,
+    translate_y: i32,
+) void {
+    const source_texture = switch (bank) {
+        .none => return,
+        .terrain => self.game.texman.getNamedTexture("terrain.png"),
+        .special => self.game.texman.getNamedTexture("special.png"),
+    };
+    const source_texture_state = self.game.texman.getTextureState(source_texture);
+    const n_tiles_wide = @intCast(u16, source_texture_state.width / 16);
     self.r_batch.begin(SpriteBatch.SpriteBatchParams{
         .texture_manager = &self.game.texman,
-        .texture = self.game.texman.getNamedTexture("terrain.png"),
+        .texture = source_texture,
     });
-    self.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
-
+    var y: usize = min_tile_y;
+    var x: usize = 0;
     var ty: u8 = 0;
     while (y < max_tile_y) : (y += 1) {
         x = min_tile_x;
         var tx: u8 = 0;
         while (x < max_tile_x) : (x += 1) {
-            const t = self.map.at2DPtr(x, y);
+            const t = self.map.at2DPtr(layer, x, y);
             if (t.isWater()) {
                 const dest = Rect{
-                    .x = @intCast(i32, x * 16) - cam.view.left(),
-                    .y = @intCast(i32, y * 16) - cam.view.top(),
+                    .x = @intCast(i32, x * 16) + translate_x,
+                    .y = @intCast(i32, y * 16) + translate_y,
                     .w = 16,
                     .h = 16,
                 };
-                self.water_buf[n_water] = WaterDraw{
+                self.water_buf[self.n_water] = WaterDraw{
                     .dest = dest,
                     .world_xy = zm.f32x4(
                         @intToFloat(f32, x * 16),
@@ -127,17 +130,17 @@ fn renderTilemap(self: *PlayState, cam: Camera) void {
                         0,
                     ),
                 };
-                n_water += 1;
-            } else if (t.bank == .terrain) {
+                self.n_water += 1;
+            } else if (t.bank == bank) {
                 const src = Rect{
-                    .x = (t.id % 32) * 16,
-                    .y = (t.id / 32) * 16,
+                    .x = (t.id % n_tiles_wide) * 16,
+                    .y = (t.id / n_tiles_wide) * 16,
                     .w = 16,
                     .h = 16,
                 };
                 const dest = Rect{
-                    .x = @intCast(i32, x * 16) - cam.view.left(),
-                    .y = @intCast(i32, y * 16) - cam.view.top(),
+                    .x = @intCast(i32, x * 16) + translate_x,
+                    .y = @intCast(i32, y * 16) + translate_y,
                     .w = 16,
                     .h = 16,
                 };
@@ -150,8 +153,26 @@ fn renderTilemap(self: *PlayState, cam: Camera) void {
         }
         ty += 1;
     }
-
     self.r_batch.end();
+}
+
+fn renderTilemap(self: *PlayState, cam: Camera) void {
+    self.n_water = 0;
+
+    const min_tile_x = @intCast(usize, cam.view.left()) / 16;
+    const min_tile_y = @intCast(usize, cam.view.top()) / 16;
+    const max_tile_x = std.math.min(
+        self.map.width,
+        1 + @intCast(usize, cam.view.right()) / 16,
+    );
+    const max_tile_y = std.math.min(
+        self.map.height,
+        1 + @intCast(usize, cam.view.bottom()) / 16,
+    );
+
+    self.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
+    self.renderTilemapLayer(.base, .terrain, min_tile_x, max_tile_x, min_tile_y, max_tile_y, -cam.view.left(), -cam.view.top());
+    self.renderTilemapLayer(.base, .special, min_tile_x, max_tile_x, min_tile_y, max_tile_y, -cam.view.left(), -cam.view.top());
 
     // water_direction, water_drift, speed set on a per-map basis?
     var water_params = WaterRenderer.WaterRendererParams{
@@ -168,8 +189,12 @@ fn renderTilemap(self: *PlayState, cam: Camera) void {
 
     self.r_water.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
     self.r_water.begin(water_params);
-    for (self.water_buf[0..n_water]) |cmd| {
+    for (self.water_buf[0..self.n_water]) |cmd| {
         self.r_water.drawQuad(cmd.dest, cmd.world_xy);
     }
     self.r_water.end();
+
+    // detail layer rendered on top of water
+    self.renderTilemapLayer(.detail, .terrain, min_tile_x, max_tile_x, min_tile_y, max_tile_y, -cam.view.left(), -cam.view.top());
+    self.renderTilemapLayer(.detail, .special, min_tile_x, max_tile_x, min_tile_y, max_tile_y, -cam.view.left(), -cam.view.top());
 }
