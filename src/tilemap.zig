@@ -11,6 +11,10 @@ pub const Tile = struct {
     id: u16,
     bank: TileBank,
     reserved: u8 = 0,
+
+    pub fn isWater(self: Tile) bool {
+        return self.bank == .terrain and self.id == 26;
+    }
 };
 
 pub const Tilemap = struct {

@@ -37,6 +37,8 @@ scene_color: TextureHandle,
 current_state: ?StateId = null,
 st_play: *PlayState,
 
+frame_counter: u64 = 0,
+
 pub const StateId = enum {
     play,
 };
@@ -181,6 +183,7 @@ pub fn handleEvent(self: *Game, ev: sdl.SDL_Event) void {
 }
 
 pub fn update(self: *Game) void {
+    self.frame_counter += 1;
     self.stateDispatchUpdate(self.current_state.?);
 }
 
