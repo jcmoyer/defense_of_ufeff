@@ -15,12 +15,15 @@ uniform vec2      uWaterDriftScale; // default to 32, 16
 out vec4 FragColor;
 
 void main() {
-    vec2 invTexCoord = vec2(fTex.x, fTex.y);
+    vec2 baseTexCoord = fTex;
+    baseTexCoord.x += cos(uGlobalTime + fPos.y / uWaterDriftScale.x) * 1.5 * uWaterDriftRange.x * uWaterSpeed;
+    baseTexCoord.y += sin(uGlobalTime + fPos.x / uWaterDriftScale.y) * 1.5 * uWaterDriftRange.y * uWaterSpeed;
 
-    invTexCoord.x += cos(uGlobalTime + fPos.y / uWaterDriftScale.x) * uWaterDriftRange.x + uWaterDirection.x * uGlobalTime * uWaterSpeed;
-    invTexCoord.y += sin(uGlobalTime + fPos.x / uWaterDriftScale.y) * uWaterDriftRange.y + uWaterDirection.y * uGlobalTime * uWaterSpeed;
+    vec2 blendTexCoord = fTex;
+    blendTexCoord.x += cos(1.5 * uGlobalTime + fPos.y / uWaterDriftScale.x) * uWaterDriftRange.x * uWaterSpeed;
+    blendTexCoord.y += sin(1.5 * uGlobalTime + fPos.x / uWaterDriftScale.y) * uWaterDriftRange.y * uWaterSpeed;
 
-    vec4 base_color  = texture(uSamplerBase, invTexCoord);
-    vec4 blend_color = texture(uSamplerBlend, invTexCoord);
+    vec4 base_color  = texture(uSamplerBase, baseTexCoord);
+    vec4 blend_color = texture(uSamplerBlend, blendTexCoord);
     FragColor = mix(base_color, blend_color, uBlendAmount);
 }

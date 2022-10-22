@@ -179,10 +179,10 @@ fn renderTilemap(self: *PlayState, cam: Camera) void {
         .texture_manager = &self.game.texman,
         .water_base = self.game.texman.getNamedTexture("water.png"),
         .water_blend = self.game.texman.getNamedTexture("water.png"),
-        .blend_amount = 0.5,
+        .blend_amount = 0.3,
         .global_time = @intToFloat(f32, self.game.frame_counter) / 30.0,
         .water_direction = zm.f32x4(0.3, 0.2, 0, 0),
-        .water_drift_range = zm.f32x4(0.3, 0.2, 0, 0),
+        .water_drift_range = zm.f32x4(0.2, 0.05, 0, 0),
         .water_drift_scale = zm.f32x4(32, 16, 0, 0),
         .water_speed = 1,
     };
