@@ -55,3 +55,10 @@ pub fn centerOn(self: *Rect, x: c_int, y: c_int) void {
     self.x = x - self.w / 2;
     self.y = y - self.h / 2;
 }
+
+pub fn inflate(self: *Rect, dx: c_int, dy: c_int) void {
+    self.x -= dx;
+    self.y -= dy;
+    self.w += 2 * dx;
+    self.h += 2 * dy;
+}

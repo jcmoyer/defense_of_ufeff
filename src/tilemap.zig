@@ -57,6 +57,10 @@ pub const Tilemap = struct {
     fn layerStart(self: Tilemap, layer: TileLayer) usize {
         return self.tileCount() * @enumToInt(layer);
     }
+
+    pub fn isValidIndex(self: Tilemap, x: usize, y: usize) bool {
+        return x < self.width and y < self.height;
+    }
 };
 
 pub fn loadTilemapFromJson(allocator: Allocator, filename: []const u8) !Tilemap {
