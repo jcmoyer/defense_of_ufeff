@@ -68,7 +68,11 @@ pub fn loadTilemapFromJson(allocator: Allocator, filename: []const u8) !Tilemap 
         firstgid: u16,
         source: []const u8,
     };
-    const TiledLayer = struct {
+    const TiledLayerType = enum {
+        tilelayer,
+        objectgroup,
+    };
+    const TiledTileLayer = struct {
         name: []const u8,
         // Fields for base64 + zlib compressed layers. std.json.parse will fail
         // for uncompressed documents because tile IDs will overflow u8.
@@ -76,6 +80,13 @@ pub fn loadTilemapFromJson(allocator: Allocator, filename: []const u8) !Tilemap 
         data: []const u8,
         compression: ?[]const u8 = null,
         encoding: ?[]const u8 = null,
+    };
+    const TiledObjectGroup = struct {
+        name: []const u8,
+    };
+    const TiledLayer = union(TiledLayerType) {
+        tilelayer: TiledTileLayer,
+        objectgroup: TiledObjectGroup,
     };
     const TiledDoc = struct {
         width: usize,
@@ -113,35 +124,38 @@ pub fn loadTilemapFromJson(allocator: Allocator, filename: []const u8) !Tilemap 
         }
     }
 
-    for (doc.layers) |t_layer| {
-        if (t_layer.encoding == null or !std.mem.eql(u8, t_layer.encoding.?, "base64")) {
-            std.log.err("Map layer is not encoded using base64", .{});
-            std.process.exit(1);
-        }
-        if (t_layer.compression == null or !std.mem.eql(u8, t_layer.compression.?, "zlib")) {
-            std.log.err("Map layer is not compressed using zlib", .{});
-            std.process.exit(1);
-        }
+    for (doc.layers) |layer| {
+        if (layer == .tilelayer) {
+            const t_layer = layer.tilelayer;
+            if (t_layer.encoding == null or !std.mem.eql(u8, t_layer.encoding.?, "base64")) {
+                std.log.err("Map layer is not encoded using base64", .{});
+                std.process.exit(1);
+            }
+            if (t_layer.compression == null or !std.mem.eql(u8, t_layer.compression.?, "zlib")) {
+                std.log.err("Map layer is not compressed using zlib", .{});
+                std.process.exit(1);
+            }
 
-        const layer_ints = try b64decompressLayer(arena_allocator, t_layer.data);
-        defer arena_allocator.free(layer_ints);
+            const layer_ints = try b64decompressLayer(arena_allocator, t_layer.data);
+            defer arena_allocator.free(layer_ints);
 
-        if (layer_ints.len != tm.tileCount()) {
-            std.log.err("Map layer has wrong tile count; got {d} expected {d}", .{ layer_ints, tm.tileCount() });
-            std.process.exit(1);
-        }
+            if (layer_ints.len != tm.tileCount()) {
+                std.log.err("Map layer has wrong tile count; got {d} expected {d}", .{ layer_ints, tm.tileCount() });
+                std.process.exit(1);
+            }
 
-        const layer_id = std.meta.stringToEnum(TileLayer, t_layer.name) orelse {
-            std.log.err("Map layer has unknown name; got '{s}'", .{t_layer.name});
-            std.process.exit(1);
-        };
-
-        for (layer_ints) |t_tid, i| {
-            const result = classifier.classify(@intCast(u16, t_tid));
-            tm.atScalarPtr(layer_id, i).* = .{
-                .bank = result.bank,
-                .id = result.adjusted_tile_id,
+            const layer_id = std.meta.stringToEnum(TileLayer, t_layer.name) orelse {
+                std.log.err("Map layer has unknown name; got '{s}'", .{t_layer.name});
+                std.process.exit(1);
             };
+
+            for (layer_ints) |t_tid, i| {
+                const result = classifier.classify(@intCast(u16, t_tid));
+                tm.atScalarPtr(layer_id, i).* = .{
+                    .bank = result.bank,
+                    .id = result.adjusted_tile_id,
+                };
+            }
         }
     }
 
