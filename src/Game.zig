@@ -180,6 +180,8 @@ pub fn handleEvent(self: *Game, ev: sdl.SDL_Event) void {
     if (ev.type == .SDL_QUIT) {
         self.running = false;
     }
+
+    self.stateDispatchEvent(self.current_state.?, ev);
 }
 
 pub fn update(self: *Game) void {
@@ -265,6 +267,12 @@ fn endRenderToScene(self: *Game) void {
     sdl.SDL_GetWindowSize(self.window, &window_width, &window_height);
     self.imm.setOutputDimensions(@intCast(u32, window_width), @intCast(u32, window_height));
     gl.viewport(0, 0, window_width, window_height);
+}
+
+fn stateDispatchEvent(self: *Game, id: StateId, ev: sdl.SDL_Event) void {
+    switch (id) {
+        .play => self.st_play.handleEvent(ev),
+    }
 }
 
 fn stateDispatchUpdate(self: *Game, id: StateId) void {

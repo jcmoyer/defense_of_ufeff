@@ -56,12 +56,39 @@ pub fn begin(self: ImmRenderer) void {
     gl.uniformMatrix4fv(self.uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
 }
 
+pub fn beginUntextured(self: ImmRenderer) void {
+    gl.useProgram(self.prog.handle);
+    gl.bindVertexArray(self.vao);
+    gl.uniformMatrix4fv(self.uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, 0);
+}
+
 pub fn drawQuad(self: ImmRenderer, x: i32, y: i32, w: u32, h: u32, r: f32, g: f32, b: f32) void {
     const left = @intToFloat(f32, x);
     const right = @intToFloat(f32, x + @intCast(i32, w));
     const top = @intToFloat(f32, y);
     const bottom = @intToFloat(f32, y + @intCast(i32, h));
     const rgba = zm.f32x4(r, g, b, 1);
+
+    const vertices = [4]Vertex{
+        Vertex{ .xyuv = zm.f32x4(left, top, 0, 1), .rgba = rgba },
+        Vertex{ .xyuv = zm.f32x4(left, bottom, 0, 0), .rgba = rgba },
+        Vertex{ .xyuv = zm.f32x4(right, bottom, 1, 0), .rgba = rgba },
+        Vertex{ .xyuv = zm.f32x4(right, top, 1, 1), .rgba = rgba },
+    };
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, self.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, 4 * @sizeOf(Vertex), &vertices, gl.STREAM_DRAW);
+    gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+}
+
+pub fn drawQuadRGBA(self: ImmRenderer, dest: Rect, rgba: zm.Vec) void {
+    const left = @intToFloat(f32, dest.left());
+    const right = @intToFloat(f32, dest.right());
+    const top = @intToFloat(f32, dest.top());
+    const bottom = @intToFloat(f32, dest.bottom());
 
     const vertices = [4]Vertex{
         Vertex{ .xyuv = zm.f32x4(left, top, 0, 1), .rgba = rgba },

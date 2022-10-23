@@ -11,6 +11,8 @@ const WaterRenderer = @import("WaterRenderer.zig");
 const zm = @import("zmath");
 const anim = @import("animation.zig");
 const wo = @import("world.zig");
+// eventually should probably eliminate this dependency
+const sdl = @import("sdl.zig");
 
 const DEFAULT_CAMERA = Camera{
     .view = Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT),
@@ -73,6 +75,8 @@ foam_anim_r: anim.Animator,
 foam_anim_u: anim.Animator,
 foam_anim_d: anim.Animator,
 world: wo.World,
+
+deb_render_tile_collision: bool = false,
 
 pub fn create(game: *Game) !*PlayState {
     var self = try game.allocator.create(PlayState);
@@ -142,6 +146,16 @@ pub fn render(self: *PlayState, alpha: f64) void {
 
     self.renderTilemap(cam_interp);
     self.renderMonsters(cam_interp);
+
+    if (self.deb_render_tile_collision) {
+        self.debugRenderTileCollision(cam_interp);
+    }
+}
+
+pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
+    if (ev.type == .SDL_KEYDOWN and ev.key.keysym.sym == sdl.SDLK_F1) {
+        self.deb_render_tile_collision = !self.deb_render_tile_collision;
+    }
 }
 
 fn renderMonsters(
@@ -290,6 +304,40 @@ fn renderTilemap(self: *PlayState, cam: Camera) void {
     // detail layer rendered on top of water
     self.renderTilemapLayer(.detail, .terrain, min_tile_x, max_tile_x, min_tile_y, max_tile_y, -cam.view.left(), -cam.view.top());
     self.renderTilemapLayer(.detail, .special, min_tile_x, max_tile_x, min_tile_y, max_tile_y, -cam.view.left(), -cam.view.top());
+}
+
+fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
+    const min_tile_x = @intCast(usize, cam.view.left()) / 16;
+    const min_tile_y = @intCast(usize, cam.view.top()) / 16;
+    const max_tile_x = std.math.min(
+        self.world.getWidth(),
+        1 + @intCast(usize, cam.view.right()) / 16,
+    );
+    const max_tile_y = std.math.min(
+        self.world.getHeight(),
+        1 + @intCast(usize, cam.view.bottom()) / 16,
+    );
+    const map = self.world.map;
+
+    self.game.imm.beginUntextured();
+    var y: usize = min_tile_y;
+    var x: usize = 0;
+    while (y < max_tile_y) : (y += 1) {
+        x = min_tile_x;
+        while (x < max_tile_x) : (x += 1) {
+            const t = map.getCollisionFlags2D(x, y);
+            if (t.all()) {
+                const dest = Rect{
+                    .x = @intCast(i32, x * 16) - cam.view.left(),
+                    .y = @intCast(i32, y * 16) - cam.view.top(),
+                    .w = 16,
+                    .h = 16,
+                };
+
+                self.game.imm.drawQuadRGBA(dest, [_]f32{ 1, 0, 0, 0.6 });
+            }
+        }
+    }
 }
 
 fn loadWorld(self: *PlayState, mapid: []const u8) void {
