@@ -10,6 +10,7 @@ const SpriteBatch = @import("SpriteBatch.zig");
 const WaterRenderer = @import("WaterRenderer.zig");
 const zm = @import("zmath");
 const anim = @import("animation.zig");
+const wo = @import("world.zig");
 
 const DEFAULT_CAMERA = Camera{
     .view = Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT),
@@ -59,7 +60,6 @@ const FoamDraw = struct {
 };
 
 game: *Game,
-map: tilemap.Tilemap = .{},
 camera: Camera = DEFAULT_CAMERA,
 prev_camera: Camera = DEFAULT_CAMERA,
 r_batch: SpriteBatch,
@@ -72,6 +72,7 @@ foam_anim_l: anim.Animator,
 foam_anim_r: anim.Animator,
 foam_anim_u: anim.Animator,
 foam_anim_d: anim.Animator,
+world: wo.World,
 
 pub fn create(game: *Game) !*PlayState {
     var self = try game.allocator.create(PlayState);
@@ -86,6 +87,7 @@ pub fn create(game: *Game) !*PlayState {
         .foam_anim_r = undefined,
         .foam_anim_u = undefined,
         .foam_anim_d = undefined,
+        .world = wo.World.init(self.game.allocator),
     };
     var foam_aset = try self.aman.createAnimationSet();
     try foam_aset.anims.put(self.aman.allocator, "l", FoamDraw.a_left);
@@ -108,13 +110,13 @@ pub fn destroy(self: *PlayState) void {
     self.game.allocator.free(self.water_buf);
     self.game.allocator.free(self.foam_buf);
     self.r_batch.destroy();
-    self.map.deinit(self.game.allocator);
+    self.world.deinit();
     self.game.allocator.destroy(self);
 }
 
 pub fn enter(self: *PlayState, from: ?Game.StateId) void {
     _ = from;
-    self.loadTilemapFromJson();
+    self.loadWorld("map01");
 }
 
 pub fn leave(self: *PlayState, to: ?Game.StateId) void {
@@ -128,6 +130,7 @@ pub fn update(self: *PlayState) void {
     self.foam_anim_r.update();
     self.foam_anim_u.update();
     self.foam_anim_d.update();
+    self.world.update();
 }
 
 pub fn render(self: *PlayState, alpha: f64) void {
@@ -138,6 +141,25 @@ pub fn render(self: *PlayState, alpha: f64) void {
     cam_interp.clampToBounds();
 
     self.renderTilemap(cam_interp);
+    self.renderMonsters(cam_interp);
+}
+
+fn renderMonsters(
+    self: *PlayState,
+    cam: Camera,
+) void {
+    const t_chara = self.game.texman.getNamedTexture("characters.png");
+    self.r_batch.begin(.{
+        .texture_manager = &self.game.texman,
+        .texture = t_chara,
+    });
+    for (self.world.monsters.items) |m| {
+        self.r_batch.drawQuad(
+            Rect.init(0, 0, 16, 16),
+            Rect.init(@intCast(i32, m.world_x) - cam.view.left(), @intCast(i32, m.world_y) - cam.view.top(), 16, 16),
+        );
+    }
+    self.r_batch.end();
 }
 
 fn renderTilemapLayer(
@@ -151,6 +173,8 @@ fn renderTilemapLayer(
     translate_x: i32,
     translate_y: i32,
 ) void {
+    const map = self.world.map;
+
     const source_texture = switch (bank) {
         .none => return,
         .terrain => self.game.texman.getNamedTexture("terrain.png"),
@@ -169,7 +193,7 @@ fn renderTilemapLayer(
         x = min_tile_x;
         var tx: u8 = 0;
         while (x < max_tile_x) : (x += 1) {
-            const t = self.map.at2DPtr(layer, x, y);
+            const t = map.at2DPtr(layer, x, y);
             if (t.isWater()) {
                 const dest = Rect{
                     .x = @intCast(i32, x * 16) + translate_x,
@@ -189,10 +213,10 @@ fn renderTilemapLayer(
 
                 self.foam_buf[self.n_water] = FoamDraw{
                     .dest = dest,
-                    .left = x > 0 and self.map.isValidIndex(x - 1, y) and !self.map.at2DPtr(layer, x - 1, y).isWater(),
-                    .right = self.map.isValidIndex(x + 1, y) and !self.map.at2DPtr(layer, x + 1, y).isWater(),
-                    .top = y > 0 and self.map.isValidIndex(x, y - 1) and !self.map.at2DPtr(layer, x, y - 1).isWater(),
-                    .bottom = self.map.isValidIndex(x, y + 1) and !self.map.at2DPtr(layer, x, y + 1).isWater(),
+                    .left = x > 0 and map.isValidIndex(x - 1, y) and !map.at2DPtr(layer, x - 1, y).isWater(),
+                    .right = map.isValidIndex(x + 1, y) and !map.at2DPtr(layer, x + 1, y).isWater(),
+                    .top = y > 0 and map.isValidIndex(x, y - 1) and !map.at2DPtr(layer, x, y - 1).isWater(),
+                    .bottom = map.isValidIndex(x, y + 1) and !map.at2DPtr(layer, x, y + 1).isWater(),
                 };
                 // self.foam_buf[self.n_water].dest.inflate(1, 1);
 
@@ -228,11 +252,11 @@ fn renderTilemap(self: *PlayState, cam: Camera) void {
     const min_tile_x = @intCast(usize, cam.view.left()) / 16;
     const min_tile_y = @intCast(usize, cam.view.top()) / 16;
     const max_tile_x = std.math.min(
-        self.map.width,
+        self.world.getWidth(),
         1 + @intCast(usize, cam.view.right()) / 16,
     );
     const max_tile_y = std.math.min(
-        self.map.height,
+        self.world.getHeight(),
         1 + @intCast(usize, cam.view.bottom()) / 16,
     );
 
@@ -268,19 +292,26 @@ fn renderTilemap(self: *PlayState, cam: Camera) void {
     self.renderTilemapLayer(.detail, .special, min_tile_x, max_tile_x, min_tile_y, max_tile_y, -cam.view.left(), -cam.view.top());
 }
 
-fn loadTilemapFromJson(self: *PlayState) void {
-    self.map = tilemap.loadTilemapFromJson(self.game.allocator, "assets/maps/map01.tmj") catch |err| {
+fn loadWorld(self: *PlayState, mapid: []const u8) void {
+    const filename = std.fmt.allocPrint(self.game.allocator, "assets/maps/{s}.tmj", .{mapid}) catch |err| {
+        std.log.err("Failed to allocate world path: {!}", .{err});
+        std.process.exit(1);
+    };
+    defer self.game.allocator.free(filename);
+
+    self.world = wo.loadWorldFromJson(self.game.allocator, filename) catch |err| {
         std.log.err("failed to load tilemap {!}", .{err});
         std.process.exit(1);
     };
+    self.world.animan = &self.aman;
 
     // Init camera for this map
 
     self.camera.bounds = Rect.init(
         0,
         0,
-        @intCast(i32, self.map.width * 16),
-        @intCast(i32, self.map.height * 16),
+        @intCast(i32, self.world.getWidth() * 16),
+        @intCast(i32, self.world.getHeight() * 16),
     );
     self.prev_camera = self.camera;
 }
