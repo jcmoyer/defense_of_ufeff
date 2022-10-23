@@ -3,10 +3,10 @@ const Allocator = std.mem.Allocator;
 
 /// Flags used to determine collision when entering a tile.
 pub const CollisionFlags = packed struct {
-    from_right: bool,
-    from_left: bool,
-    from_top: bool,
-    from_bottom: bool,
+    from_right: bool = false,
+    from_left: bool = false,
+    from_top: bool = false,
+    from_bottom: bool = false,
 
     pub fn initAll() CollisionFlags {
         return .{
@@ -75,14 +75,40 @@ pub const Tile = struct {
 
     fn getTerrainCollisionFlags(self: Tile) CollisionFlags {
         return switch (self.id) {
-            24...25 => CollisionFlags.initNone(),
+            // Grass (no cliff)
+            0...11,
+            32...43,
+            64...75,
+            96...107,
+            // Sand (no cliff)
+            12...23,
+            44...55,
+            76...87,
+            108...119,
+            // Plain tiles
+            24...25,
+            => CollisionFlags.initNone(),
+            136 => .{
+                .from_left = true,
+                .from_top = true,
+            },
+            138 => .{
+                .from_top = true,
+            },
+            168 => .{
+                .from_left = true,
+            },
             else => CollisionFlags.initAll(),
         };
     }
 
     fn getSpecialCollisionFlags(self: Tile) CollisionFlags {
         return switch (self.id) {
-            70...72, 74...76, 78...79 => CollisionFlags.initNone(),
+            70...72,
+            74...76,
+            78...79,
+            89,
+            => CollisionFlags.initNone(),
             else => CollisionFlags.initAll(),
         };
     }

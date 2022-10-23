@@ -326,15 +326,41 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
         x = min_tile_x;
         while (x < max_tile_x) : (x += 1) {
             const t = map.getCollisionFlags2D(x, y);
+            const dest = Rect{
+                .x = @intCast(i32, x * 16) - cam.view.left(),
+                .y = @intCast(i32, y * 16) - cam.view.top(),
+                .w = 16,
+                .h = 16,
+            };
             if (t.all()) {
-                const dest = Rect{
-                    .x = @intCast(i32, x * 16) - cam.view.left(),
-                    .y = @intCast(i32, y * 16) - cam.view.top(),
-                    .w = 16,
-                    .h = 16,
-                };
-
                 self.game.imm.drawQuadRGBA(dest, [_]f32{ 1, 0, 0, 0.6 });
+                continue;
+            }
+
+            if (t.from_left) {
+                var left_rect = dest;
+                left_rect.w = 4;
+                self.game.imm.drawQuadRGBA(left_rect, [_]f32{ 1, 0, 0, 0.6 });
+            }
+
+            if (t.from_top) {
+                var top_rect = dest;
+                top_rect.h = 4;
+                self.game.imm.drawQuadRGBA(top_rect, [_]f32{ 1, 0, 0, 0.6 });
+            }
+
+            if (t.from_bottom) {
+                var bot_rect = dest;
+                bot_rect.translate(0, bot_rect.h - 4);
+                bot_rect.h = 4;
+                self.game.imm.drawQuadRGBA(bot_rect, [_]f32{ 1, 0, 0, 0.6 });
+            }
+
+            if (t.from_right) {
+                var right_rect = dest;
+                right_rect.translate(right_rect.w - 4, 0);
+                right_rect.w = 4;
+                self.game.imm.drawQuadRGBA(right_rect, [_]f32{ 1, 0, 0, 0.6 });
             }
         }
     }
