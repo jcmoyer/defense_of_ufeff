@@ -64,37 +64,6 @@ pub const Tilemap = struct {
 };
 
 pub fn loadTilemapFromJson(allocator: Allocator, filename: []const u8) !Tilemap {
-    const TiledTileset = struct {
-        firstgid: u16,
-        source: []const u8,
-    };
-    const TiledLayerType = enum {
-        tilelayer,
-        objectgroup,
-    };
-    const TiledTileLayer = struct {
-        name: []const u8,
-        // Fields for base64 + zlib compressed layers. std.json.parse will fail
-        // for uncompressed documents because tile IDs will overflow u8.
-        // Need to do manual parsing to support both formats I guess?
-        data: []const u8,
-        compression: ?[]const u8 = null,
-        encoding: ?[]const u8 = null,
-    };
-    const TiledObjectGroup = struct {
-        name: []const u8,
-    };
-    const TiledLayer = union(TiledLayerType) {
-        tilelayer: TiledTileLayer,
-        objectgroup: TiledObjectGroup,
-    };
-    const TiledDoc = struct {
-        width: usize,
-        height: usize,
-        tilesets: []TiledTileset,
-        layers: []TiledLayer,
-    };
-
     var arena = std.heap.ArenaAllocator.init(allocator);
     var arena_allocator = arena.allocator();
     defer arena.deinit();
@@ -125,41 +94,56 @@ pub fn loadTilemapFromJson(allocator: Allocator, filename: []const u8) !Tilemap 
     }
 
     for (doc.layers) |layer| {
-        if (layer == .tilelayer) {
-            const t_layer = layer.tilelayer;
-            if (t_layer.encoding == null or !std.mem.eql(u8, t_layer.encoding.?, "base64")) {
-                std.log.err("Map layer is not encoded using base64", .{});
-                std.process.exit(1);
-            }
-            if (t_layer.compression == null or !std.mem.eql(u8, t_layer.compression.?, "zlib")) {
-                std.log.err("Map layer is not compressed using zlib", .{});
-                std.process.exit(1);
-            }
-
-            const layer_ints = try b64decompressLayer(arena_allocator, t_layer.data);
-            defer arena_allocator.free(layer_ints);
-
-            if (layer_ints.len != tm.tileCount()) {
-                std.log.err("Map layer has wrong tile count; got {d} expected {d}", .{ layer_ints, tm.tileCount() });
-                std.process.exit(1);
-            }
-
-            const layer_id = std.meta.stringToEnum(TileLayer, t_layer.name) orelse {
-                std.log.err("Map layer has unknown name; got '{s}'", .{t_layer.name});
-                std.process.exit(1);
-            };
-
-            for (layer_ints) |t_tid, i| {
-                const result = classifier.classify(@intCast(u16, t_tid));
-                tm.atScalarPtr(layer_id, i).* = .{
-                    .bank = result.bank,
-                    .id = result.adjusted_tile_id,
-                };
-            }
+        switch (layer) {
+            .tilelayer => |x| try loadTileLayer(x, LoadContext{
+                .arena = arena_allocator,
+                .tilemap = &tm,
+                .classifier = &classifier,
+            }),
+            else => {},
         }
     }
 
     return tm;
+}
+
+const LoadContext = struct {
+    arena: Allocator,
+    /// Loading data into this tilemap
+    tilemap: *Tilemap,
+    classifier: *const BankClassifier,
+};
+
+fn loadTileLayer(layer: TiledTileLayer, ctx: LoadContext) !void {
+    if (layer.encoding == null or !std.mem.eql(u8, layer.encoding.?, "base64")) {
+        std.log.err("Map layer is not encoded using base64", .{});
+        std.process.exit(1);
+    }
+    if (layer.compression == null or !std.mem.eql(u8, layer.compression.?, "zlib")) {
+        std.log.err("Map layer is not compressed using zlib", .{});
+        std.process.exit(1);
+    }
+
+    const layer_ints = try b64decompressLayer(ctx.arena, layer.data);
+    defer ctx.arena.free(layer_ints);
+
+    if (layer_ints.len != ctx.tilemap.tileCount()) {
+        std.log.err("Map layer has wrong tile count; got {d} expected {d}", .{ layer_ints, ctx.tilemap.tileCount() });
+        std.process.exit(1);
+    }
+
+    const layer_id = std.meta.stringToEnum(TileLayer, layer.name) orelse {
+        std.log.err("Map layer has unknown name; got '{s}'", .{layer.name});
+        std.process.exit(1);
+    };
+
+    for (layer_ints) |t_tid, i| {
+        const result = ctx.classifier.classify(@intCast(u16, t_tid));
+        ctx.tilemap.atScalarPtr(layer_id, i).* = .{
+            .bank = result.bank,
+            .id = result.adjusted_tile_id,
+        };
+    }
 }
 
 fn b64decompressLayer(allocator: Allocator, data: []const u8) ![]u32 {
@@ -241,4 +225,40 @@ const BankClassifier = struct {
     fn deinit(self: *BankClassifier, allocator: Allocator) void {
         self.ranges.deinit(allocator);
     }
+};
+
+const TiledTileset = struct {
+    firstgid: u16,
+    source: []const u8,
+};
+
+const TiledLayerType = enum {
+    tilelayer,
+    objectgroup,
+};
+
+const TiledTileLayer = struct {
+    name: []const u8,
+    // Fields for base64 + zlib compressed layers. std.json.parse will fail
+    // for uncompressed documents because tile IDs will overflow u8.
+    // Need to do manual parsing to support both formats I guess?
+    data: []const u8,
+    compression: ?[]const u8 = null,
+    encoding: ?[]const u8 = null,
+};
+
+const TiledObjectGroup = struct {
+    name: []const u8,
+};
+
+const TiledLayer = union(TiledLayerType) {
+    tilelayer: TiledTileLayer,
+    objectgroup: TiledObjectGroup,
+};
+
+const TiledDoc = struct {
+    width: usize,
+    height: usize,
+    tilesets: []TiledTileset,
+    layers: []TiledLayer,
 };
