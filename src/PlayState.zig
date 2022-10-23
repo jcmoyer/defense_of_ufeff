@@ -9,6 +9,7 @@ const Camera = @import("Camera.zig");
 const SpriteBatch = @import("SpriteBatch.zig");
 const WaterRenderer = @import("WaterRenderer.zig");
 const zm = @import("zmath");
+const anim = @import("animation.zig");
 
 const DEFAULT_CAMERA = Camera{
     .view = Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT),
@@ -27,44 +28,34 @@ const FoamDraw = struct {
     top: bool,
     bottom: bool,
 
-    fn leftSrc(self: FoamDraw) Rect {
-        _ = self;
-        return Rect.init(0, 0, 2, 16);
+    fn makeFoamAnimation(comptime x0: i32, comptime y0: i32) anim.Animation {
+        return anim.Animation{
+            .next = "",
+            .frames = &[_]anim.Frame{
+                .{
+                    .rect = Rect.init(x0, y0, 16, 16),
+                    .time = 8,
+                },
+                .{
+                    .rect = Rect.init(x0, y0 + 16, 16, 16),
+                    .time = 8,
+                },
+                .{
+                    .rect = Rect.init(x0, y0 + 32, 16, 16),
+                    .time = 8,
+                },
+                .{
+                    .rect = Rect.init(x0, y0 + 16, 16, 16),
+                    .time = 8,
+                },
+            },
+        };
     }
-    fn rightSrc(self: FoamDraw) Rect {
-        _ = self;
-        return Rect.init(16 - 2, 0, 2, 16);
-    }
-    fn topSrc(self: FoamDraw) Rect {
-        _ = self;
-        return Rect.init(0, 0, 16, 2);
-    }
-    fn bottomSrc(self: FoamDraw) Rect {
-        _ = self;
-        return Rect.init(0, 16 - 2, 16, 2);
-    }
-    fn leftDest(self: FoamDraw) Rect {
-        var d = self.dest;
-        d.w = 2;
-        return d;
-    }
-    fn rightDest(self: FoamDraw) Rect {
-        var d = self.dest;
-        d.x = (d.x + d.w) - 2;
-        d.w = 2;
-        return d;
-    }
-    fn topDest(self: FoamDraw) Rect {
-        var d = self.dest;
-        d.h = 2;
-        return d;
-    }
-    fn bottomDest(self: FoamDraw) Rect {
-        var d = self.dest;
-        d.y = (d.y + d.h) - 2;
-        d.h = 2;
-        return d;
-    }
+
+    const a_left = makeFoamAnimation(0, 0);
+    const a_right = makeFoamAnimation(16, 0);
+    const a_top = makeFoamAnimation(32, 0);
+    const a_bottom = makeFoamAnimation(48, 0);
 };
 
 game: *Game,
@@ -76,6 +67,11 @@ r_water: WaterRenderer,
 water_buf: []WaterDraw,
 n_water: usize = 0,
 foam_buf: []FoamDraw,
+aman: anim.AnimationManager,
+foam_anim_l: anim.Animator,
+foam_anim_r: anim.Animator,
+foam_anim_u: anim.Animator,
+foam_anim_d: anim.Animator,
 
 pub fn create(game: *Game) !*PlayState {
     var self = try game.allocator.create(PlayState);
@@ -85,11 +81,30 @@ pub fn create(game: *Game) !*PlayState {
         .r_water = WaterRenderer.create(),
         .water_buf = try game.allocator.alloc(WaterDraw, max_onscreen_tiles),
         .foam_buf = try game.allocator.alloc(FoamDraw, max_onscreen_tiles),
+        .aman = anim.AnimationManager.init(game.allocator),
+        .foam_anim_l = undefined,
+        .foam_anim_r = undefined,
+        .foam_anim_u = undefined,
+        .foam_anim_d = undefined,
     };
+    var foam_aset = try self.aman.createAnimationSet();
+    try foam_aset.anims.put(self.aman.allocator, "l", FoamDraw.a_left);
+    try foam_aset.anims.put(self.aman.allocator, "r", FoamDraw.a_right);
+    try foam_aset.anims.put(self.aman.allocator, "u", FoamDraw.a_top);
+    try foam_aset.anims.put(self.aman.allocator, "d", FoamDraw.a_bottom);
+    self.foam_anim_l = foam_aset.createAnimator();
+    self.foam_anim_l.setAnimation("l");
+    self.foam_anim_r = foam_aset.createAnimator();
+    self.foam_anim_r.setAnimation("r");
+    self.foam_anim_u = foam_aset.createAnimator();
+    self.foam_anim_u.setAnimation("u");
+    self.foam_anim_d = foam_aset.createAnimator();
+    self.foam_anim_d.setAnimation("d");
     return self;
 }
 
 pub fn destroy(self: *PlayState) void {
+    self.aman.deinit();
     self.game.allocator.free(self.water_buf);
     self.game.allocator.free(self.foam_buf);
     self.r_batch.destroy();
@@ -109,8 +124,10 @@ pub fn leave(self: *PlayState, to: ?Game.StateId) void {
 
 pub fn update(self: *PlayState) void {
     self.prev_camera = self.camera;
-    // self.camera.view.x += 1;
-    // self.camera.view.y += 1;
+    self.foam_anim_l.update();
+    self.foam_anim_r.update();
+    self.foam_anim_u.update();
+    self.foam_anim_d.update();
 }
 
 pub fn render(self: *PlayState, alpha: f64) void {
@@ -177,7 +194,7 @@ fn renderTilemapLayer(
                     .top = y > 0 and self.map.isValidIndex(x, y - 1) and !self.map.at2DPtr(layer, x, y - 1).isWater(),
                     .bottom = self.map.isValidIndex(x, y + 1) and !self.map.at2DPtr(layer, x, y + 1).isWater(),
                 };
-                self.foam_buf[self.n_water].dest.inflate(1, 1);
+                // self.foam_buf[self.n_water].dest.inflate(1, 1);
 
                 self.n_water += 1;
             } else if (t.bank == bank) {
@@ -278,16 +295,16 @@ fn renderFoam(
     });
     for (self.foam_buf[0..self.n_water]) |f| {
         if (f.left) {
-            self.r_batch.drawQuad(f.leftSrc(), f.leftDest());
+            self.r_batch.drawQuad(self.foam_anim_l.getCurrentRect(), f.dest);
         }
         if (f.top) {
-            self.r_batch.drawQuad(f.topSrc(), f.topDest());
+            self.r_batch.drawQuad(self.foam_anim_u.getCurrentRect(), f.dest);
         }
         if (f.bottom) {
-            self.r_batch.drawQuad(f.bottomSrc(), f.bottomDest());
+            self.r_batch.drawQuad(self.foam_anim_d.getCurrentRect(), f.dest);
         }
         if (f.right) {
-            self.r_batch.drawQuad(f.rightSrc(), f.rightDest());
+            self.r_batch.drawQuad(self.foam_anim_r.getCurrentRect(), f.dest);
         }
     }
     self.r_batch.end();
