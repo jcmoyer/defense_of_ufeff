@@ -6,28 +6,46 @@ const shader = @import("shader.zig");
 const texture = @import("texture.zig");
 const Rect = @import("Rect.zig");
 
-const vssrc = @embedFile("ImmRenderer.vert");
-const fssrc = @embedFile("ImmRenderer.frag");
+const textured_vs = @embedFile("ImmRenderer.vert");
+const textured_fs = @embedFile("ImmRenderer.frag");
 
+const untextured_vs = @embedFile("ImmRendererUntextured.vert");
+const untextured_fs = @embedFile("ImmRendererUntextured.frag");
+
+// Shared between textured/untextured; wastes 2 floats per vertex but it should be fine
 const Vertex = extern struct {
     xyuv: zm.F32x4,
     rgba: zm.F32x4,
 };
 
-const Uniforms = struct {
-    uTransform: gl.GLint,
+const TexturedUniforms = struct {
+    uTransform: gl.GLint = -1,
+    uSampler: gl.GLint = -1,
 };
 
-prog: shader.Program,
-vao: gl.GLuint,
-buffer: gl.GLuint,
-transform: zm.Mat,
-uniforms: Uniforms,
+const UntexturedUniforms = struct {
+    uTransform: gl.GLint = -1,
+};
+
+tex_prog: shader.Program,
+tex_uniforms: TexturedUniforms = .{},
+
+untex_prog: shader.Program,
+untex_uniforms: UntexturedUniforms = .{},
+
+// Shared
+vao: gl.GLuint = 0,
+buffer: gl.GLuint = 0,
+transform: zm.Mat = zm.identity(),
 
 pub fn create() ImmRenderer {
-    var self: ImmRenderer = undefined;
-    self.prog = shader.createProgramFromSource(vssrc, fssrc);
-    self.uniforms = shader.getUniformLocations(Uniforms, self.prog);
+    var self: ImmRenderer = .{
+        .tex_prog = shader.createProgramFromSource(textured_vs, textured_fs),
+        .untex_prog = shader.createProgramFromSource(untextured_vs, untextured_fs),
+    };
+    self.tex_uniforms = shader.getUniformLocations(TexturedUniforms, self.tex_prog);
+    self.untex_uniforms = shader.getUniformLocations(UntexturedUniforms, self.untex_prog);
+
     gl.genVertexArrays(1, &self.vao);
     gl.genBuffers(1, &self.buffer);
     gl.bindVertexArray(self.vao);
@@ -36,6 +54,7 @@ pub fn create() ImmRenderer {
     gl.vertexAttribPointer(1, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "rgba")));
     gl.enableVertexAttribArray(0);
     gl.enableVertexAttribArray(1);
+
     return self;
 }
 
@@ -50,19 +69,16 @@ pub fn setOutputDimensions(self: *ImmRenderer, w: u32, h: u32) void {
     self.transform = zm.orthographicOffCenterRh(0, wf, 0, hf, 0, 1);
 }
 
-pub fn begin(self: ImmRenderer) void {
-    gl.useProgram(self.prog.handle);
+pub fn beginTextured(self: ImmRenderer) void {
+    gl.useProgram(self.tex_prog.handle);
     gl.bindVertexArray(self.vao);
-    gl.uniformMatrix4fv(self.uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
+    gl.uniformMatrix4fv(self.tex_uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
 }
 
 pub fn beginUntextured(self: ImmRenderer) void {
-    gl.useProgram(self.prog.handle);
+    gl.useProgram(self.untex_prog.handle);
     gl.bindVertexArray(self.vao);
-    gl.uniformMatrix4fv(self.uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
-
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, 0);
+    gl.uniformMatrix4fv(self.untex_uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
 }
 
 pub fn drawQuad(self: ImmRenderer, x: i32, y: i32, w: u32, h: u32, r: f32, g: f32, b: f32) void {

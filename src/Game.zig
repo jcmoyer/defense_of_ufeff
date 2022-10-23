@@ -199,7 +199,7 @@ pub fn render(self: *Game, alpha: f64) void {
     gl.activeTexture(gl.TEXTURE0);
     self.scene_color.bind(gl.TEXTURE_2D);
     self.imm.setOutputDimensions(1, 1);
-    self.imm.begin();
+    self.imm.beginTextured();
     self.imm.drawQuad(0, 0, 1, 1, 1, 1, 1);
     gl.bindTexture(gl.TEXTURE_2D, 0);
 
