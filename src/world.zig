@@ -13,6 +13,16 @@ pub const TileCoord = struct {
     x: usize,
     y: usize,
 
+    fn toScalarCoord(self: TileCoord, ref_width: usize) usize {
+        return self.y * ref_width + self.x;
+    }
+
+    fn manhattan(a: TileCoord, b: TileCoord) usize {
+        const dx = @intCast(isize, a.x) - @intCast(isize, b.x);
+        const dy = @intCast(isize, a.y) - @intCast(isize, b.y);
+        return @intCast(usize, std.math.absInt(dx + dy) catch @panic("manhattan distance of TileCoords too big"));
+    }
+
     fn offset(self: TileCoord, dir: Direction) TileCoord {
         return switch (dir) {
             .left => TileCoord{ .x = self.x -% 1, .y = self.y },
@@ -100,16 +110,19 @@ pub const World = struct {
     map: Tilemap = .{},
     monsters: std.ArrayListUnmanaged(Monster) = .{},
     animan: ?*anim.AnimationManager = null,
+    pathfinder: ?PathfindingState = null,
 
     pub fn init(allocator: Allocator) World {
         return .{
             .allocator = allocator,
+            .pathfinder = PathfindingState.init(allocator),
         };
     }
 
     pub fn deinit(self: *World) void {
         self.monsters.deinit(self.allocator);
         self.map.deinit(self.allocator);
+        self.pathfinder.?.deinit();
     }
 
     pub fn getWidth(self: World) usize {
@@ -133,15 +146,8 @@ pub const World = struct {
         }
     }
 
-    pub fn tryMove(self: *World, mobid: usize, dir: Direction) bool {
-        var m = &self.monsters.items[mobid];
-
-        // cannot interrupt an object that is already moving
-        if (m.mstate != .idle) {
-            return false;
-        }
-
-        const coord_now = m.getTilePosition();
+    pub fn isValidMove(self: World, start: TileCoord, dir: Direction) bool {
+        const coord_now = start;
         const coord_want = coord_now.offset(dir);
 
         if (!self.map.isValidIndex(coord_want.x, coord_want.y)) {
@@ -175,9 +181,161 @@ pub const World = struct {
             return false;
         }
 
+        return true;
+    }
+
+    pub fn tryMove(self: *World, mobid: usize, dir: Direction) bool {
+        var m = &self.monsters.items[mobid];
+
+        // cannot interrupt an object that is already moving
+        if (m.mstate != .idle) {
+            return false;
+        }
+
+        if (!self.isValidMove(m.getTilePosition(), dir)) {
+            return false;
+        }
+
         m.beginMove(dir);
 
         return true;
+    }
+
+    pub fn findPath(self: *World, start: TileCoord, end: TileCoord) ?[]TileCoord {
+        if (self.pathfinder == null) {
+            self.pathfinder = PathfindingState.init(self.allocator);
+        }
+
+        self.pathfinder.?.reserve(self.map.tileCount()) catch unreachable;
+        return self.pathfinder.?.findPath(start, end, self) catch unreachable;
+    }
+};
+
+// Reusable storage
+const PathfindingState = struct {
+    const Score = struct {
+        fscore: usize,
+        gscore: usize,
+        from: TileCoord,
+
+        const infinity = Score{
+            .fscore = std.math.maxInt(usize),
+            .gscore = std.math.maxInt(usize),
+            .from = undefined,
+        };
+    };
+
+    const Context = struct {
+        map: *const Tilemap,
+        score_map: []Score,
+    };
+
+    allocator: Allocator,
+    frontier: std.PriorityQueue(TileCoord, Context, orderFScore),
+    frontier_set: std.AutoArrayHashMapUnmanaged(TileCoord, void),
+    score_map: []Score,
+    // won't know length until we walk the result, though upper bound is tile map size
+    result: std.ArrayListUnmanaged(TileCoord),
+
+    fn init(allocator: Allocator) PathfindingState {
+        return PathfindingState{
+            .allocator = allocator,
+            .frontier = std.PriorityQueue(TileCoord, Context, orderFScore).init(allocator, undefined),
+            .frontier_set = .{},
+            .score_map = &[_]Score{},
+            .result = .{},
+        };
+    }
+
+    fn deinit(self: *PathfindingState) void {
+        self.frontier.deinit();
+        self.frontier_set.deinit(self.allocator);
+        if (self.score_map.len != 0) {
+            self.allocator.free(self.score_map);
+        }
+        self.result.deinit(self.allocator);
+    }
+
+    fn reserve(self: *PathfindingState, count: usize) !void {
+        try self.frontier.ensureTotalCapacity(count);
+        try self.frontier_set.ensureTotalCapacity(self.allocator, count);
+        if (self.score_map.len != 0) {
+            self.allocator.free(self.score_map);
+        }
+        self.score_map = try self.allocator.alloc(Score, count);
+    }
+
+    fn orderFScore(ctx: Context, lhs: TileCoord, rhs: TileCoord) std.math.Order {
+        const w = ctx.map.width;
+        return std.math.order(
+            ctx.score_map[lhs.toScalarCoord(w)].fscore,
+            ctx.score_map[rhs.toScalarCoord(w)].fscore,
+        );
+    }
+
+    fn findPath(self: *PathfindingState, start: TileCoord, end: TileCoord, world: *const World) !?[]TileCoord {
+        const map = &world.map;
+        const width = map.width;
+
+        // sus, upstream interface needs some love
+        self.frontier.len = 0;
+        self.frontier.context = Context{
+            .map = &world.map,
+            .score_map = self.score_map,
+        };
+
+        self.frontier_set.clearRetainingCapacity();
+
+        try self.frontier.add(start);
+        try self.frontier_set.put(self.allocator, start, {});
+        std.mem.set(Score, self.score_map, Score.infinity);
+
+        self.score_map[start.toScalarCoord(map.width)] = .{
+            .fscore = 0,
+            .gscore = 0,
+            .from = undefined,
+        };
+
+        while (self.frontier.removeOrNull()) |current| {
+            if (std.meta.eql(current, end)) {
+                self.result.clearRetainingCapacity();
+                var coord = end;
+                while (!std.meta.eql(coord, start)) {
+                    try self.result.append(self.allocator, coord);
+                    coord = self.score_map[coord.toScalarCoord(width)].from;
+                }
+                try self.result.append(self.allocator, coord);
+                std.mem.reverse(TileCoord, self.result.items);
+                return self.result.items;
+            }
+
+            // examine neighbors
+            var d_int: u8 = 0;
+            while (d_int < 4) : (d_int += 1) {
+                const dir = @intToEnum(Direction, d_int);
+                if (world.isValidMove(current, dir)) {
+                    // 1 here is the graph edge weight, basically hardcoding manhattan distance
+                    const tentative_score = self.score_map[current.toScalarCoord(width)].gscore + 1;
+                    const neighbor = current.offset(dir);
+                    const neighbor_score = self.score_map[neighbor.toScalarCoord(width)].gscore;
+                    if (tentative_score < neighbor_score) {
+                        self.score_map[neighbor.toScalarCoord(width)] = .{
+                            .from = current,
+                            .gscore = tentative_score,
+                            // manhattan is the heuristic
+                            .fscore = tentative_score + neighbor.manhattan(end),
+                        };
+                        if (!self.frontier_set.contains(neighbor)) {
+                            try self.frontier_set.put(self.allocator, neighbor, {});
+                            try self.frontier.add(neighbor);
+                        }
+                    }
+                }
+            }
+        }
+
+        std.log.debug("no path", .{});
+        return null;
     }
 };
 

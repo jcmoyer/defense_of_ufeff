@@ -190,21 +190,6 @@ fn renderMonsters(
         );
     }
     self.r_batch.end();
-
-    self.game.imm.beginUntextured();
-    for (self.world.monsters.items) |m| {
-        const wx = m.getTilePosition().x * 16;
-        const wy = m.getTilePosition().y * 16;
-        self.game.imm.drawQuadRGBA(
-            Rect.init(
-                @intCast(i32, wx) - cam.view.left(),
-                @intCast(i32, wy) - cam.view.top(),
-                16,
-                16,
-            ),
-            [4]f32{ 0, 0, 1, 0.5 },
-        );
-    }
 }
 
 fn renderTilemapLayer(
@@ -393,6 +378,39 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
                 right_rect.w = 4;
                 self.game.imm.drawQuadRGBA(right_rect, [_]f32{ 1, 0, 0, 0.6 });
             }
+        }
+    }
+
+    self.game.imm.beginUntextured();
+    for (self.world.monsters.items) |m| {
+        const wx = m.getTilePosition().x * 16;
+        const wy = m.getTilePosition().y * 16;
+        self.game.imm.drawQuadRGBA(
+            Rect.init(
+                @intCast(i32, wx) - cam.view.left(),
+                @intCast(i32, wy) - cam.view.top(),
+                16,
+                16,
+            ),
+            [4]f32{ 0, 0, 1, 0.5 },
+        );
+    }
+
+    var path = self.world.findPath(self.world.monsters.items[0].getTilePosition(), wo.TileCoord{
+        .x = 5,
+        .y = 0,
+    });
+    if (path) |p| {
+        for (p) |coord| {
+            self.game.imm.drawQuadRGBA(
+                Rect.init(
+                    @intCast(i32, coord.x * 16) - cam.view.left(),
+                    @intCast(i32, coord.y * 16) - cam.view.top(),
+                    16,
+                    16,
+                ),
+                [4]f32{ 1, 1, 0, 0.5 },
+            );
         }
     }
 }
