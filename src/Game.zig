@@ -4,7 +4,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl.zig");
-const gl = @import("gl33.zig");
+const gl = @import("gl33");
 const ImmRenderer = @import("ImmRenderer.zig");
 const texture = @import("texture.zig");
 const Texture = texture.Texture;

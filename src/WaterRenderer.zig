@@ -2,7 +2,7 @@
 //! not support coloring.
 const WaterRenderer = @This();
 
-const gl = @import("gl33.zig");
+const gl = @import("gl33");
 const zm = @import("zmath");
 const shader = @import("shader.zig");
 const texmod = @import("texture.zig");

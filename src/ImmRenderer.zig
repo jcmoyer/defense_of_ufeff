@@ -1,6 +1,6 @@
 const ImmRenderer = @This();
 
-const gl = @import("gl33.zig");
+const gl = @import("gl33");
 const zm = @import("zmath");
 const shader = @import("shader.zig");
 const texture = @import("texture.zig");

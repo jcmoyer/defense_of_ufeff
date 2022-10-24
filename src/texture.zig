@@ -1,5 +1,5 @@
 const stb_image = @import("stb_image");
-const gl = @import("gl33.zig");
+const gl = @import("gl33");
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const log = std.log.scoped(.texture);

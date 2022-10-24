@@ -1,6 +1,7 @@
 const std = @import("std");
 const zmath = @import("thirdparty/zmath/build.zig");
 const stb = @import("thirdparty/stb/build.zig");
+const opengl = @import("thirdparty/zig-opengl/build.zig");
 
 pub fn build(b: *std.build.Builder) void {
     // Standard target options allows the person running `zig build` to choose
@@ -19,6 +20,7 @@ pub fn build(b: *std.build.Builder) void {
     exe.addPackage(stb.stb_image_pkg);
     exe.addPackage(stb.stb_vorbis_pkg);
     exe.addPackage(zmath.pkg);
+    exe.addPackage(opengl.gl33_pkg);
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.install();

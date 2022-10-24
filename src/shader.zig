@@ -1,4 +1,4 @@
-const gl = @import("gl33.zig");
+const gl = @import("gl33");
 const std = @import("std");
 const log = std.log.scoped(.shader);
 

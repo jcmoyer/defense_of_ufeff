@@ -2,7 +2,7 @@ const PlayState = @This();
 
 const std = @import("std");
 const Game = @import("Game.zig");
-const gl = @import("gl33.zig");
+const gl = @import("gl33");
 const tilemap = @import("tilemap.zig");
 const Rect = @import("Rect.zig");
 const Camera = @import("Camera.zig");
