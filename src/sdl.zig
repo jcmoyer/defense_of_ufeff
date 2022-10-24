@@ -1278,3 +1278,5 @@ pub extern fn SDL_CloseAudioDevice(dev: SDL_AudioDeviceID) void;
 pub extern fn SDL_PauseAudioDevice(dev: SDL_AudioDeviceID, pause_on: c_int) void;
 pub extern fn SDL_LockAudioDevice(dev: SDL_AudioDeviceID) void;
 pub extern fn SDL_UnlockAudioDevice(dev: SDL_AudioDeviceID) void;
+
+pub extern fn SDL_GetKeyboardState(numkeys: ?*c_int) [*]const u8;

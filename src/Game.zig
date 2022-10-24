@@ -12,6 +12,7 @@ const TextureManager = texture.TextureManager;
 const TextureHandle = texture.TextureHandle;
 const AudioSystem = @import("audio.zig").AudioSystem;
 const PlayState = @import("PlayState.zig");
+const input = @import("input.zig");
 
 /// Updates per second
 const UPDATE_RATE = 30;
@@ -39,6 +40,8 @@ st_play: *PlayState,
 
 frame_counter: u64 = 0,
 
+input_state: input.InputState,
+
 pub const StateId = enum {
     play,
 };
@@ -55,6 +58,7 @@ pub fn create(allocator: Allocator) !*Game {
         .imm = undefined,
         .audio = undefined,
         .scene_color = undefined,
+        .input_state = undefined,
         .st_play = undefined,
     };
 
@@ -101,6 +105,7 @@ pub fn create(allocator: Allocator) !*Game {
         std.process.exit(1);
     };
 
+    ptr.input_state = input.InputState.init();
     ptr.texman = TextureManager.init(allocator);
     ptr.imm = ImmRenderer.create();
     ptr.audio = AudioSystem.create(allocator);

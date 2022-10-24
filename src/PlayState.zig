@@ -134,6 +134,22 @@ pub fn update(self: *PlayState) void {
     self.foam_anim_r.update();
     self.foam_anim_u.update();
     self.foam_anim_d.update();
+
+    // TODO: for testing collision, remove eventually
+    var m = &self.world.monsters.items[0];
+    if (self.game.input_state.isKeyDown(sdl.SDL_SCANCODE_LEFT)) {
+        m.beginMove(.left);
+    }
+    if (self.game.input_state.isKeyDown(sdl.SDL_SCANCODE_RIGHT)) {
+        m.beginMove(.right);
+    }
+    if (self.game.input_state.isKeyDown(sdl.SDL_SCANCODE_UP)) {
+        m.beginMove(.up);
+    }
+    if (self.game.input_state.isKeyDown(sdl.SDL_SCANCODE_DOWN)) {
+        m.beginMove(.down);
+    }
+
     self.world.update();
 }
 

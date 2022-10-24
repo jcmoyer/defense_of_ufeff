@@ -85,8 +85,10 @@ pub const Monster = struct {
     }
 
     pub fn setAnimationFromFacing(self: *Monster) void {
-        const anim_name = @tagName(self.face);
-        self.animator.setAnimation(anim_name);
+        if (self.animator) |*a| {
+            const anim_name = @tagName(self.face);
+            a.setAnimation(anim_name);
+        }
     }
 };
 
