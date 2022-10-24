@@ -136,18 +136,18 @@ pub fn update(self: *PlayState) void {
     self.foam_anim_d.update();
 
     // TODO: for testing collision, remove eventually
-    var m = &self.world.monsters.items[0];
+    // var m = &self.world.monsters.items[0];
     if (self.game.input_state.isKeyDown(sdl.SDL_SCANCODE_LEFT)) {
-        m.beginMove(.left);
+        _ = self.world.tryMove(0, .left);
     }
     if (self.game.input_state.isKeyDown(sdl.SDL_SCANCODE_RIGHT)) {
-        m.beginMove(.right);
+        _ = self.world.tryMove(0, .right);
     }
     if (self.game.input_state.isKeyDown(sdl.SDL_SCANCODE_UP)) {
-        m.beginMove(.up);
+        _ = self.world.tryMove(0, .up);
     }
     if (self.game.input_state.isKeyDown(sdl.SDL_SCANCODE_DOWN)) {
-        m.beginMove(.down);
+        _ = self.world.tryMove(0, .down);
     }
 
     self.world.update();
@@ -190,6 +190,21 @@ fn renderMonsters(
         );
     }
     self.r_batch.end();
+
+    self.game.imm.beginUntextured();
+    for (self.world.monsters.items) |m| {
+        const wx = m.getTilePosition().x * 16;
+        const wy = m.getTilePosition().y * 16;
+        self.game.imm.drawQuadRGBA(
+            Rect.init(
+                @intCast(i32, wx) - cam.view.left(),
+                @intCast(i32, wy) - cam.view.top(),
+                16,
+                16,
+            ),
+            [4]f32{ 0, 0, 1, 0.5 },
+        );
+    }
 }
 
 fn renderTilemapLayer(

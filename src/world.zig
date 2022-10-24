@@ -2,6 +2,7 @@ const tmod = @import("tilemap.zig");
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const anim = @import("animation.zig");
+const Direction = @import("direction.zig").Direction;
 
 const Tile = tmod.Tile;
 const TileBank = tmod.TileBank;
@@ -11,17 +12,19 @@ const TileLayer = tmod.TileLayer;
 pub const TileCoord = struct {
     x: usize,
     y: usize,
+
+    fn offset(self: TileCoord, dir: Direction) TileCoord {
+        return switch (dir) {
+            .left => TileCoord{ .x = self.x -% 1, .y = self.y },
+            .right => TileCoord{ .x = self.x +% 1, .y = self.y },
+            .up => TileCoord{ .x = self.x, .y = self.y -% 1 },
+            .down => TileCoord{ .x = self.x, .y = self.y +% 1 },
+        };
+    }
 };
 
 pub const MoveState = enum {
     idle,
-    left,
-    right,
-    up,
-    down,
-};
-
-pub const Direction = enum {
     left,
     right,
     up,
@@ -128,6 +131,53 @@ pub const World = struct {
         for (self.monsters.items) |*m| {
             m.update();
         }
+    }
+
+    pub fn tryMove(self: *World, mobid: usize, dir: Direction) bool {
+        var m = &self.monsters.items[mobid];
+
+        // cannot interrupt an object that is already moving
+        if (m.mstate != .idle) {
+            return false;
+        }
+
+        const coord_now = m.getTilePosition();
+        const coord_want = coord_now.offset(dir);
+
+        if (!self.map.isValidIndex(coord_want.x, coord_want.y)) {
+            return false;
+        }
+
+        const flags_x0 = self.map.getCollisionFlags2D(coord_now.x, coord_now.y);
+        const flags_x1 = self.map.getCollisionFlags2D(coord_want.x, coord_want.y);
+
+        // remember 'dir' is the direction we want to move IN, but it's not the
+        // direction we're entering the tile from!
+        const entering_from = dir.invert();
+
+        // collides from where we're currently standing
+        if (flags_x1.from(entering_from)) {
+            return false;
+        }
+
+        // We also need to handle the case where e.g. we're on a cliffside,
+        // if the cliff is a top-left corner tile like so:
+        //             ___
+        //            |
+        //          A | B
+        //            |
+        //
+        // Tile B will have the flag: collides .from_left, so A->B will be blocked.
+        // However, it is also invalid to move from B to A, even though A may be a
+        // tile that accepts movement from all directions. To solve this, we need
+        // to check both A->B and B->A
+        if (flags_x0.from(dir)) {
+            return false;
+        }
+
+        m.beginMove(dir);
+
+        return true;
     }
 };
 

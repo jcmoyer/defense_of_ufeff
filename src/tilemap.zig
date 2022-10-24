@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const Direction = @import("direction.zig").Direction;
 
 /// Flags used to determine collision when entering a tile.
 pub const CollisionFlags = packed struct {
@@ -41,6 +42,15 @@ pub const CollisionFlags = packed struct {
 
     pub fn none(self: CollisionFlags) bool {
         return !(self.from_right or self.from_left or self.from_top or self.from_bottom);
+    }
+
+    pub fn from(self: CollisionFlags, dir: Direction) bool {
+        return switch (dir) {
+            .right => self.from_right,
+            .up => self.from_top,
+            .down => self.from_bottom,
+            .left => self.from_left,
+        };
     }
 };
 
@@ -136,6 +146,15 @@ pub const Tilemap = struct {
 
     pub fn tileCount(self: Tilemap) usize {
         return self.width * self.height;
+    }
+
+    /// Simply returns null if the index is invalid. Use with wrapping ops (e.g. -%)
+    /// so that 0 - 1 => USIZE_MAX => invalid index
+    pub fn at2DPtrOpt(self: Tilemap, layer: TileLayer, x: usize, y: usize) ?*Tile {
+        if (!self.isValidIndex(x, y)) {
+            return null;
+        }
+        return self.at2DPtr(layer, x, y);
     }
 
     pub fn at2DPtr(self: Tilemap, layer: TileLayer, x: usize, y: usize) *Tile {
