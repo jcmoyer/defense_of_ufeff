@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.9" tiledversion="1.9.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="16" tileheight="16" infinite="0" nextlayerid="5" nextobjectid="8">
+ <editorsettings>
+  <export target="map01.tmj" format="json"/>
+ </editorsettings>
+ <tileset firstgid="1" source="terrain.tsx"/>
+ <tileset firstgid="1025" source="special.tsx"/>
+ <layer id="1" name="base" width="32" height="16" locked="1">
+  <data encoding="base64" compression="zlib">
+   eJyTZmBgkEbC+owMDJIM9MPodg+k/QPt/4G2n5jwl6ay/SD7SIl7WthPit3Utp+cNDIQdlJqdycQd2PB+Oyipv0rSfQnNe3GZz++8KdmfHpS2TxS8UsgfoUFD6Sb0DEfEPMDccEA2V0IxAF0thcA0ek9QQ==
+  </data>
+ </layer>
+ <layer id="2" name="detail" width="32" height="16" locked="1">
+  <data encoding="base64" compression="zlib">
+   eJytlEEOwiAQRQlha7UH4ArU6D2q0bjRtS6MPUDj5YWECdMJwgD9yQ9NS3h/BooQSz2UqNZdhdHZSCFeKm3QO8J9quWYEp3j+KPlD5kMOX0a+4F74LKcvG8yzy+pHzOxRsQ8yzAH3mO17D1XM2LQrK3i9GkNZmf7trXeyfxcYDrPK9Vr/LneM/mTDBnAteo8e0DniSPKr80Rq537f7TyObW7NafIN3o3Uv5XBYPwOpid23ddkIGyaQbIYZi142ftGZtE3n9MKrivuH2H+lzfev+/xpzi5jJRadJf2LM+4oP1kdmXkhywB/i8xPgX66v1D4dLNUM=
+  </data>
+ </layer>
+ <objectgroup id="3" name="info">
+  <object id="1" class="spawn_indicator" x="464" y="160">
+   <point/>
+  </object>
+  <object id="5" class="spawn_indicator" x="80" y="224">
+   <point/>
+  </object>
+  <object id="6" class="construction_blocker" x="416" y="128" width="96" height="80"/>
+  <object id="7" class="construction_blocker" x="0" y="176" width="160" height="80"/>
+ </objectgroup>
+</map>
