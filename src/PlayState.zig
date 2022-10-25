@@ -78,6 +78,7 @@ foam_anim_r: anim.Animator,
 foam_anim_u: anim.Animator,
 foam_anim_d: anim.Animator,
 world: wo.World,
+fontspec: bmfont.BitmapFontSpec,
 
 deb_render_tile_collision: bool = false,
 
@@ -96,6 +97,7 @@ pub fn create(game: *Game) !*PlayState {
         .foam_anim_d = undefined,
         .world = wo.World.init(self.game.allocator),
         .r_font = undefined,
+        .fontspec = undefined,
     };
     self.r_font = BitmapFont.init(&self.r_batch);
     var foam_aset = try self.aman.createAnimationSet();
@@ -111,10 +113,19 @@ pub fn create(game: *Game) !*PlayState {
     self.foam_anim_u.setAnimation("u");
     self.foam_anim_d = foam_aset.createAnimator();
     self.foam_anim_d.setAnimation("d");
+
+    // TODO probably want a better way to manage this, direct IO shouldn't be here
+    // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
+    var font_file = try std.fs.cwd().openFile("assets/tables/text16.json", .{});
+    defer font_file.close();
+    var spec_json = try font_file.readToEndAlloc(self.game.allocator, 1024 * 1024);
+    defer self.game.allocator.free(spec_json);
+    self.fontspec = try bmfont.BitmapFontSpec.initJson(self.game.allocator, spec_json);
     return self;
 }
 
 pub fn destroy(self: *PlayState) void {
+    self.fontspec.deinit();
     self.aman.deinit();
     self.game.allocator.free(self.water_buf);
     self.game.allocator.free(self.foam_buf);
@@ -175,8 +186,9 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.r_font.begin(.{
         .texture_manager = &self.game.texman,
         .texture = self.game.texman.getNamedTexture("text16.png"),
+        .spec = &self.fontspec,
     });
-    self.r_font.drawText("Hello world", 0, 0);
+    self.r_font.drawText("HELLO WORLD", 0, 0);
     self.r_font.end();
 }
 
