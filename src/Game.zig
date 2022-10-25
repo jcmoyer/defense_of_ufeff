@@ -12,7 +12,7 @@ const TextureManager = texture.TextureManager;
 const TextureHandle = texture.TextureHandle;
 const AudioSystem = @import("audio.zig").AudioSystem;
 const PlayState = @import("PlayState.zig");
-const input = @import("input.zig");
+const InputState = @import("input.zig").InputState;
 
 /// Updates per second
 const UPDATE_RATE = 30;
@@ -40,7 +40,7 @@ st_play: *PlayState,
 
 frame_counter: u64 = 0,
 
-input_state: input.InputState,
+input: InputState,
 
 pub const StateId = enum {
     play,
@@ -58,7 +58,7 @@ pub fn create(allocator: Allocator) !*Game {
         .imm = undefined,
         .audio = undefined,
         .scene_color = undefined,
-        .input_state = undefined,
+        .input = undefined,
         .st_play = undefined,
     };
 
@@ -105,7 +105,7 @@ pub fn create(allocator: Allocator) !*Game {
         std.process.exit(1);
     };
 
-    ptr.input_state = input.InputState.init();
+    ptr.input = InputState.init();
     ptr.texman = TextureManager.init(allocator);
     ptr.imm = ImmRenderer.create();
     ptr.audio = AudioSystem.create(allocator);
@@ -184,6 +184,9 @@ pub fn run(self: *Game) void {
 pub fn handleEvent(self: *Game, ev: sdl.SDL_Event) void {
     if (ev.type == .SDL_QUIT) {
         self.running = false;
+    } else if (ev.type == .SDL_MOUSEMOTION) {
+        self.input.mouse.client_x = ev.motion.x;
+        self.input.mouse.client_y = ev.motion.y;
     }
 
     self.stateDispatchEvent(self.current_state.?, ev);
@@ -312,4 +315,19 @@ pub fn changeState(self: *Game, to: StateId) void {
     self.current_state = to;
     self.stateDispatchEnter(to, old);
     log.debug("State change: {any} -> {any}", .{ old, to });
+}
+
+pub fn unproject(self: *Game, x: i32, y: i32) [2]i32 {
+    var w: c_int = 0;
+    var h: c_int = 0;
+
+    sdl.SDL_GetWindowSize(self.window, &w, &h);
+
+    const scale_x = @intToFloat(f64, w) / @intToFloat(f64, INTERNAL_WIDTH);
+    const scale_y = @intToFloat(f64, h) / @intToFloat(f64, INTERNAL_HEIGHT);
+
+    return [2]i32{
+        @floatToInt(i32, @intToFloat(f64, x) / scale_x),
+        @floatToInt(i32, @intToFloat(f64, y) / scale_y),
+    };
 }

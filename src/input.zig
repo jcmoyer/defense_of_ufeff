@@ -14,8 +14,14 @@ const KeyboardState = struct {
     }
 };
 
+const MouseState = struct {
+    client_x: i32 = 0,
+    client_y: i32 = 0,
+};
+
 pub const InputState = struct {
     keyboard: KeyboardState,
+    mouse: MouseState = .{},
 
     pub fn init() InputState {
         return .{
@@ -26,5 +32,13 @@ pub const InputState = struct {
     pub fn isKeyDown(self: InputState, scancode: u32) bool {
         std.debug.assert(scancode < sdl.SDL_NUM_SCANCODES);
         return self.keyboard.keys[scancode] != 0;
+    }
+
+    pub fn getMouseClientX(self: InputState) i32 {
+        return self.mouse.client_x;
+    }
+
+    pub fn getMouseClientY(self: InputState) i32 {
+        return self.mouse.client_y;
     }
 };

@@ -137,16 +137,16 @@ pub fn update(self: *PlayState) void {
 
     // TODO: for testing collision, remove eventually
     // var m = &self.world.monsters.items[0];
-    if (self.game.input_state.isKeyDown(sdl.SDL_SCANCODE_LEFT)) {
+    if (self.game.input.isKeyDown(sdl.SDL_SCANCODE_LEFT)) {
         _ = self.world.tryMove(0, .left);
     }
-    if (self.game.input_state.isKeyDown(sdl.SDL_SCANCODE_RIGHT)) {
+    if (self.game.input.isKeyDown(sdl.SDL_SCANCODE_RIGHT)) {
         _ = self.world.tryMove(0, .right);
     }
-    if (self.game.input_state.isKeyDown(sdl.SDL_SCANCODE_UP)) {
+    if (self.game.input.isKeyDown(sdl.SDL_SCANCODE_UP)) {
         _ = self.world.tryMove(0, .up);
     }
-    if (self.game.input_state.isKeyDown(sdl.SDL_SCANCODE_DOWN)) {
+    if (self.game.input.isKeyDown(sdl.SDL_SCANCODE_DOWN)) {
         _ = self.world.tryMove(0, .down);
     }
 
@@ -413,6 +413,20 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
             );
         }
     }
+
+    var m = self.game.unproject(
+        self.game.input.mouse.client_x,
+        self.game.input.mouse.client_y,
+    );
+    self.game.imm.drawQuadRGBA(
+        Rect.init(
+            @divFloor(m[0], 16) * 16 - cam.view.left(),
+            @divFloor(m[1], 16) * 16 - cam.view.top(),
+            16,
+            16,
+        ),
+        [4]f32{ 0, 1, 0, 0.5 },
+    );
 }
 
 fn loadWorld(self: *PlayState, mapid: []const u8) void {

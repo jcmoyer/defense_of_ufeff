@@ -226,21 +226,17 @@ pub const SDL_KeyboardEvent = extern struct {
 //     char text[SDL_TEXTINPUTEVENT_TEXT_SIZE];  /**< The input text */
 // } SDL_TextInputEvent;
 
-// /**
-//  *  \brief Mouse motion event structure (event.motion.*)
-//  */
-// typedef struct SDL_MouseMotionEvent
-// {
-//     Uint32 type;        /**< ::SDL_MOUSEMOTION */
-//     Uint32 timestamp;   /**< In milliseconds, populated using SDL_GetTicks() */
-//     Uint32 windowID;    /**< The window with mouse focus, if any */
-//     Uint32 which;       /**< The mouse instance id, or SDL_TOUCH_MOUSEID */
-//     Uint32 state;       /**< The current button state */
-//     Sint32 x;           /**< X coordinate, relative to window */
-//     Sint32 y;           /**< Y coordinate, relative to window */
-//     Sint32 xrel;        /**< The relative motion in the X direction */
-//     Sint32 yrel;        /**< The relative motion in the Y direction */
-// } SDL_MouseMotionEvent;
+pub const SDL_MouseMotionEvent = extern struct {
+    type: u32,
+    timestamp: u32,
+    windowID: u32,
+    which: u32,
+    state: u32,
+    x: i32,
+    y: i32,
+    xrel: i32,
+    yrel: i32,
+};
 
 // /**
 //  *  \brief Mouse button event structure (event.button.*)
@@ -575,7 +571,7 @@ pub const SDL_Event = extern union {
     // SDL_TextEditingEvent edit;              /**< Text editing event data */
     // SDL_TextEditingExtEvent editExt;        /**< Extended text editing event data */
     // SDL_TextInputEvent text;                /**< Text input event data */
-    // SDL_MouseMotionEvent motion;            /**< Mouse motion event data */
+    motion: SDL_MouseMotionEvent,
     // SDL_MouseButtonEvent button;            /**< Mouse button event data */
     // SDL_MouseWheelEvent wheel;              /**< Mouse wheel event data */
     // SDL_JoyAxisEvent jaxis;                 /**< Joystick axis event data */
