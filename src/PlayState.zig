@@ -11,6 +11,8 @@ const WaterRenderer = @import("WaterRenderer.zig");
 const zm = @import("zmath");
 const anim = @import("animation.zig");
 const wo = @import("world.zig");
+const bmfont = @import("bmfont.zig");
+const BitmapFont = bmfont.BitmapFont;
 // eventually should probably eliminate this dependency
 const sdl = @import("sdl.zig");
 
@@ -65,6 +67,7 @@ game: *Game,
 camera: Camera = DEFAULT_CAMERA,
 prev_camera: Camera = DEFAULT_CAMERA,
 r_batch: SpriteBatch,
+r_font: BitmapFont,
 r_water: WaterRenderer,
 water_buf: []WaterDraw,
 n_water: usize = 0,
@@ -92,7 +95,9 @@ pub fn create(game: *Game) !*PlayState {
         .foam_anim_u = undefined,
         .foam_anim_d = undefined,
         .world = wo.World.init(self.game.allocator),
+        .r_font = undefined,
     };
+    self.r_font = BitmapFont.init(&self.r_batch);
     var foam_aset = try self.aman.createAnimationSet();
     try foam_aset.anims.put(self.aman.allocator, "l", FoamDraw.a_left);
     try foam_aset.anims.put(self.aman.allocator, "r", FoamDraw.a_right);
@@ -166,6 +171,13 @@ pub fn render(self: *PlayState, alpha: f64) void {
     if (self.deb_render_tile_collision) {
         self.debugRenderTileCollision(cam_interp);
     }
+
+    self.r_font.begin(.{
+        .texture_manager = &self.game.texman,
+        .texture = self.game.texman.getNamedTexture("text16.png"),
+    });
+    self.r_font.drawText("Hello world", 0, 0);
+    self.r_font.end();
 }
 
 pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
