@@ -105,10 +105,25 @@ pub const Monster = struct {
     }
 };
 
+pub const Tower = struct {
+    world_x: u32,
+    world_y: u32,
+
+    pub fn setWorldPosition(self: *Tower, new_x: u32, new_y: u32) void {
+        self.world_x = new_x;
+        self.world_y = new_y;
+    }
+
+    pub fn getTilePosition(self: Tower) TileCoord {
+        return .{ .x = self.world_x / 16, .y = self.world_y / 16 };
+    }
+};
+
 pub const World = struct {
     allocator: Allocator,
     map: Tilemap = .{},
     monsters: std.ArrayListUnmanaged(Monster) = .{},
+    towers: std.ArrayListUnmanaged(Tower) = .{},
     animan: ?*anim.AnimationManager = null,
     pathfinder: ?PathfindingState = null,
 
@@ -121,8 +136,11 @@ pub const World = struct {
 
     pub fn deinit(self: *World) void {
         self.monsters.deinit(self.allocator);
+        self.towers.deinit(self.allocator);
         self.map.deinit(self.allocator);
-        self.pathfinder.?.deinit();
+        if (self.pathfinder) |*p| {
+            p.deinit();
+        }
     }
 
     pub fn getWidth(self: World) usize {
@@ -131,6 +149,33 @@ pub const World = struct {
 
     pub fn getHeight(self: World) usize {
         return self.map.height;
+    }
+
+    pub fn canBuildAt(self: *World, coord: TileCoord) bool {
+        const collision_flags = self.map.getCollisionFlags2D(coord.x, coord.y);
+        if (collision_flags.all()) {
+            return false;
+        }
+        const tile_flags = self.map.at2DPtr(.base, coord.x, coord.y).flags;
+        if (tile_flags.construction_blocked or tile_flags.contains_tower) {
+            return false;
+        }
+        return true;
+    }
+
+    pub fn spawnTower(self: *World, coord: TileCoord) !void {
+        self.map.at2DPtr(.base, coord.x, coord.y).flags.contains_tower = true;
+        try self.spawnTowerWorld(
+            @intCast(u32, coord.x * 16),
+            @intCast(u32, coord.y * 16),
+        );
+    }
+
+    fn spawnTowerWorld(self: *World, world_x: u32, world_y: u32) !void {
+        try self.towers.append(self.allocator, Tower{
+            .world_x = world_x,
+            .world_y = world_y,
+        });
     }
 
     pub fn spawnMonsterWorld(self: *World, world_x: u32, world_y: u32) !void {
@@ -151,6 +196,11 @@ pub const World = struct {
         const coord_want = coord_now.offset(dir);
 
         if (!self.map.isValidIndex(coord_want.x, coord_want.y)) {
+            return false;
+        }
+
+        const dest_tile = self.map.at2DPtr(.base, coord_want.x, coord_want.y);
+        if (dest_tile.flags.contains_tower) {
             return false;
         }
 
@@ -431,8 +481,24 @@ fn loadTileLayer(layer: TiledTileLayer, ctx: LoadContext) !void {
 fn loadObjectGroup(layer: TiledObjectGroup, ctx: LoadContext) !void {
     for (layer.objects) |obj| {
         if (std.mem.eql(u8, obj.class, "spawn_indicator")) {
-            // TODO: just for testing
-            try ctx.world.spawnMonsterWorld(@intCast(u32, obj.x), @intCast(u32, obj.y));
+            // TODO: implement this
+        } else if (std.mem.eql(u8, obj.class, "construction_blocker")) {
+            const tile_start = TileCoord{
+                .x = @intCast(usize, @divExact(obj.x, 16)),
+                .y = @intCast(usize, @divExact(obj.y, 16)),
+            };
+            const tile_end = TileCoord{
+                .x = tile_start.x + @intCast(usize, @divExact(obj.width, 16)),
+                .y = tile_start.y + @intCast(usize, @divExact(obj.height, 16)),
+            };
+
+            var ty: usize = tile_start.y;
+            while (ty < tile_end.y) : (ty += 1) {
+                var tx: usize = tile_start.x;
+                while (tx < tile_end.x) : (tx += 1) {
+                    ctx.world.map.at2DPtr(.base, tx, ty).flags.construction_blocked = true;
+                }
+            }
         }
     }
 }

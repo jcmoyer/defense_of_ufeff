@@ -241,19 +241,18 @@ pub const SDL_MouseMotionEvent = extern struct {
 // /**
 //  *  \brief Mouse button event structure (event.button.*)
 //  */
-// typedef struct SDL_MouseButtonEvent
-// {
-//     Uint32 type;        /**< ::SDL_MOUSEBUTTONDOWN or ::SDL_MOUSEBUTTONUP */
-//     Uint32 timestamp;   /**< In milliseconds, populated using SDL_GetTicks() */
-//     Uint32 windowID;    /**< The window with mouse focus, if any */
-//     Uint32 which;       /**< The mouse instance id, or SDL_TOUCH_MOUSEID */
-//     Uint8 button;       /**< The mouse button index */
-//     Uint8 state;        /**< ::SDL_PRESSED or ::SDL_RELEASED */
-//     Uint8 clicks;       /**< 1 for single-click, 2 for double-click, etc. */
-//     Uint8 padding1;
-//     Sint32 x;           /**< X coordinate, relative to window */
-//     Sint32 y;           /**< Y coordinate, relative to window */
-// } SDL_MouseButtonEvent;
+pub const SDL_MouseButtonEvent = extern struct {
+    type: u32,
+    timestamp: u32,
+    windowID: u32,
+    which: u32,
+    button: u8,
+    state: u8,
+    clicks: u8,
+    padding1: u8,
+    x: i32,
+    y: i32,
+};
 
 // /**
 //  *  \brief Mouse wheel event structure (event.wheel.*)
@@ -572,7 +571,7 @@ pub const SDL_Event = extern union {
     // SDL_TextEditingExtEvent editExt;        /**< Extended text editing event data */
     // SDL_TextInputEvent text;                /**< Text input event data */
     motion: SDL_MouseMotionEvent,
-    // SDL_MouseButtonEvent button;            /**< Mouse button event data */
+    button: SDL_MouseButtonEvent,
     // SDL_MouseWheelEvent wheel;              /**< Mouse wheel event data */
     // SDL_JoyAxisEvent jaxis;                 /**< Joystick axis event data */
     // SDL_JoyBallEvent jball;                 /**< Joystick ball event data */
@@ -1276,3 +1275,22 @@ pub extern fn SDL_LockAudioDevice(dev: SDL_AudioDeviceID) void;
 pub extern fn SDL_UnlockAudioDevice(dev: SDL_AudioDeviceID) void;
 
 pub extern fn SDL_GetKeyboardState(numkeys: ?*c_int) [*]const u8;
+
+// /**
+//  * Used as a mask when testing buttons in buttonstate.
+//  *
+//  * - Button 1:  Left mouse button
+//  * - Button 2:  Middle mouse button
+//  * - Button 3:  Right mouse button
+//  */
+// #define SDL_BUTTON(X)       (1 << ((X)-1))
+pub const SDL_BUTTON_LEFT = 1;
+pub const SDL_BUTTON_MIDDLE = 2;
+pub const SDL_BUTTON_RIGHT = 3;
+pub const SDL_BUTTON_X1 = 4;
+pub const SDL_BUTTON_X2 = 5;
+// #define SDL_BUTTON_LMASK    SDL_BUTTON(SDL_BUTTON_LEFT)
+// #define SDL_BUTTON_MMASK    SDL_BUTTON(SDL_BUTTON_MIDDLE)
+// #define SDL_BUTTON_RMASK    SDL_BUTTON(SDL_BUTTON_RIGHT)
+// #define SDL_BUTTON_X1MASK   SDL_BUTTON(SDL_BUTTON_X1)
+// #define SDL_BUTTON_X2MASK   SDL_BUTTON(SDL_BUTTON_X2)

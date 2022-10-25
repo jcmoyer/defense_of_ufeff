@@ -178,6 +178,8 @@ pub fn render(self: *PlayState, alpha: f64) void {
 
     self.renderTilemap(cam_interp);
     self.renderMonsters(cam_interp);
+    self.renderTowers(cam_interp);
+    self.renderBlockedConstructionRects(cam_interp);
 
     if (self.deb_render_tile_collision) {
         self.debugRenderTileCollision(cam_interp);
@@ -196,6 +198,40 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
     if (ev.type == .SDL_KEYDOWN and ev.key.keysym.sym == sdl.SDLK_F1) {
         self.deb_render_tile_collision = !self.deb_render_tile_collision;
     }
+
+    if (ev.type == .SDL_MOUSEBUTTONDOWN and ev.button.button == sdl.SDL_BUTTON_LEFT) {
+        const loc = self.game.unproject(
+            ev.button.x,
+            ev.button.y,
+        );
+        const tile_x = @divFloor(loc[0], 16);
+        const tile_y = @divFloor(loc[1], 16);
+        const tile_coord = wo.TileCoord{ .x = @intCast(usize, tile_x), .y = @intCast(usize, tile_y) };
+        if (self.world.canBuildAt(tile_coord)) {
+            self.world.spawnTower(tile_coord) catch unreachable;
+        }
+    }
+}
+
+fn renderTowers(
+    self: *PlayState,
+    cam: Camera,
+) void {
+    const t_special = self.game.texman.getNamedTexture("special.png");
+    const t_characters = self.game.texman.getNamedTexture("characters.png");
+    _ = t_characters;
+    // render tower bases
+    self.r_batch.begin(.{
+        .texture_manager = &self.game.texman,
+        .texture = t_special,
+    });
+    for (self.world.towers.items) |t| {
+        self.r_batch.drawQuad(
+            Rect.init(0, 7 * 16, 16, 16),
+            Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - cam.view.top(), 16, 16),
+        );
+    }
+    self.r_batch.end();
 }
 
 fn renderMonsters(
@@ -298,6 +334,45 @@ fn renderTilemapLayer(
         ty += 1;
     }
     self.r_batch.end();
+}
+
+fn renderBlockedConstructionRects(
+    self: *PlayState,
+    cam: Camera,
+) void {
+    const min_tile_x = @intCast(usize, cam.view.left()) / 16;
+    const min_tile_y = @intCast(usize, cam.view.top()) / 16;
+    const max_tile_x = std.math.min(
+        self.world.getWidth(),
+        1 + @intCast(usize, cam.view.right()) / 16,
+    );
+    const max_tile_y = std.math.min(
+        self.world.getHeight(),
+        1 + @intCast(usize, cam.view.bottom()) / 16,
+    );
+    const map = self.world.map;
+
+    self.game.imm.beginUntextured();
+    var y: usize = min_tile_y;
+    var x: usize = 0;
+    while (y < max_tile_y) : (y += 1) {
+        x = min_tile_x;
+        while (x < max_tile_x) : (x += 1) {
+            const t = map.at2DPtr(.base, x, y);
+            if (!t.flags.construction_blocked) {
+                continue;
+            }
+            const dest = Rect{
+                .x = @intCast(i32, x * 16) - cam.view.left(),
+                .y = @intCast(i32, y * 16) - cam.view.top(),
+                .w = 16,
+                .h = 16,
+            };
+            var a = 0.3 * @sin(@intToFloat(f32, self.game.frame_counter) / 15.0);
+            a = std.math.max(a, 0);
+            self.game.imm.drawQuadRGBA(dest, [_]f32{ 1, 0, 0, a });
+        }
+    }
 }
 
 fn renderTilemap(self: *PlayState, cam: Camera) void {
@@ -475,6 +550,10 @@ fn loadWorld(self: *PlayState, mapid: []const u8) void {
         @intCast(i32, self.world.getHeight() * 16),
     );
     self.prev_camera = self.camera;
+
+    // TODO: just for testing
+    self.world.spawnMonsterWorld(464, 160) catch unreachable;
+    self.world.spawnMonsterWorld(80, 224) catch unreachable;
 }
 
 fn renderFoam(

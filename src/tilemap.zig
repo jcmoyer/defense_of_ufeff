@@ -65,10 +65,16 @@ pub const TileLayer = enum {
     detail,
 };
 
+pub const TileInstanceFlags = packed struct {
+    construction_blocked: bool = false,
+    contains_tower: bool = false,
+    reserved: u6 = 0,
+};
+
 pub const Tile = struct {
     id: u16,
     bank: TileBank,
-    reserved: u8 = 0,
+    flags: TileInstanceFlags = .{},
 
     pub fn isWater(self: Tile) bool {
         return self.bank == .terrain and self.id == 26;
