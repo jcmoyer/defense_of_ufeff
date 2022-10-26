@@ -180,6 +180,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.renderMonsters(cam_interp);
     self.renderTowers(cam_interp);
     self.renderBlockedConstructionRects(cam_interp);
+    self.renderPlacementIndicator(cam_interp);
 
     if (self.deb_render_tile_collision) {
         self.debugRenderTileCollision(cam_interp);
@@ -421,6 +422,25 @@ fn renderTilemap(self: *PlayState, cam: Camera) void {
     self.renderTilemapLayer(.detail, .special, min_tile_x, max_tile_x, min_tile_y, max_tile_y, -cam.view.left(), -cam.view.top());
 }
 
+fn renderPlacementIndicator(self: *PlayState, cam: Camera) void {
+    var m = self.game.unproject(
+        self.game.input.mouse.client_x,
+        self.game.input.mouse.client_y,
+    );
+    var tc = wo.TileCoord{
+        .x = @intCast(usize, @divFloor(m[0], 16)),
+        .y = @intCast(usize, @divFloor(m[1], 16)),
+    };
+    const color = if (self.world.canBuildAt(tc)) [4]f32{ 0, 1, 0, 0.5 } else [4]f32{ 1, 0, 0, 0.5 };
+    const dest = Rect.init(
+        @intCast(i32, tc.x * 16) - cam.view.left(),
+        @intCast(i32, tc.y * 16) - cam.view.top(),
+        16,
+        16,
+    );
+    self.game.imm.drawQuadRGBA(dest, color);
+}
+
 fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
     const min_tile_x = @intCast(usize, cam.view.left()) / 16;
     const min_tile_y = @intCast(usize, cam.view.top()) / 16;
@@ -509,20 +529,6 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
             );
         }
     }
-
-    var m = self.game.unproject(
-        self.game.input.mouse.client_x,
-        self.game.input.mouse.client_y,
-    );
-    self.game.imm.drawQuadRGBA(
-        Rect.init(
-            @divFloor(m[0], 16) * 16 - cam.view.left(),
-            @divFloor(m[1], 16) * 16 - cam.view.top(),
-            16,
-            16,
-        ),
-        [4]f32{ 0, 1, 0, 0.5 },
-    );
 }
 
 fn loadWorld(self: *PlayState, mapid: []const u8) void {
