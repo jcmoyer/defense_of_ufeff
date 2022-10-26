@@ -23,6 +23,14 @@ pub const TileCoord = struct {
         return @intCast(usize, std.math.absInt(dx + dy) catch @panic("manhattan distance of TileCoords too big"));
     }
 
+    /// This seems to be a better A* heuristic than manhattan distance, as the
+    /// resulting path doesn't change by placing obstacles next to it.
+    fn euclideanDistance(a: TileCoord, b: TileCoord) f32 {
+        const dx = @intToFloat(f32, a.x) - @intToFloat(f32, b.x);
+        const dy = @intToFloat(f32, a.y) - @intToFloat(f32, b.y);
+        return std.math.sqrt(dx * dx + dy * dy);
+    }
+
     fn offset(self: TileCoord, dir: Direction) TileCoord {
         return switch (dir) {
             .left => TileCoord{ .x = self.x -% 1, .y = self.y },
@@ -264,13 +272,13 @@ pub const World = struct {
 // Reusable storage
 const PathfindingState = struct {
     const Score = struct {
-        fscore: usize,
-        gscore: usize,
+        fscore: f32,
+        gscore: f32,
         from: TileCoord,
 
         const infinity = Score{
-            .fscore = std.math.maxInt(usize),
-            .gscore = std.math.maxInt(usize),
+            .fscore = std.math.inf_f32,
+            .gscore = std.math.inf_f32,
             .from = undefined,
         };
     };
@@ -372,8 +380,7 @@ const PathfindingState = struct {
                         self.score_map[neighbor.toScalarCoord(width)] = .{
                             .from = current,
                             .gscore = tentative_score,
-                            // manhattan is the heuristic
-                            .fscore = tentative_score + neighbor.manhattan(end),
+                            .fscore = tentative_score + self.heuristic(neighbor, end),
                         };
                         if (!self.frontier_set.contains(neighbor)) {
                             try self.frontier_set.put(self.allocator, neighbor, {});
@@ -386,6 +393,11 @@ const PathfindingState = struct {
 
         std.log.debug("no path", .{});
         return null;
+    }
+
+    fn heuristic(self: *PathfindingState, from: TileCoord, to: TileCoord) f32 {
+        _ = self;
+        return from.euclideanDistance(to);
     }
 };
 
