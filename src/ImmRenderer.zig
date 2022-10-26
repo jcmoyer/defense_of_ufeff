@@ -1,5 +1,7 @@
 const ImmRenderer = @This();
 
+const std = @import("std");
+const log = std.log.scoped(.ImmRenderer);
 const gl = @import("gl33");
 const zm = @import("zmath");
 const shader = @import("shader.zig");
@@ -11,6 +13,11 @@ const textured_fs = @embedFile("ImmRenderer.frag");
 
 const untextured_vs = @embedFile("ImmRendererUntextured.vert");
 const untextured_fs = @embedFile("ImmRendererUntextured.frag");
+
+pub const TexturedParams = struct {
+    texture_manager: *const texture.TextureManager,
+    texture: texture.TextureHandle,
+};
 
 // Shared between textured/untextured; wastes 2 floats per vertex but it should be fine
 const Vertex = extern struct {
@@ -37,6 +44,7 @@ untex_uniforms: UntexturedUniforms = .{},
 vao: gl.GLuint = 0,
 buffer: gl.GLuint = 0,
 transform: zm.Mat = zm.identity(),
+tex_params: ?TexturedParams = null,
 
 pub fn create() ImmRenderer {
     var self: ImmRenderer = .{
@@ -69,10 +77,13 @@ pub fn setOutputDimensions(self: *ImmRenderer, w: u32, h: u32) void {
     self.transform = zm.orthographicOffCenterRh(0, wf, 0, hf, 0, 1);
 }
 
-pub fn beginTextured(self: ImmRenderer) void {
+pub fn beginTextured(self: *ImmRenderer, params: TexturedParams) void {
     gl.useProgram(self.tex_prog.handle);
     gl.bindVertexArray(self.vao);
     gl.uniformMatrix4fv(self.tex_uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, params.texture.raw_handle);
+    self.tex_params = params;
 }
 
 pub fn beginUntextured(self: ImmRenderer) void {
@@ -118,7 +129,14 @@ pub fn drawQuadRGBA(self: ImmRenderer, dest: Rect, rgba: zm.Vec) void {
     gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 }
 
-pub fn drawQuadTextured(self: ImmRenderer, t: texture.TextureState, src: Rect, dest: Rect) void {
+pub fn drawQuadTextured(self: ImmRenderer, src: Rect, dest: Rect) void {
+    const params = self.tex_params orelse {
+        log.warn("Tried to draw textured quad without tex_params", .{});
+        return;
+    };
+
+    const t = params.texture_manager.getTextureState(params.texture);
+
     const uv_left = @intToFloat(f32, src.x) / @intToFloat(f32, t.width);
     const uv_right = @intToFloat(f32, src.right()) / @intToFloat(f32, t.width);
     const uv_top = 1 - @intToFloat(f32, src.y) / @intToFloat(f32, t.height);

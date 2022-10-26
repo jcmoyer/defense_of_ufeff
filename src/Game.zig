@@ -204,10 +204,11 @@ pub fn render(self: *Game, alpha: f64) void {
 
     self.endRenderToScene();
 
-    gl.activeTexture(gl.TEXTURE0);
-    self.scene_color.bind(gl.TEXTURE_2D);
     self.imm.setOutputDimensions(1, 1);
-    self.imm.beginTextured();
+    self.imm.beginTextured(.{
+        .texture_manager = &self.texman,
+        .texture = self.scene_color,
+    });
     self.imm.drawQuad(0, 0, 1, 1, 1, 1, 1);
     gl.bindTexture(gl.TEXTURE_2D, 0);
 
