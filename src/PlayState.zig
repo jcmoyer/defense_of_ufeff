@@ -495,10 +495,7 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
         );
     }
 
-    var path = self.world.findPath(self.world.monsters.items[0].getTilePosition(), wo.TileCoord{
-        .x = 5,
-        .y = 0,
-    });
+    var path = self.world.findPath(self.world.monsters.items[0].getTilePosition(), self.world.goal.?);
     if (path) |p| {
         for (p) |coord| {
             self.game.imm.drawQuadRGBA(

@@ -134,6 +134,7 @@ pub const World = struct {
     towers: std.ArrayListUnmanaged(Tower) = .{},
     animan: ?*anim.AnimationManager = null,
     pathfinder: ?PathfindingState = null,
+    goal: ?TileCoord = null,
 
     pub fn init(allocator: Allocator) World {
         return .{
@@ -157,6 +158,10 @@ pub const World = struct {
 
     pub fn getHeight(self: World) usize {
         return self.map.height;
+    }
+
+    fn setGoal(self: *World, coord: TileCoord) void {
+        self.goal = coord;
     }
 
     pub fn canBuildAt(self: *World, coord: TileCoord) bool {
@@ -511,6 +516,12 @@ fn loadObjectGroup(layer: TiledObjectGroup, ctx: LoadContext) !void {
                     ctx.world.map.at2DPtr(.base, tx, ty).flags.construction_blocked = true;
                 }
             }
+        } else if (std.mem.eql(u8, obj.class, "goal")) {
+            const coord = TileCoord{
+                .x = @intCast(usize, @divExact(obj.x, 16)),
+                .y = @intCast(usize, @divExact(obj.y, 16)),
+            };
+            ctx.world.setGoal(coord);
         }
     }
 }
