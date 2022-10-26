@@ -62,6 +62,7 @@ const FoamDraw = struct {
     const a_top = makeFoamAnimation(32, 0);
     const a_bottom = makeFoamAnimation(48, 0);
 };
+const FingerRenderer = @import("FingerRenderer.zig");
 
 game: *Game,
 camera: Camera = DEFAULT_CAMERA,
@@ -79,6 +80,7 @@ foam_anim_u: anim.Animator,
 foam_anim_d: anim.Animator,
 world: wo.World,
 fontspec: bmfont.BitmapFontSpec,
+r_finger: FingerRenderer,
 
 deb_render_tile_collision: bool = false,
 
@@ -98,6 +100,7 @@ pub fn create(game: *Game) !*PlayState {
         .world = wo.World.init(self.game.allocator),
         .r_font = undefined,
         .fontspec = undefined,
+        .r_finger = FingerRenderer.create(),
     };
     self.r_font = BitmapFont.init(&self.r_batch);
     var foam_aset = try self.aman.createAnimationSet();
@@ -193,6 +196,13 @@ pub fn render(self: *PlayState, alpha: f64) void {
     });
     self.r_font.drawText("HELLO WORLD", 0, 0);
     self.r_font.end();
+
+    self.r_finger.beginTextured(.{
+        .texture_manager = &self.game.texman,
+        .texture = self.game.texman.getNamedTexture("finger.png"),
+    });
+    self.r_finger.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
+    self.r_finger.drawFinger(64, 64, @intToFloat(f32, self.game.frame_counter) / 8.0);
 }
 
 pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
