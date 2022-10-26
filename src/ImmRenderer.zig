@@ -15,8 +15,7 @@ const untextured_vs = @embedFile("ImmRendererUntextured.vert");
 const untextured_fs = @embedFile("ImmRendererUntextured.frag");
 
 pub const TexturedParams = struct {
-    texture_manager: *const texture.TextureManager,
-    texture: texture.TextureHandle,
+    texture: *texture.Texture,
 };
 
 // Shared between textured/untextured; wastes 2 floats per vertex but it should be fine
@@ -82,7 +81,7 @@ pub fn beginTextured(self: *ImmRenderer, params: TexturedParams) void {
     gl.bindVertexArray(self.vao);
     gl.uniformMatrix4fv(self.tex_uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, params.texture.raw_handle);
+    gl.bindTexture(gl.TEXTURE_2D, params.texture.handle);
     self.tex_params = params;
 }
 

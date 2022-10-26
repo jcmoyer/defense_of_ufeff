@@ -9,7 +9,6 @@ const ImmRenderer = @import("ImmRenderer.zig");
 const texture = @import("texture.zig");
 const Texture = texture.Texture;
 const TextureManager = texture.TextureManager;
-const TextureHandle = texture.TextureHandle;
 const AudioSystem = @import("audio.zig").AudioSystem;
 const PlayState = @import("PlayState.zig");
 const InputState = @import("input.zig").InputState;
@@ -33,7 +32,7 @@ audio: *AudioSystem,
 scene_framebuf: gl.GLuint = 0,
 scene_renderbuf: gl.GLuint = 0,
 // Texture containing color information
-scene_color: TextureHandle,
+scene_color: *Texture,
 
 current_state: ?StateId = null,
 st_play: *PlayState,
@@ -206,7 +205,6 @@ pub fn render(self: *Game, alpha: f64) void {
 
     self.imm.setOutputDimensions(1, 1);
     self.imm.beginTextured(.{
-        .texture_manager = &self.texman,
         .texture = self.scene_color,
     });
     self.imm.drawQuad(0, 0, 1, 1, 1, 1, 1);
@@ -233,7 +231,7 @@ fn initFramebuffer(self: *Game) void {
 
     // allocate storage for framebuffer color
     self.scene_color = self.texman.createInMemory();
-    const scene_color = self.scene_color.raw_handle;
+    const scene_color = self.scene_color.handle;
 
     gl.bindTexture(gl.TEXTURE_2D, scene_color);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, INTERNAL_WIDTH, INTERNAL_HEIGHT, 0, gl.RGB, gl.UNSIGNED_BYTE, null);

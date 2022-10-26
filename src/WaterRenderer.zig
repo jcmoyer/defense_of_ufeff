@@ -6,8 +6,7 @@ const gl = @import("gl33");
 const zm = @import("zmath");
 const shader = @import("shader.zig");
 const texmod = @import("texture.zig");
-const TextureHandle = texmod.TextureHandle;
-const TextureManager = texmod.TextureManager;
+const Texture = texmod.Texture;
 const Rect = @import("Rect.zig");
 const std = @import("std");
 
@@ -32,9 +31,8 @@ const Uniforms = struct {
 };
 
 pub const WaterRendererParams = struct {
-    texture_manager: *const TextureManager,
-    water_base: TextureHandle,
-    water_blend: TextureHandle,
+    water_base: *const Texture,
+    water_blend: *const Texture,
     water_direction: zm.Vec,
     water_drift_scale: zm.Vec,
     water_drift_range: zm.Vec,
@@ -167,9 +165,9 @@ pub fn begin(self: *WaterRenderer, params: WaterRendererParams) void {
     gl.uniform2fv(self.uniforms.uWaterDriftScale, 1, zm.arrNPtr(&params.water_drift_scale));
 
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, params.water_base.raw_handle);
+    gl.bindTexture(gl.TEXTURE_2D, params.water_base.handle);
     gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, params.water_blend.raw_handle);
+    gl.bindTexture(gl.TEXTURE_2D, params.water_blend.handle);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.index_buffer);
 

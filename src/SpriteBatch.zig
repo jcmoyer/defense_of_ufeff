@@ -4,8 +4,7 @@ const gl = @import("gl33");
 const zm = @import("zmath");
 const shader = @import("shader.zig");
 const texmod = @import("texture.zig");
-const TextureHandle = texmod.TextureHandle;
-const TextureManager = texmod.TextureManager;
+const Texture = texmod.Texture;
 const Rect = @import("Rect.zig");
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -24,8 +23,7 @@ const Uniforms = struct {
 };
 
 pub const SpriteBatchParams = struct {
-    texture_manager: *const TextureManager,
-    texture: TextureHandle,
+    texture: *const Texture,
 };
 
 const quad_count = 1024;
@@ -143,13 +141,12 @@ pub fn begin(self: *SpriteBatch, params: SpriteBatchParams) void {
     gl.uniformMatrix4fv(self.uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
     gl.uniform1i(self.uniforms.uSampler, 0);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, params.texture.raw_handle);
+    gl.bindTexture(gl.TEXTURE_2D, params.texture.handle);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.index_buffer);
 
-    const tex_state = params.texture_manager.getTextureState(params.texture);
-    self.ref_width = @intToFloat(f32, tex_state.width);
-    self.ref_height = @intToFloat(f32, tex_state.height);
+    self.ref_width = @intToFloat(f32, params.texture.width);
+    self.ref_height = @intToFloat(f32, params.texture.height);
 
     self.vertex_head = 0;
     gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer);

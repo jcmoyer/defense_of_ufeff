@@ -190,7 +190,6 @@ pub fn render(self: *PlayState, alpha: f64) void {
     }
 
     self.r_font.begin(.{
-        .texture_manager = &self.game.texman,
         .texture = self.game.texman.getNamedTexture("text16.png"),
         .spec = &self.fontspec,
     });
@@ -198,7 +197,6 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.r_font.end();
 
     self.r_finger.beginTextured(.{
-        .texture_manager = &self.game.texman,
         .texture = self.game.texman.getNamedTexture("finger.png"),
     });
     self.r_finger.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
@@ -233,7 +231,6 @@ fn renderTowers(
     _ = t_characters;
     // render tower bases
     self.r_batch.begin(.{
-        .texture_manager = &self.game.texman,
         .texture = t_special,
     });
     for (self.world.towers.items) |t| {
@@ -251,7 +248,6 @@ fn renderMonsters(
 ) void {
     const t_chara = self.game.texman.getNamedTexture("characters.png");
     self.r_batch.begin(.{
-        .texture_manager = &self.game.texman,
         .texture = t_chara,
     });
     for (self.world.monsters.items) |m| {
@@ -281,10 +277,8 @@ fn renderTilemapLayer(
         .terrain => self.game.texman.getNamedTexture("terrain.png"),
         .special => self.game.texman.getNamedTexture("special.png"),
     };
-    const source_texture_state = self.game.texman.getTextureState(source_texture);
-    const n_tiles_wide = @intCast(u16, source_texture_state.width / 16);
+    const n_tiles_wide = @intCast(u16, source_texture.width / 16);
     self.r_batch.begin(SpriteBatch.SpriteBatchParams{
-        .texture_manager = &self.game.texman,
         .texture = source_texture,
     });
     var y: usize = min_tile_y;
@@ -406,7 +400,6 @@ fn renderTilemap(self: *PlayState, cam: Camera) void {
 
     // water_direction, water_drift, speed set on a per-map basis?
     var water_params = WaterRenderer.WaterRendererParams{
-        .texture_manager = &self.game.texman,
         .water_base = self.game.texman.getNamedTexture("water.png"),
         .water_blend = self.game.texman.getNamedTexture("water.png"),
         .blend_amount = 0.3,
@@ -574,7 +567,6 @@ fn renderFoam(
 ) void {
     const t_foam = self.game.texman.getNamedTexture("water_foam.png");
     self.r_batch.begin(.{
-        .texture_manager = &self.game.texman,
         .texture = t_foam,
     });
     for (self.foam_buf[0..self.n_water]) |f| {

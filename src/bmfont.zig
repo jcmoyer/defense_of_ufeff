@@ -1,7 +1,6 @@
 const SpriteBatch = @import("SpriteBatch.zig");
 const texmod = @import("texture.zig");
-const TextureHandle = texmod.TextureHandle;
-const TextureManager = texmod.TextureManager;
+const Texture = texmod.Texture;
 const Rect = @import("Rect.zig");
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -48,8 +47,7 @@ pub const BitmapFontSpec = struct {
 };
 
 pub const BitmapFontParams = struct {
-    texture_manager: *const TextureManager,
-    texture: TextureHandle,
+    texture: *const Texture,
     spec: *const BitmapFontSpec,
 };
 
@@ -68,11 +66,9 @@ pub const BitmapFont = struct {
     pub fn begin(self: *BitmapFont, params: BitmapFontParams) void {
         self.r_batch.begin(.{
             .texture = params.texture,
-            .texture_manager = params.texture_manager,
         });
-        const ts = params.texture_manager.getTextureState(params.texture);
-        self.ref_width = ts.width;
-        self.ref_height = ts.height;
+        self.ref_width = params.texture.width;
+        self.ref_height = params.texture.height;
         self.fontspec = params.spec;
     }
 

@@ -15,8 +15,7 @@ const textured_vs = @embedFile("FingerRenderer.vert");
 const textured_fs = @embedFile("FingerRenderer.frag");
 
 pub const TexturedParams = struct {
-    texture_manager: *const texture.TextureManager,
-    texture: texture.TextureHandle,
+    texture: *const texture.Texture,
 };
 
 const Vertex = extern struct {
@@ -70,7 +69,7 @@ pub fn beginTextured(self: *FingerRenderer, params: TexturedParams) void {
     gl.bindVertexArray(self.vao);
     gl.uniformMatrix4fv(self.tex_uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, params.texture.raw_handle);
+    gl.bindTexture(gl.TEXTURE_2D, params.texture.handle);
     self.tex_params = params;
 }
 
