@@ -88,6 +88,8 @@ pub const Monster = struct {
                 }
             },
         }
+
+        self.animator.?.update();
     }
 
     pub fn beginMove(self: *Monster, f: Direction) void {
@@ -132,7 +134,6 @@ pub const World = struct {
     map: Tilemap = .{},
     monsters: std.ArrayListUnmanaged(Monster) = .{},
     towers: std.ArrayListUnmanaged(Tower) = .{},
-    animan: ?*anim.AnimationManager = null,
     pathfinder: ?PathfindingState = null,
     goal: ?TileCoord = null,
 
@@ -195,6 +196,7 @@ pub const World = struct {
         try self.monsters.append(self.allocator, Monster{
             .world_x = world_x,
             .world_y = world_y,
+            .animator = anim.a_chara.createAnimator("down"),
         });
     }
 
@@ -249,6 +251,8 @@ pub const World = struct {
 
     pub fn tryMove(self: *World, mobid: usize, dir: Direction) bool {
         var m = &self.monsters.items[mobid];
+
+        m.setFacing(dir);
 
         // cannot interrupt an object that is already moving
         if (m.mstate != .idle) {

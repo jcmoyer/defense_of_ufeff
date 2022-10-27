@@ -32,35 +32,6 @@ const FoamDraw = struct {
     right: bool,
     top: bool,
     bottom: bool,
-
-    fn makeFoamAnimation(comptime x0: i32, comptime y0: i32) anim.Animation {
-        return anim.Animation{
-            .next = "",
-            .frames = &[_]anim.Frame{
-                .{
-                    .rect = Rect.init(x0, y0, 16, 16),
-                    .time = 8,
-                },
-                .{
-                    .rect = Rect.init(x0, y0 + 16, 16, 16),
-                    .time = 8,
-                },
-                .{
-                    .rect = Rect.init(x0, y0 + 32, 16, 16),
-                    .time = 8,
-                },
-                .{
-                    .rect = Rect.init(x0, y0 + 16, 16, 16),
-                    .time = 8,
-                },
-            },
-        };
-    }
-
-    const a_left = makeFoamAnimation(0, 0);
-    const a_right = makeFoamAnimation(16, 0);
-    const a_top = makeFoamAnimation(32, 0);
-    const a_bottom = makeFoamAnimation(48, 0);
 };
 const FingerRenderer = @import("FingerRenderer.zig");
 
@@ -73,7 +44,6 @@ r_water: WaterRenderer,
 water_buf: []WaterDraw,
 n_water: usize = 0,
 foam_buf: []FoamDraw,
-aman: anim.AnimationManager,
 foam_anim_l: anim.Animator,
 foam_anim_r: anim.Animator,
 foam_anim_u: anim.Animator,
@@ -92,30 +62,16 @@ pub fn create(game: *Game) !*PlayState {
         .r_water = WaterRenderer.create(),
         .water_buf = try game.allocator.alloc(WaterDraw, max_onscreen_tiles),
         .foam_buf = try game.allocator.alloc(FoamDraw, max_onscreen_tiles),
-        .aman = anim.AnimationManager.init(game.allocator),
-        .foam_anim_l = undefined,
-        .foam_anim_r = undefined,
-        .foam_anim_u = undefined,
-        .foam_anim_d = undefined,
+        .foam_anim_l = anim.a_foam.createAnimator("l"),
+        .foam_anim_r = anim.a_foam.createAnimator("r"),
+        .foam_anim_u = anim.a_foam.createAnimator("u"),
+        .foam_anim_d = anim.a_foam.createAnimator("d"),
         .world = wo.World.init(self.game.allocator),
         .r_font = undefined,
         .fontspec = undefined,
         .r_finger = FingerRenderer.create(),
     };
     self.r_font = BitmapFont.init(&self.r_batch);
-    var foam_aset = try self.aman.createAnimationSet();
-    try foam_aset.anims.put(self.aman.allocator, "l", FoamDraw.a_left);
-    try foam_aset.anims.put(self.aman.allocator, "r", FoamDraw.a_right);
-    try foam_aset.anims.put(self.aman.allocator, "u", FoamDraw.a_top);
-    try foam_aset.anims.put(self.aman.allocator, "d", FoamDraw.a_bottom);
-    self.foam_anim_l = foam_aset.createAnimator();
-    self.foam_anim_l.setAnimation("l");
-    self.foam_anim_r = foam_aset.createAnimator();
-    self.foam_anim_r.setAnimation("r");
-    self.foam_anim_u = foam_aset.createAnimator();
-    self.foam_anim_u.setAnimation("u");
-    self.foam_anim_d = foam_aset.createAnimator();
-    self.foam_anim_d.setAnimation("d");
 
     // TODO probably want a better way to manage this, direct IO shouldn't be here
     // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
@@ -129,7 +85,7 @@ pub fn create(game: *Game) !*PlayState {
 
 pub fn destroy(self: *PlayState) void {
     self.fontspec.deinit();
-    self.aman.deinit();
+    // self.aman.deinit();
     self.game.allocator.free(self.water_buf);
     self.game.allocator.free(self.foam_buf);
     self.r_batch.destroy();
@@ -252,7 +208,7 @@ fn renderMonsters(
     });
     for (self.world.monsters.items) |m| {
         self.r_batch.drawQuad(
-            Rect.init(0, 0, 16, 16),
+            m.animator.?.getCurrentRect(),
             Rect.init(@intCast(i32, m.world_x) - cam.view.left(), @intCast(i32, m.world_y) - cam.view.top(), 16, 16),
         );
     }
@@ -545,7 +501,7 @@ fn loadWorld(self: *PlayState, mapid: []const u8) void {
         std.log.err("failed to load tilemap {!}", .{err});
         std.process.exit(1);
     };
-    self.world.animan = &self.aman;
+    // self.world.animan = &self.aman;
 
     // Init camera for this map
 

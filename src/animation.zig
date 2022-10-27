@@ -9,36 +9,134 @@ pub const Frame = struct {
 
 pub const Animation = struct {
     frames: []const Frame,
-    next: []const u8,
+    next: ?[]const u8 = null,
+};
+
+pub const AnimationSetVtbl = struct {
+    getAnimationFn: *const fn (self: *const anyopaque, name: []const u8) ?Animation,
+    hasAnimationFn: *const fn (self: *const anyopaque, name: []const u8) bool,
 };
 
 pub const AnimationSet = struct {
+    ptr: *const anyopaque,
+    vtbl: AnimationSetVtbl,
+
+    pub fn getAnimation(self: AnimationSet, name: []const u8) ?Animation {
+        return self.vtbl.getAnimationFn(self.ptr, name);
+    }
+
+    pub fn hasAnimation(self: AnimationSet, name: []const u8) bool {
+        return self.vtbl.hasAnimationFn(self.ptr, name);
+    }
+};
+
+pub const MappedAnimationSet = struct {
+    allocator: Allocator,
     anims: std.StringArrayHashMapUnmanaged(Animation) = .{},
 
-    fn deinit(self: *AnimationSet, allocator: Allocator) void {
-        self.anims.deinit(allocator);
+    fn deinit(self: *AnimationSet) void {
+        self.anims.deinit(self.allocator);
+    }
+
+    pub fn getAnimation(self: AnimationSet, name: []const u8) ?Animation {
+        return self.anims.get(name);
+    }
+
+    pub fn addAnimation(self: *AnimationSet, name: []const u8, anim: Animation) !void {
+        var gop = try self.anims.getOrPut(self.allocator, name);
+        if (gop.found_existing) {
+            return error.AlreadyExists;
+        } else {
+            gop.value_ptr = anim;
+        }
     }
 
     pub fn hasAnimation(self: AnimationSet, name: []const u8) bool {
         return self.anims.contains(name);
     }
 
-    pub fn createAnimator(self: *const AnimationSet) Animator {
+    pub fn createAnimator(self: *const AnimationSet, name: []const u8) Animator {
         return Animator{
             .aset = self,
-            .current_anim = "",
+            .aset_vtbl = .{
+                .getAnimationFn = vGetAnimation,
+                .hasAnimationFn = vHasAnimation,
+            },
+            .current_anim = name,
         };
+    }
+
+    fn vGetAnimation(ptr: *const anyopaque, name: []const u8) ?Animation {
+        const this = @ptrCast(*const AnimationSet, @alignCast(@alignOf(*AnimationSet), ptr));
+        return getAnimation(this.*, name);
+    }
+    fn vHasAnimation(ptr: *const anyopaque, name: []const u8) bool {
+        const this = @ptrCast(*const AnimationSet, @alignCast(@alignOf(*AnimationSet), ptr));
+        return hasAnimation(this.*, name);
     }
 };
 
+pub const StaticAnimationDef = struct {
+    name: []const u8,
+    animation: Animation,
+};
+
+pub fn StaticAnimationSet(comptime defs: []const StaticAnimationDef) type {
+    return struct {
+        const Self = @This();
+
+        pub fn createAnimator(self: *const Self, name: []const u8) Animator {
+            return Animator{
+                .anim_set = .{
+                    .ptr = self,
+                    .vtbl = .{
+                        .getAnimationFn = vGetAnimation,
+                        .hasAnimationFn = vHasAnimation,
+                    },
+                },
+                .current_anim = name,
+            };
+        }
+
+        pub fn getAnimation(self: Self, name: []const u8) ?Animation {
+            _ = self;
+            inline for (defs) |a| {
+                if (std.mem.eql(u8, name, a.name)) {
+                    return a.animation;
+                }
+            }
+            return null;
+        }
+
+        pub fn hasAnimation(self: Self, name: []const u8) bool {
+            _ = self;
+            inline for (defs) |a| {
+                if (std.mem.eql(u8, name, a.name)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        fn vGetAnimation(ptr: *const anyopaque, name: []const u8) ?Animation {
+            const this = @ptrCast(*const Self, ptr);
+            return getAnimation(this.*, name);
+        }
+        fn vHasAnimation(ptr: *const anyopaque, name: []const u8) bool {
+            const this = @ptrCast(*const Self, ptr);
+            return hasAnimation(this.*, name);
+        }
+    };
+}
+
 pub const Animator = struct {
-    aset: *const AnimationSet,
+    anim_set: AnimationSet,
     current_anim: []const u8,
     frame_index: usize = 0,
     counter: u32 = 0,
 
     pub fn getCurrentAnimation(self: Animator) Animation {
-        return self.aset.anims.get(self.current_anim).?;
+        return self.anim_set.getAnimation(self.current_anim).?;
     }
 
     pub fn getCurrentFrame(self: Animator) Frame {
@@ -57,8 +155,10 @@ pub const Animator = struct {
 
             if (self.frame_index == self.getCurrentAnimation().frames.len) {
                 self.frame_index = 0;
-                if (self.aset.anims.contains(self.getCurrentAnimation().next)) {
-                    self.current_anim = self.getCurrentAnimation().next;
+                if (self.getCurrentAnimation().next) |next_name| {
+                    if (self.anim_set.hasAnimation(next_name)) {
+                        self.current_anim = next_name;
+                    }
                 }
             }
         }
@@ -74,36 +174,73 @@ pub const Animator = struct {
             return;
         }
 
-        if (self.aset.hasAnimation(name)) {
+        if (self.anim_set.hasAnimation(name)) {
             self.current_anim = name;
             self.reset();
         }
     }
 };
 
-pub const AnimationManager = struct {
-    allocator: Allocator,
-    asets: std.ArrayListUnmanaged(*AnimationSet),
+//
+// Animation data
+//
 
-    pub fn init(allocator: Allocator) AnimationManager {
-        return .{
-            .allocator = allocator,
-            .asets = .{},
-        };
-    }
+fn makeFoamAnimation(comptime x0: i32, comptime y0: i32) Animation {
+    return Animation{
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(x0, y0, 16, 16),
+                .time = 8,
+            },
+            .{
+                .rect = Rect.init(x0, y0 + 16, 16, 16),
+                .time = 8,
+            },
+            .{
+                .rect = Rect.init(x0, y0 + 32, 16, 16),
+                .time = 8,
+            },
+            .{
+                .rect = Rect.init(x0, y0 + 16, 16, 16),
+                .time = 8,
+            },
+        },
+    };
+}
 
-    pub fn deinit(self: *AnimationManager) void {
-        for (self.asets.items) |p| {
-            p.deinit(self.allocator);
-            self.allocator.destroy(p);
-        }
-        self.asets.deinit(self.allocator);
-    }
+pub const a_foam_left = makeFoamAnimation(0, 0);
+pub const a_foam_right = makeFoamAnimation(16, 0);
+pub const a_foam_top = makeFoamAnimation(32, 0);
+pub const a_foam_bottom = makeFoamAnimation(48, 0);
+pub const a_foam = StaticAnimationSet(&[_]StaticAnimationDef{
+    .{ .name = "l", .animation = a_foam_left },
+    .{ .name = "r", .animation = a_foam_right },
+    .{ .name = "u", .animation = a_foam_top },
+    .{ .name = "d", .animation = a_foam_bottom },
+}){};
 
-    pub fn createAnimationSet(self: *AnimationManager) !*AnimationSet {
-        var aset = try self.allocator.create(AnimationSet);
-        aset.* = .{};
-        try self.asets.append(self.allocator, aset);
-        return aset;
-    }
-};
+fn makeStandardCharacterTwoFrame(comptime x0: i32, comptime y0: i32) Animation {
+    return Animation{
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(x0, y0, 16, 16),
+                .time = 8,
+            },
+            .{
+                .rect = Rect.init(x0, y0 + 16, 16, 16),
+                .time = 8,
+            },
+        },
+    };
+}
+
+fn makeStandardCharacter(comptime x0: i32, comptime y0: i32) [4]StaticAnimationDef {
+    return [4]StaticAnimationDef{
+        .{ .name = "down", .animation = makeStandardCharacterTwoFrame(x0, y0) },
+        .{ .name = "up", .animation = makeStandardCharacterTwoFrame(x0 + 16, y0) },
+        .{ .name = "right", .animation = makeStandardCharacterTwoFrame(x0 + 32, y0) },
+        .{ .name = "left", .animation = makeStandardCharacterTwoFrame(x0 + 48, y0) },
+    };
+}
+
+pub const a_chara = StaticAnimationSet(&makeStandardCharacter(0, 0)){};
