@@ -3,6 +3,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const anim = @import("animation.zig");
 const Direction = @import("direction.zig").Direction;
+const zm = @import("zmath");
 
 const Tile = tmod.Tile;
 const TileBank = tmod.TileBank;
@@ -50,6 +51,8 @@ pub const MoveState = enum {
 };
 
 pub const Monster = struct {
+    p_world_x: u32 = 0,
+    p_world_y: u32 = 0,
     world_x: u32 = 0,
     world_y: u32 = 0,
     mspeed: u32 = 4,
@@ -67,6 +70,9 @@ pub const Monster = struct {
     }
 
     pub fn update(self: *Monster) void {
+        self.p_world_x = self.world_x;
+        self.p_world_y = self.world_y;
+
         switch (self.mstate) {
             .idle => {},
             .left => self.world_x -= self.mspeed,
@@ -112,6 +118,13 @@ pub const Monster = struct {
             const anim_name = @tagName(self.face);
             a.setAnimation(anim_name);
         }
+    }
+
+    // TODO: this return type is bad, need a proper vec abstraction
+    pub fn getInterpWorldPosition(self: Monster, t: f64) [2]u32 {
+        const ix = zm.lerpV(@intToFloat(f64, self.p_world_x), @intToFloat(f64, self.world_x), t);
+        const iy = zm.lerpV(@intToFloat(f64, self.p_world_y), @intToFloat(f64, self.world_y), t);
+        return [2]u32{ @floatToInt(u32, ix), @floatToInt(u32, iy) };
     }
 };
 

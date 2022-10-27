@@ -136,7 +136,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     cam_interp.clampToBounds();
 
     self.renderTilemap(cam_interp);
-    self.renderMonsters(cam_interp);
+    self.renderMonsters(cam_interp, alpha);
     self.renderTowers(cam_interp);
     self.renderBlockedConstructionRects(cam_interp);
     self.renderPlacementIndicator(cam_interp);
@@ -201,15 +201,17 @@ fn renderTowers(
 fn renderMonsters(
     self: *PlayState,
     cam: Camera,
+    a: f64,
 ) void {
     const t_chara = self.game.texman.getNamedTexture("characters.png");
     self.r_batch.begin(.{
         .texture = t_chara,
     });
     for (self.world.monsters.items) |m| {
+        const w = m.getInterpWorldPosition(a);
         self.r_batch.drawQuad(
             m.animator.?.getCurrentRect(),
-            Rect.init(@intCast(i32, m.world_x) - cam.view.left(), @intCast(i32, m.world_y) - cam.view.top(), 16, 16),
+            Rect.init(@intCast(i32, w[0]) - cam.view.left(), @intCast(i32, w[1]) - cam.view.top(), 16, 16),
         );
     }
     self.r_batch.end();
