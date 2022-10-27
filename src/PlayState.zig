@@ -14,6 +14,7 @@ const wo = @import("world.zig");
 const bmfont = @import("bmfont.zig");
 const QuadBatch = @import("QuadBatch.zig");
 const BitmapFont = bmfont.BitmapFont;
+const particle = @import("particle.zig");
 // eventually should probably eliminate this dependency
 const sdl = @import("sdl.zig");
 
@@ -53,8 +54,11 @@ foam_anim_d: anim.Animator,
 world: wo.World,
 fontspec: bmfont.BitmapFontSpec,
 r_finger: FingerRenderer,
+emitter: particle.Emitter,
 
 deb_render_tile_collision: bool = false,
+
+rng: std.rand.DefaultPrng = std.rand.DefaultPrng.init(0),
 
 pub fn create(game: *Game) !*PlayState {
     var self = try game.allocator.create(PlayState);
@@ -73,6 +77,7 @@ pub fn create(game: *Game) !*PlayState {
         .fontspec = undefined,
         .r_finger = FingerRenderer.create(),
         .r_quad = QuadBatch.create(),
+        .emitter = try particle.Emitter.initCapacity(self.game.allocator, 512),
     };
     self.r_font = BitmapFont.init(&self.r_batch);
 
@@ -87,6 +92,7 @@ pub fn create(game: *Game) !*PlayState {
 }
 
 pub fn destroy(self: *PlayState) void {
+    self.emitter.deinit(self.game.allocator);
     self.fontspec.deinit();
     self.r_quad.destroy();
     self.game.allocator.free(self.water_buf);
@@ -128,7 +134,28 @@ pub fn update(self: *PlayState) void {
         _ = self.world.tryMove(0, .down);
     }
 
+    self.emitter.pos[0] = 100;
+    self.emitter.pos[1] = 100;
+
+    self.emitter.emitFunc(4, emitPortalSpray, self);
+    self.emitter.update();
+
     self.world.update();
+}
+
+fn updatePortalSpray(p: *particle.Particle) void {
+    const a = std.math.min(1.0, @intToFloat(f32, 30 -| p.frames_alive) / 30.0);
+    p.color_a = @floatToInt(u8, a * 255);
+    p.size = a * 8;
+}
+
+fn emitPortalSpray(p: *particle.Particle, ctx: *const particle.GeneratorContext) void {
+    var self = @ptrCast(*PlayState, @alignCast(@alignOf(PlayState), ctx.userdata));
+
+    p.vel = [2]f32{ self.rng.random().float(f32) * 2 - 1, self.rng.random().float(f32) * 2 - 1 };
+    p.size = 8;
+    p.color_a = 255;
+    p.updateFn = updatePortalSpray;
 }
 
 pub fn render(self: *PlayState, alpha: f64) void {
@@ -160,6 +187,9 @@ pub fn render(self: *PlayState, alpha: f64) void {
     });
     self.r_finger.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
     self.r_finger.drawFinger(64, 64, @intToFloat(f32, self.game.frame_counter) / 8.0);
+
+    self.r_quad.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
+    self.emitter.render(&self.r_quad, @floatCast(f32, alpha));
 }
 
 pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {

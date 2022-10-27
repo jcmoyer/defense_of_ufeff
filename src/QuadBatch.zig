@@ -170,6 +170,10 @@ fn flush(self: *QuadBatch, remap: bool) void {
 }
 
 pub fn drawQuad(self: *QuadBatch, dest: Rect) void {
+    self.drawQuadRGBA(dest, 255, 255, 255, 255);
+}
+
+pub fn drawQuadRGBA(self: *QuadBatch, dest: Rect, r: u8, g: u8, b: u8, a: u8) void {
     const left = @intToFloat(f32, dest.left());
     const right = @intToFloat(f32, dest.right());
     const top = @intToFloat(f32, dest.top());
@@ -178,34 +182,34 @@ pub fn drawQuad(self: *QuadBatch, dest: Rect) void {
     self.vertices[self.vertex_head + 0] = .{
         .x = left,
         .y = top,
-        .r = 255,
-        .g = 255,
-        .b = 255,
-        .a = 255,
+        .r = r,
+        .g = g,
+        .b = b,
+        .a = a,
     };
     self.vertices[self.vertex_head + 1] = .{
         .x = left,
         .y = bottom,
-        .r = 255,
-        .g = 255,
-        .b = 255,
-        .a = 255,
+        .r = r,
+        .g = g,
+        .b = b,
+        .a = a,
     };
     self.vertices[self.vertex_head + 2] = .{
         .x = right,
         .y = top,
-        .r = 255,
-        .g = 255,
-        .b = 255,
-        .a = 255,
+        .r = r,
+        .g = g,
+        .b = b,
+        .a = a,
     };
     self.vertices[self.vertex_head + 3] = .{
         .x = right,
         .y = bottom,
-        .r = 255,
-        .g = 255,
-        .b = 255,
-        .a = 255,
+        .r = r,
+        .g = g,
+        .b = b,
+        .a = a,
     };
     self.vertex_head += 4;
 
