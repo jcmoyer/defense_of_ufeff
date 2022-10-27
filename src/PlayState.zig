@@ -12,6 +12,7 @@ const zm = @import("zmath");
 const anim = @import("animation.zig");
 const wo = @import("world.zig");
 const bmfont = @import("bmfont.zig");
+const QuadBatch = @import("QuadBatch.zig");
 const BitmapFont = bmfont.BitmapFont;
 // eventually should probably eliminate this dependency
 const sdl = @import("sdl.zig");
@@ -39,6 +40,7 @@ game: *Game,
 camera: Camera = DEFAULT_CAMERA,
 prev_camera: Camera = DEFAULT_CAMERA,
 r_batch: SpriteBatch,
+r_quad: QuadBatch,
 r_font: BitmapFont,
 r_water: WaterRenderer,
 water_buf: []WaterDraw,
@@ -70,6 +72,7 @@ pub fn create(game: *Game) !*PlayState {
         .r_font = undefined,
         .fontspec = undefined,
         .r_finger = FingerRenderer.create(),
+        .r_quad = QuadBatch.create(),
     };
     self.r_font = BitmapFont.init(&self.r_batch);
 
@@ -85,7 +88,7 @@ pub fn create(game: *Game) !*PlayState {
 
 pub fn destroy(self: *PlayState) void {
     self.fontspec.deinit();
-    // self.aman.deinit();
+    self.r_quad.destroy();
     self.game.allocator.free(self.water_buf);
     self.game.allocator.free(self.foam_buf);
     self.r_batch.destroy();
