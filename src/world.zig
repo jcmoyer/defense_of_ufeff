@@ -252,6 +252,16 @@ pub const World = struct {
             @intCast(u32, coord.x * 16),
             @intCast(u32, coord.y * 16),
         );
+        self.invalidatePathCache();
+    }
+
+    fn invalidatePathCache(self: *World) void {
+        self.path_cache.clear();
+        for (self.monsters.items) |*m| {
+            const coord = m.getTilePosition();
+            m.path_index = 0;
+            m.path = self.findPath(coord, self.goal.?).?;
+        }
     }
 
     fn spawnTowerWorld(self: *World, world_x: u32, world_y: u32) !void {
@@ -394,6 +404,9 @@ const PathfindingCache = struct {
     }
 
     fn clear(self: *PathfindingCache) void {
+        for (self.entries.values()) |v| {
+            self.allocator.free(v);
+        }
         self.entries.clearRetainingCapacity();
     }
 
