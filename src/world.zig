@@ -237,6 +237,12 @@ pub const World = struct {
         if (tile_flags.construction_blocked or tile_flags.contains_tower) {
             return false;
         }
+        for (self.monsters.items) |m| {
+            const blocked_coord = m.getTilePosition();
+            if (std.meta.eql(coord, blocked_coord)) {
+                return false;
+            }
+        }
         return true;
     }
 
