@@ -140,7 +140,7 @@ pub fn update(self: *PlayState) void {
     self.emitter.emitFunc(4, emitPortalSpray, self);
     self.emitter.update();
 
-    self.world.update();
+    self.world.update(self.game.frame_counter);
 }
 
 fn updatePortalSpray(p: *particle.Particle) void {
@@ -204,7 +204,7 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
         );
         const tile_x = @divFloor(loc[0], 16);
         const tile_y = @divFloor(loc[1], 16);
-        const tile_coord = wo.TileCoord{ .x = @intCast(usize, tile_x), .y = @intCast(usize, tile_y) };
+        const tile_coord = tilemap.TileCoord{ .x = @intCast(usize, tile_x), .y = @intCast(usize, tile_y) };
         if (self.world.canBuildAt(tile_coord)) {
             self.world.spawnTower(tile_coord) catch unreachable;
         }
@@ -421,7 +421,7 @@ fn renderPlacementIndicator(self: *PlayState, cam: Camera) void {
         self.game.input.mouse.client_x,
         self.game.input.mouse.client_y,
     );
-    var tc = wo.TileCoord{
+    var tc = tilemap.TileCoord{
         .x = @intCast(usize, @divFloor(m[0], 16)),
         .y = @intCast(usize, @divFloor(m[1], 16)),
     };

@@ -4,69 +4,13 @@ const Allocator = std.mem.Allocator;
 const anim = @import("animation.zig");
 const Direction = @import("direction.zig").Direction;
 const zm = @import("zmath");
+const timing = @import("timing.zig");
 
 const Tile = tmod.Tile;
 const TileBank = tmod.TileBank;
 const Tilemap = tmod.Tilemap;
 const TileLayer = tmod.TileLayer;
-
-pub const TileCoord = struct {
-    x: usize,
-    y: usize,
-
-    pub fn worldX(self: TileCoord) u32 {
-        return @intCast(u32, self.x * 16);
-    }
-
-    pub fn worldY(self: TileCoord) u32 {
-        return @intCast(u32, self.y * 16);
-    }
-
-    fn toScalarCoord(self: TileCoord, ref_width: usize) usize {
-        return self.y * ref_width + self.x;
-    }
-
-    fn manhattan(a: TileCoord, b: TileCoord) usize {
-        const dx = @intCast(isize, a.x) - @intCast(isize, b.x);
-        const dy = @intCast(isize, a.y) - @intCast(isize, b.y);
-        return @intCast(usize, std.math.absInt(dx + dy) catch @panic("manhattan distance of TileCoords too big"));
-    }
-
-    /// This seems to be a better A* heuristic than manhattan distance, as the
-    /// resulting path doesn't change by placing obstacles next to it.
-    fn euclideanDistance(a: TileCoord, b: TileCoord) f32 {
-        const dx = @intToFloat(f32, a.x) - @intToFloat(f32, b.x);
-        const dy = @intToFloat(f32, a.y) - @intToFloat(f32, b.y);
-        return std.math.sqrt(dx * dx + dy * dy);
-    }
-
-    fn offset(self: TileCoord, dir: Direction) TileCoord {
-        return switch (dir) {
-            .left => TileCoord{ .x = self.x -% 1, .y = self.y },
-            .right => TileCoord{ .x = self.x +% 1, .y = self.y },
-            .up => TileCoord{ .x = self.x, .y = self.y -% 1 },
-            .down => TileCoord{ .x = self.x, .y = self.y +% 1 },
-        };
-    }
-
-    fn directionToAdjacent(self: TileCoord, to: TileCoord) Direction {
-        const dx = @intCast(isize, self.x) - @intCast(isize, to.x);
-        if (dx == 1) {
-            return .left;
-        }
-        if (dx == -1) {
-            return .right;
-        }
-        const dy = @intCast(isize, self.y) - @intCast(isize, to.y);
-        if (dy == 1) {
-            return .up;
-        }
-        if (dy == -1) {
-            return .down;
-        }
-        unreachable;
-    }
-};
+const TileCoord = tmod.TileCoord;
 
 pub const MoveState = enum {
     idle,
@@ -181,11 +125,14 @@ pub const Tower = struct {
 
 pub const Spawn = struct {
     coord: TileCoord,
+    timer: timing.FrameTimer,
+    spawn_interval: f32,
 };
 
 pub const World = struct {
     allocator: Allocator,
     map: Tilemap = .{},
+    scratch_map: Tilemap = .{},
     monsters: std.ArrayListUnmanaged(Monster) = .{},
     towers: std.ArrayListUnmanaged(Tower) = .{},
     spawns: std.ArrayListUnmanaged(Spawn) = .{},
@@ -207,6 +154,7 @@ pub const World = struct {
         self.monsters.deinit(self.allocator);
         self.towers.deinit(self.allocator);
         self.map.deinit(self.allocator);
+        self.scratch_map.deinit(self.allocator);
         self.pathfinder.deinit();
     }
 
@@ -225,6 +173,8 @@ pub const World = struct {
     fn createSpawn(self: *World, coord: TileCoord) !void {
         try self.spawns.append(self.allocator, Spawn{
             .coord = coord,
+            .timer = timing.FrameTimer.initSeconds(0, 1),
+            .spawn_interval = 1,
         });
     }
 
@@ -243,6 +193,14 @@ pub const World = struct {
                 return false;
             }
         }
+        self.map.copyInto(&self.scratch_map);
+        self.scratch_map.at2DPtr(.base, coord.x, coord.y).flags.contains_tower = true;
+        for (self.monsters.items) |*m| {
+            if (!self.findTheoreticalPath(m.getTilePosition(), self.goal.?)) {
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -294,53 +252,16 @@ pub const World = struct {
         return self.spawns.items[spawn_id].coord;
     }
 
-    pub fn update(self: *World) void {
+    pub fn update(self: *World, frame: u64) void {
+        for (self.spawns.items) |*s, id| {
+            if (s.timer.expired(frame)) {
+                s.timer.restart(frame);
+                self.spawnMonster(id) catch unreachable;
+            }
+        }
         for (self.monsters.items) |*m| {
             m.update();
         }
-    }
-
-    pub fn isValidMove(self: World, start: TileCoord, dir: Direction) bool {
-        const coord_now = start;
-        const coord_want = coord_now.offset(dir);
-
-        if (!self.map.isValidIndex(coord_want.x, coord_want.y)) {
-            return false;
-        }
-
-        const dest_tile = self.map.at2DPtr(.base, coord_want.x, coord_want.y);
-        if (dest_tile.flags.contains_tower) {
-            return false;
-        }
-
-        const flags_x0 = self.map.getCollisionFlags2D(coord_now.x, coord_now.y);
-        const flags_x1 = self.map.getCollisionFlags2D(coord_want.x, coord_want.y);
-
-        // remember 'dir' is the direction we want to move IN, but it's not the
-        // direction we're entering the tile from!
-        const entering_from = dir.invert();
-
-        // collides from where we're currently standing
-        if (flags_x1.from(entering_from)) {
-            return false;
-        }
-
-        // We also need to handle the case where e.g. we're on a cliffside,
-        // if the cliff is a top-left corner tile like so:
-        //             ___
-        //            |
-        //          A | B
-        //            |
-        //
-        // Tile B will have the flag: collides .from_left, so A->B will be blocked.
-        // However, it is also invalid to move from B to A, even though A may be a
-        // tile that accepts movement from all directions. To solve this, we need
-        // to check both A->B and B->A
-        if (flags_x0.from(dir)) {
-            return false;
-        }
-
-        return true;
     }
 
     pub fn tryMove(self: *World, mobid: usize, dir: Direction) bool {
@@ -353,7 +274,7 @@ pub const World = struct {
             return false;
         }
 
-        if (!self.isValidMove(m.getTilePosition(), dir)) {
+        if (!self.map.isValidMove(m.getTilePosition(), dir)) {
             return false;
         }
 
@@ -367,7 +288,7 @@ pub const World = struct {
             return existing_path;
         }
         var timer = std.time.Timer.start() catch unreachable;
-        const has_path = self.pathfinder.findPath(start, end, self, &self.path_cache) catch |err| {
+        const has_path = self.pathfinder.findPath(start, end, &self.map, &self.path_cache) catch |err| {
             std.log.err("findPath failed: {!}", .{err});
             std.process.exit(1);
         };
@@ -378,6 +299,16 @@ pub const World = struct {
         } else {
             return null;
         }
+    }
+
+    pub fn findTheoreticalPath(self: *World, start: TileCoord, end: TileCoord) bool {
+        var timer = std.time.Timer.start() catch unreachable;
+        const has_path = self.pathfinder.findPath(start, end, &self.scratch_map, null) catch |err| {
+            std.log.err("findTheoreticalPath failed: {!}", .{err});
+            std.process.exit(1);
+        };
+        std.log.debug("Theoretical pathfinding {any}->{any} took {d}us", .{ start, end, timer.read() / std.time.ns_per_us });
+        return has_path;
     }
 };
 
@@ -485,14 +416,13 @@ const PathfindingState = struct {
         );
     }
 
-    fn findPath(self: *PathfindingState, start: TileCoord, end: TileCoord, world: *const World, cache: *PathfindingCache) !bool {
-        const map = &world.map;
+    fn findPath(self: *PathfindingState, start: TileCoord, end: TileCoord, map: *const Tilemap, cache: ?*PathfindingCache) !bool {
         const width = map.width;
 
         // sus, upstream interface needs some love
         self.frontier.len = 0;
         self.frontier.context = Context{
-            .map = &world.map,
+            .map = map,
             .score_map = self.score_map,
         };
 
@@ -510,16 +440,19 @@ const PathfindingState = struct {
 
         while (self.frontier.removeOrNull()) |current| {
             if (std.meta.eql(current, end)) {
-                self.result.clearRetainingCapacity();
-                var coord = end;
-                while (!std.meta.eql(coord, start)) {
+                if (cache != null) {
+                    self.result.clearRetainingCapacity();
+                    var coord = end;
+                    while (!std.meta.eql(coord, start)) {
+                        try self.result.append(self.allocator, coord);
+                        coord = self.score_map[coord.toScalarCoord(width)].from;
+                    }
                     try self.result.append(self.allocator, coord);
-                    coord = self.score_map[coord.toScalarCoord(width)].from;
+                    std.mem.reverse(TileCoord, self.result.items);
+                    // return self.result.items;
+                    cache.?.set(start, self.result.toOwnedSlice(self.allocator));
                 }
-                try self.result.append(self.allocator, coord);
-                std.mem.reverse(TileCoord, self.result.items);
-                // return self.result.items;
-                cache.set(start, self.result.toOwnedSlice(self.allocator));
+
                 return true;
             }
 
@@ -527,7 +460,7 @@ const PathfindingState = struct {
             var d_int: u8 = 0;
             while (d_int < 4) : (d_int += 1) {
                 const dir = @intToEnum(Direction, d_int);
-                if (world.isValidMove(current, dir)) {
+                if (map.isValidMove(current, dir)) {
                     // 1 here is the graph edge weight, basically hardcoding manhattan distance
                     const tentative_score = self.score_map[current.toScalarCoord(width)].gscore + 1;
                     const neighbor = current.offset(dir);
@@ -548,7 +481,10 @@ const PathfindingState = struct {
         }
 
         std.log.debug("no path", .{});
-        cache.set(start, &[_]TileCoord{});
+        if (cache) |c| {
+            c.set(start, &[_]TileCoord{});
+        }
+
         return false;
     }
 
@@ -573,6 +509,7 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !World {
 
     var world = World.init(allocator);
     world.map = try Tilemap.init(allocator, doc.width, doc.height);
+    world.scratch_map = try Tilemap.init(allocator, doc.width, doc.height);
     errdefer world.map.deinit(allocator);
     try world.pathfinder.reserve(world.map.tileCount());
     try world.path_cache.reserve(world.map.tileCount());
