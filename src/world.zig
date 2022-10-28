@@ -5,6 +5,7 @@ const anim = @import("animation.zig");
 const Direction = @import("direction.zig").Direction;
 const zm = @import("zmath");
 const timing = @import("timing.zig");
+const particle = @import("particle.zig");
 
 const Tile = tmod.Tile;
 const TileBank = tmod.TileBank;
@@ -134,10 +135,36 @@ pub const Tower = struct {
     }
 };
 
+var rng = std.rand.Xoshiro256.init(0);
+
 pub const Spawn = struct {
     coord: TileCoord,
+    emitter: particle.Emitter,
     timer: timing.FrameTimer,
     spawn_interval: f32,
+
+    fn emit(self: *Spawn) void {
+        self.emitter.emitFunc(16, emitGen, null);
+    }
+
+    fn updatePart(p: *particle.Particle) void {
+        const a = std.math.min(1.0, @intToFloat(f32, 60 -| p.frames_alive) / 60.0);
+        p.color_a = @floatToInt(u8, a * 255);
+        p.size *= 0.97;
+        p.vel[1] *= 0.95;
+        p.vel[0] *= 0.9;
+    }
+
+    fn emitGen(p: *particle.Particle, ctx: *const particle.GeneratorContext) void {
+        _ = ctx;
+        p.vel = [2]f32{
+            rng.random().float(f32) * 4 - rng.random().float(f32) * 4,
+            -rng.random().float(f32) * 2,
+        };
+        p.size = rng.random().float(f32) * 7;
+        p.color_a = 255;
+        p.updateFn = updatePart;
+    }
 };
 
 pub const World = struct {
@@ -163,6 +190,9 @@ pub const World = struct {
 
     pub fn deinit(self: *World) void {
         self.path_cache.deinit();
+        for (self.spawns.items) |*s| {
+            s.emitter.deinit(self.allocator);
+        }
         self.spawns.deinit(self.allocator);
         self.monsters.deinit(self.allocator);
         self.towers.deinit(self.allocator);
@@ -189,7 +219,12 @@ pub const World = struct {
             .coord = coord,
             .timer = timing.FrameTimer.initSeconds(0, 1),
             .spawn_interval = 1,
+            .emitter = try particle.Emitter.initCapacity(self.allocator, 16),
         });
+        self.spawns.items[self.spawns.items.len - 1].emitter.pos = [2]f32{
+            @intToFloat(f32, coord.x * 16) + 8,
+            @intToFloat(f32, coord.y * 16) + 16,
+        };
     }
 
     pub fn canBuildAt(self: *World, coord: TileCoord) bool {
@@ -254,6 +289,7 @@ pub const World = struct {
 
     pub fn spawnMonster(self: *World, spawn_id: usize) !void {
         const pos = self.getSpawnPosition(spawn_id);
+        self.getSpawn(spawn_id).emit();
         var mon = Monster{
             .path = self.findPath(pos, self.goal.?).?,
             .animator = anim.a_chara.createAnimator("down"),
@@ -266,12 +302,17 @@ pub const World = struct {
         return self.spawns.items[spawn_id].coord;
     }
 
+    pub fn getSpawn(self: *World, spawn_id: usize) *Spawn {
+        return &self.spawns.items[spawn_id];
+    }
+
     pub fn update(self: *World, frame: u64) void {
         for (self.spawns.items) |*s, id| {
             if (s.timer.expired(frame)) {
                 s.timer.restart(frame);
                 self.spawnMonster(id) catch unreachable;
             }
+            s.emitter.update();
         }
         for (self.monsters.items) |*m| {
             m.update();
