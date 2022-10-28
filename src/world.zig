@@ -48,6 +48,24 @@ pub const TileCoord = struct {
             .down => TileCoord{ .x = self.x, .y = self.y +% 1 },
         };
     }
+
+    fn directionToAdjacent(self: TileCoord, to: TileCoord) Direction {
+        const dx = @intCast(isize, self.x) - @intCast(isize, to.x);
+        if (dx == 1) {
+            return .left;
+        }
+        if (dx == -1) {
+            return .right;
+        }
+        const dy = @intCast(isize, self.y) - @intCast(isize, to.y);
+        if (dy == 1) {
+            return .up;
+        }
+        if (dy == -1) {
+            return .down;
+        }
+        unreachable;
+    }
 };
 
 pub const MoveState = enum {
@@ -63,10 +81,13 @@ pub const Monster = struct {
     p_world_y: u32 = 0,
     world_x: u32 = 0,
     world_y: u32 = 0,
-    mspeed: u32 = 4,
+    mspeed: u32 = 1,
     mstate: MoveState = .idle,
     face: Direction = .down,
     animator: ?anim.Animator = null,
+    path: []TileCoord,
+    path_index: usize = 0,
+    path_forward: bool = true,
 
     pub fn setWorldPosition(self: *Monster, new_x: u32, new_y: u32) void {
         self.world_x = new_x;
@@ -80,6 +101,14 @@ pub const Monster = struct {
     pub fn update(self: *Monster) void {
         self.p_world_x = self.world_x;
         self.p_world_y = self.world_y;
+
+        if (self.mstate == .idle) {
+            const steps_remaining = self.path.len - (self.path_index + 1);
+            if (steps_remaining > 0) {
+                self.beginMove(self.path[self.path_index].directionToAdjacent(self.path[self.path_index + 1]));
+                self.path_index += 1;
+            }
+        }
 
         switch (self.mstate) {
             .idle => {},
@@ -160,24 +189,25 @@ pub const World = struct {
     monsters: std.ArrayListUnmanaged(Monster) = .{},
     towers: std.ArrayListUnmanaged(Tower) = .{},
     spawns: std.ArrayListUnmanaged(Spawn) = .{},
-    pathfinder: ?PathfindingState = null,
+    pathfinder: PathfindingState,
+    path_cache: PathfindingCache,
     goal: ?TileCoord = null,
 
     pub fn init(allocator: Allocator) World {
         return .{
             .allocator = allocator,
             .pathfinder = PathfindingState.init(allocator),
+            .path_cache = PathfindingCache.init(allocator),
         };
     }
 
     pub fn deinit(self: *World) void {
+        self.path_cache.deinit();
         self.spawns.deinit(self.allocator);
         self.monsters.deinit(self.allocator);
         self.towers.deinit(self.allocator);
         self.map.deinit(self.allocator);
-        if (self.pathfinder) |*p| {
-            p.deinit();
-        }
+        self.pathfinder.deinit();
     }
 
     pub fn getWidth(self: World) usize {
@@ -236,6 +266,7 @@ pub const World = struct {
     pub fn spawnMonster(self: *World, spawn_id: usize) !void {
         const pos = self.getSpawnPosition(spawn_id);
         const mon = Monster{
+            .path = self.findPath(pos, self.goal.?).?,
             .world_x = pos.worldX(),
             .world_y = pos.worldY(),
             .animator = anim.a_chara.createAnimator("down"),
@@ -316,12 +347,57 @@ pub const World = struct {
     }
 
     pub fn findPath(self: *World, start: TileCoord, end: TileCoord) ?[]TileCoord {
-        if (self.pathfinder == null) {
-            self.pathfinder = PathfindingState.init(self.allocator);
+        if (self.path_cache.get(start)) |existing_path| {
+            return existing_path;
         }
+        const has_path = self.pathfinder.findPath(start, end, self, &self.path_cache) catch |err| {
+            std.log.err("findPath failed: {!}", .{err});
+            std.process.exit(1);
+        };
+        if (has_path) {
+            return self.path_cache.get(start).?;
+        } else {
+            return null;
+        }
+    }
+};
 
-        self.pathfinder.?.reserve(self.map.tileCount()) catch unreachable;
-        return self.pathfinder.?.findPath(start, end, self) catch unreachable;
+const PathfindingCache = struct {
+    allocator: Allocator,
+    entries: std.AutoArrayHashMap(TileCoord, []TileCoord),
+
+    fn init(allocator: Allocator) PathfindingCache {
+        return .{
+            .allocator = allocator,
+            .entries = std.AutoArrayHashMap(TileCoord, []TileCoord).init(allocator),
+        };
+    }
+
+    fn deinit(self: *PathfindingCache) void {
+        for (self.entries.values()) |v| {
+            self.allocator.free(v);
+        }
+        self.entries.deinit();
+    }
+
+    fn reserve(self: *PathfindingCache, coord_count: usize) !void {
+        try self.entries.ensureTotalCapacity(coord_count);
+    }
+
+    fn clear(self: *PathfindingCache) void {
+        self.entries.clearRetainingCapacity();
+    }
+
+    fn set(self: *PathfindingCache, from: TileCoord, path: []TileCoord) void {
+        self.entries.putAssumeCapacityNoClobber(from, path);
+    }
+
+    fn get(self: *PathfindingCache, from: TileCoord) ?[]TileCoord {
+        return self.entries.get(from);
+    }
+
+    fn hasPathFrom(self: *PathfindingCache, from: TileCoord) bool {
+        return self.entries.contains(from);
     }
 };
 
@@ -387,7 +463,7 @@ const PathfindingState = struct {
         );
     }
 
-    fn findPath(self: *PathfindingState, start: TileCoord, end: TileCoord, world: *const World) !?[]TileCoord {
+    fn findPath(self: *PathfindingState, start: TileCoord, end: TileCoord, world: *const World, cache: *PathfindingCache) !bool {
         const map = &world.map;
         const width = map.width;
 
@@ -420,7 +496,9 @@ const PathfindingState = struct {
                 }
                 try self.result.append(self.allocator, coord);
                 std.mem.reverse(TileCoord, self.result.items);
-                return self.result.items;
+                // return self.result.items;
+                cache.set(start, self.result.toOwnedSlice(self.allocator));
+                return true;
             }
 
             // examine neighbors
@@ -448,7 +526,8 @@ const PathfindingState = struct {
         }
 
         std.log.debug("no path", .{});
-        return null;
+        cache.set(start, &[_]TileCoord{});
+        return false;
     }
 
     fn heuristic(self: *PathfindingState, from: TileCoord, to: TileCoord) f32 {
@@ -470,11 +549,11 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !World {
     var tokens = std.json.TokenStream.init(buffer);
     var doc = try std.json.parse(TiledDoc, &tokens, .{ .allocator = arena_allocator, .ignore_unknown_fields = true });
 
-    var world = World{
-        .allocator = allocator,
-        .map = try Tilemap.init(allocator, doc.width, doc.height),
-    };
+    var world = World.init(allocator);
+    world.map = try Tilemap.init(allocator, doc.width, doc.height);
     errdefer world.map.deinit(allocator);
+    try world.pathfinder.reserve(world.map.tileCount());
+    try world.path_cache.reserve(world.map.tileCount());
 
     var classifier = BankClassifier{};
     defer classifier.deinit(arena_allocator);
