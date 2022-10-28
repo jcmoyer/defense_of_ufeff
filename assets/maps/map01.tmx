@@ -16,10 +16,10 @@
   </data>
  </layer>
  <objectgroup id="3" name="info">
-  <object id="1" class="spawn_indicator" x="464" y="160">
+  <object id="1" class="spawn_point" x="464" y="160">
    <point/>
   </object>
-  <object id="5" class="spawn_indicator" x="80" y="224">
+  <object id="5" class="spawn_point" x="80" y="224">
    <point/>
   </object>
   <object id="6" class="construction_blocker" x="416" y="128" width="96" height="80"/>

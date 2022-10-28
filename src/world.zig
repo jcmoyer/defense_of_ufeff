@@ -14,6 +14,14 @@ pub const TileCoord = struct {
     x: usize,
     y: usize,
 
+    pub fn worldX(self: TileCoord) u32 {
+        return @intCast(u32, self.x * 16);
+    }
+
+    pub fn worldY(self: TileCoord) u32 {
+        return @intCast(u32, self.y * 16);
+    }
+
     fn toScalarCoord(self: TileCoord, ref_width: usize) usize {
         return self.y * ref_width + self.x;
     }
@@ -142,11 +150,16 @@ pub const Tower = struct {
     }
 };
 
+pub const Spawn = struct {
+    coord: TileCoord,
+};
+
 pub const World = struct {
     allocator: Allocator,
     map: Tilemap = .{},
     monsters: std.ArrayListUnmanaged(Monster) = .{},
     towers: std.ArrayListUnmanaged(Tower) = .{},
+    spawns: std.ArrayListUnmanaged(Spawn) = .{},
     pathfinder: ?PathfindingState = null,
     goal: ?TileCoord = null,
 
@@ -158,6 +171,7 @@ pub const World = struct {
     }
 
     pub fn deinit(self: *World) void {
+        self.spawns.deinit(self.allocator);
         self.monsters.deinit(self.allocator);
         self.towers.deinit(self.allocator);
         self.map.deinit(self.allocator);
@@ -176,6 +190,12 @@ pub const World = struct {
 
     fn setGoal(self: *World, coord: TileCoord) void {
         self.goal = coord;
+    }
+
+    fn createSpawn(self: *World, coord: TileCoord) !void {
+        try self.spawns.append(self.allocator, Spawn{
+            .coord = coord,
+        });
     }
 
     pub fn canBuildAt(self: *World, coord: TileCoord) bool {
@@ -205,12 +225,26 @@ pub const World = struct {
         });
     }
 
-    pub fn spawnMonsterWorld(self: *World, world_x: u32, world_y: u32) !void {
+    fn spawnMonsterWorld(self: *World, world_x: u32, world_y: u32) !void {
         try self.monsters.append(self.allocator, Monster{
             .world_x = world_x,
             .world_y = world_y,
             .animator = anim.a_chara.createAnimator("down"),
         });
+    }
+
+    pub fn spawnMonster(self: *World, spawn_id: usize) !void {
+        const pos = self.getSpawnPosition(spawn_id);
+        const mon = Monster{
+            .world_x = pos.worldX(),
+            .world_y = pos.worldY(),
+            .animator = anim.a_chara.createAnimator("down"),
+        };
+        try self.monsters.append(self.allocator, mon);
+    }
+
+    pub fn getSpawnPosition(self: *World, spawn_id: usize) TileCoord {
+        return self.spawns.items[spawn_id].coord;
     }
 
     pub fn update(self: *World) void {
@@ -514,8 +548,12 @@ fn loadTileLayer(layer: TiledTileLayer, ctx: LoadContext) !void {
 
 fn loadObjectGroup(layer: TiledObjectGroup, ctx: LoadContext) !void {
     for (layer.objects) |obj| {
-        if (std.mem.eql(u8, obj.class, "spawn_indicator")) {
-            // TODO: implement this
+        if (std.mem.eql(u8, obj.class, "spawn_point")) {
+            const coord = TileCoord{
+                .x = @intCast(usize, @divExact(obj.x, 16)),
+                .y = @intCast(usize, @divExact(obj.y, 16)),
+            };
+            try ctx.world.createSpawn(coord);
         } else if (std.mem.eql(u8, obj.class, "construction_blocker")) {
             const tile_start = TileCoord{
                 .x = @intCast(usize, @divExact(obj.x, 16)),

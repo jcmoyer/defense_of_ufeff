@@ -549,8 +549,8 @@ fn loadWorld(self: *PlayState, mapid: []const u8) void {
     self.prev_camera = self.camera;
 
     // TODO: just for testing
-    self.world.spawnMonsterWorld(464, 160) catch unreachable;
-    self.world.spawnMonsterWorld(80, 224) catch unreachable;
+    self.world.spawnMonster(0) catch unreachable;
+    self.world.spawnMonster(1) catch unreachable;
 }
 
 fn renderFoam(
