@@ -25,6 +25,8 @@ pub const Monster = struct {
     p_world_y: u32 = 0,
     world_x: u32 = 0,
     world_y: u32 = 0,
+    /// Updated immediately on move
+    tile_pos: TileCoord = .{ .x = 0, .y = 0 },
     mspeed: u32 = 1,
     mstate: MoveState = .idle,
     face: Direction = .down,
@@ -33,13 +35,20 @@ pub const Monster = struct {
     path_index: usize = 0,
     path_forward: bool = true,
 
+    pub fn setTilePosition(self: *Monster, coord: TileCoord) void {
+        self.setWorldPosition(@intCast(u32, coord.x * 16), @intCast(u32, coord.y * 16));
+    }
+
     pub fn setWorldPosition(self: *Monster, new_x: u32, new_y: u32) void {
         self.world_x = new_x;
         self.world_y = new_y;
+        self.p_world_x = self.world_x;
+        self.p_world_y = self.world_y;
+        self.tile_pos = .{ .x = new_x / 16, .y = new_y / 16 };
     }
 
     pub fn getTilePosition(self: Monster) TileCoord {
-        return .{ .x = self.world_x / 16, .y = self.world_y / 16 };
+        return self.tile_pos;
     }
 
     pub fn update(self: *Monster) void {
@@ -49,6 +58,7 @@ pub const Monster = struct {
         if (self.mstate == .idle) {
             const steps_remaining = self.path.len - (self.path_index + 1);
             if (steps_remaining > 0) {
+                std.debug.assert(std.meta.eql(self.path[self.path_index], self.getTilePosition()));
                 self.beginMove(self.path[self.path_index].directionToAdjacent(self.path[self.path_index + 1]));
                 self.path_index += 1;
             }
@@ -86,6 +96,7 @@ pub const Monster = struct {
             .right => .right,
             .down => .down,
         };
+        self.tile_pos = self.tile_pos.offset(f);
         self.setFacing(f);
     }
 
@@ -133,6 +144,7 @@ pub const World = struct {
     allocator: Allocator,
     map: Tilemap = .{},
     scratch_map: Tilemap = .{},
+    scratch_cache: PathfindingCache,
     monsters: std.ArrayListUnmanaged(Monster) = .{},
     towers: std.ArrayListUnmanaged(Tower) = .{},
     spawns: std.ArrayListUnmanaged(Spawn) = .{},
@@ -145,6 +157,7 @@ pub const World = struct {
             .allocator = allocator,
             .pathfinder = PathfindingState.init(allocator),
             .path_cache = PathfindingCache.init(allocator),
+            .scratch_cache = PathfindingCache.init(allocator),
         };
     }
 
@@ -155,6 +168,7 @@ pub const World = struct {
         self.towers.deinit(self.allocator);
         self.map.deinit(self.allocator);
         self.scratch_map.deinit(self.allocator);
+        self.scratch_cache.deinit();
         self.pathfinder.deinit();
     }
 
@@ -195,6 +209,7 @@ pub const World = struct {
         }
         self.map.copyInto(&self.scratch_map);
         self.scratch_map.at2DPtr(.base, coord.x, coord.y).flags.contains_tower = true;
+        self.scratch_cache.clear();
         for (self.monsters.items) |*m| {
             if (!self.findTheoreticalPath(m.getTilePosition(), self.goal.?)) {
                 return false;
@@ -239,12 +254,11 @@ pub const World = struct {
 
     pub fn spawnMonster(self: *World, spawn_id: usize) !void {
         const pos = self.getSpawnPosition(spawn_id);
-        const mon = Monster{
+        var mon = Monster{
             .path = self.findPath(pos, self.goal.?).?,
-            .world_x = pos.worldX(),
-            .world_y = pos.worldY(),
             .animator = anim.a_chara.createAnimator("down"),
         };
+        mon.setTilePosition(pos);
         try self.monsters.append(self.allocator, mon);
     }
 
@@ -302,12 +316,13 @@ pub const World = struct {
     }
 
     pub fn findTheoreticalPath(self: *World, start: TileCoord, end: TileCoord) bool {
-        var timer = std.time.Timer.start() catch unreachable;
-        const has_path = self.pathfinder.findPath(start, end, &self.scratch_map, null) catch |err| {
+        if (self.scratch_cache.hasPathFrom(start)) {
+            return true;
+        }
+        const has_path = self.pathfinder.findPath(start, end, &self.scratch_map, &self.scratch_cache) catch |err| {
             std.log.err("findTheoreticalPath failed: {!}", .{err});
             std.process.exit(1);
         };
-        std.log.debug("Theoretical pathfinding {any}->{any} took {d}us", .{ start, end, timer.read() / std.time.ns_per_us });
         return has_path;
     }
 };
@@ -480,7 +495,7 @@ const PathfindingState = struct {
             }
         }
 
-        std.log.debug("no path", .{});
+        std.log.debug("no path {any} to {any}", .{ start, end });
         if (cache) |c| {
             c.set(start, &[_]TileCoord{});
         }
@@ -513,6 +528,7 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !World {
     errdefer world.map.deinit(allocator);
     try world.pathfinder.reserve(world.map.tileCount());
     try world.path_cache.reserve(world.map.tileCount());
+    try world.scratch_cache.reserve(world.map.tileCount());
 
     var classifier = BankClassifier{};
     defer classifier.deinit(arena_allocator);
