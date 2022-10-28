@@ -508,39 +508,6 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
             [4]f32{ 0, 0, 1, 0.5 },
         );
     }
-
-    var timer = std.time.Timer.start() catch unreachable;
-
-    var path = self.world.findPath(self.world.monsters.items[0].getTilePosition(), self.world.goal.?);
-    if (path) |p| {
-        for (p) |coord| {
-            self.game.imm.drawQuadRGBA(
-                Rect.init(
-                    @intCast(i32, coord.x * 16) - cam.view.left(),
-                    @intCast(i32, coord.y * 16) - cam.view.top(),
-                    16,
-                    16,
-                ),
-                [4]f32{ 1, 1, 0, 0.5 },
-            );
-        }
-    }
-    path = self.world.findPath(self.world.monsters.items[1].getTilePosition(), self.world.goal.?);
-    if (path) |p| {
-        for (p) |coord| {
-            self.game.imm.drawQuadRGBA(
-                Rect.init(
-                    @intCast(i32, coord.x * 16) - cam.view.left(),
-                    @intCast(i32, coord.y * 16) - cam.view.top(),
-                    16,
-                    16,
-                ),
-                [4]f32{ 1, 1, 0, 0.5 },
-            );
-        }
-    }
-
-    std.debug.print("{d}ms pathfinding\n", .{timer.read() / std.time.ns_per_ms});
 }
 
 fn loadWorld(self: *PlayState, mapid: []const u8) void {

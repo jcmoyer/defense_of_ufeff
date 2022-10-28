@@ -350,10 +350,13 @@ pub const World = struct {
         if (self.path_cache.get(start)) |existing_path| {
             return existing_path;
         }
+        var timer = std.time.Timer.start() catch unreachable;
         const has_path = self.pathfinder.findPath(start, end, self, &self.path_cache) catch |err| {
             std.log.err("findPath failed: {!}", .{err});
             std.process.exit(1);
         };
+        std.log.debug("Pathfinding {any}->{any} took {d}us", .{ start, end, timer.read() / std.time.ns_per_us });
+
         if (has_path) {
             return self.path_cache.get(start).?;
         } else {
