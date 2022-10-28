@@ -87,8 +87,7 @@ pub const Emitter = struct {
             }
 
             var pos = zm.lerp(p.pos[0], p.pos[1], a);
-            pos[0] -= p.size / 2;
-            pos[1] -= p.size / 2;
+            pos -= @splat(2, p.size / 2);
             pos += self.pos;
 
             r_quad.drawQuadRGBA(
