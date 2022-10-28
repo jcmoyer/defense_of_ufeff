@@ -13,6 +13,8 @@ const Tilemap = tmod.Tilemap;
 const TileLayer = tmod.TileLayer;
 const TileCoord = tmod.TileCoord;
 
+const AudioSystem = @import("audio.zig").AudioSystem;
+
 pub const MoveState = enum {
     idle,
     left,
@@ -135,9 +137,9 @@ pub const Tower = struct {
     }
 };
 
-var rng = std.rand.Xoshiro256.init(0);
-
 pub const Spawn = struct {
+    var rng = std.rand.Xoshiro256.init(0);
+
     coord: TileCoord,
     emitter: particle.Emitter,
     timer: timing.FrameTimer,
@@ -295,6 +297,7 @@ pub const World = struct {
             .animator = anim.a_chara.createAnimator("down"),
         };
         mon.setTilePosition(pos);
+        AudioSystem.instance.playSound("assets/sounds/spawn.ogg").release();
         try self.monsters.append(self.allocator, mon);
     }
 

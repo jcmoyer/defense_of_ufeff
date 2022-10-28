@@ -66,6 +66,8 @@ const DecodeRequest = struct {
 };
 
 pub const AudioSystem = struct {
+    pub var instance: *AudioSystem = undefined;
+
     allocator: Allocator,
 
     device: sdl.SDL_AudioDeviceID,
@@ -87,6 +89,7 @@ pub const AudioSystem = struct {
             log.err("Failed to spawn audio decode thread: {!}", .{err});
             std.process.exit(1);
         };
+        instance = self;
         self.* = AudioSystem{
             .allocator = allocator,
             .decode_queue = std.ArrayList(DecodeRequest).init(allocator),
