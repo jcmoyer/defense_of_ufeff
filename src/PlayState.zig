@@ -217,9 +217,13 @@ fn renderProjectiles(
     });
     for (self.world.projectiles.items) |t| {
         const dest = t.getInterpWorldPosition(alpha);
-        self.r_batch.drawQuad(
+        self.r_batch.drawQuadRotated(
             Rect.init(8 * 16, 5 * 16, 16, 16),
-            Rect.init(@intCast(i32, dest[0]) - cam.view.left(), @intCast(i32, dest[1]) - cam.view.top(), 16, 16),
+            @intToFloat(f32, @intCast(i32, dest[0]) - cam.view.left()),
+            @intToFloat(f32, @intCast(i32, dest[1]) - cam.view.top()),
+            16,
+            16,
+            @intToFloat(f32, self.game.frame_counter) / 30.0,
         );
     }
     self.r_batch.end();

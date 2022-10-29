@@ -208,3 +208,42 @@ pub fn drawQuad(self: *SpriteBatch, src: Rect, dest: Rect) void {
         self.flush(true);
     }
 }
+
+pub fn drawQuadRotated(self: *SpriteBatch, src: Rect, dest_x: f32, dest_y: f32, w: f32, h: f32, angle: f32) void {
+    const transform = zm.mul(zm.rotationZ(angle), zm.translation(dest_x, dest_y, 0));
+
+    const hw = w / 2;
+    const hh = h / 2;
+
+    const p0 = zm.mul(zm.f32x4(-hw, -hh, 0, 1), transform);
+    const p1 = zm.mul(zm.f32x4(-hw, hh, 0, 1), transform);
+    const p2 = zm.mul(zm.f32x4(hw, -hh, 0, 1), transform);
+    const p3 = zm.mul(zm.f32x4(hw, hh, 0, 1), transform);
+
+    const uv_left = @intToFloat(f32, src.left()) / self.ref_width;
+    const uv_right = @intToFloat(f32, src.right()) / self.ref_width;
+    const uv_top = 1.0 - @intToFloat(f32, src.top()) / self.ref_height;
+    const uv_bottom = 1.0 - @intToFloat(f32, src.bottom()) / self.ref_height;
+
+    self.vertices[self.vertex_head + 0] = .{
+        .xyuv = zm.f32x4(p0[0], p0[1], uv_left, uv_top),
+        .rgba = zm.f32x4s(1),
+    };
+    self.vertices[self.vertex_head + 1] = .{
+        .xyuv = zm.f32x4(p1[0], p1[1], uv_left, uv_bottom),
+        .rgba = zm.f32x4s(1),
+    };
+    self.vertices[self.vertex_head + 2] = .{
+        .xyuv = zm.f32x4(p2[0], p2[1], uv_right, uv_top),
+        .rgba = zm.f32x4s(1),
+    };
+    self.vertices[self.vertex_head + 3] = .{
+        .xyuv = zm.f32x4(p3[0], p3[1], uv_right, uv_bottom),
+        .rgba = zm.f32x4s(1),
+    };
+    self.vertex_head += 4;
+
+    if (self.vertex_head == vertex_count) {
+        self.flush(true);
+    }
+}
