@@ -135,7 +135,7 @@ pub const Tower = struct {
     }
 
     pub fn getTilePosition(self: Tower) TileCoord {
-        return .{ .x = self.world_x / 16, .y = self.world_y / 16 };
+        return TileCoord.initWorld(self.world_x, self.world_y);
     }
 };
 
@@ -658,21 +658,10 @@ fn loadTileLayer(layer: TiledTileLayer, ctx: LoadContext) !void {
 fn loadObjectGroup(layer: TiledObjectGroup, ctx: LoadContext) !void {
     for (layer.objects) |obj| {
         if (std.mem.eql(u8, obj.class, "spawn_point")) {
-            const coord = TileCoord{
-                .x = @intCast(usize, @divExact(obj.x, 16)),
-                .y = @intCast(usize, @divExact(obj.y, 16)),
-            };
-            try ctx.world.createSpawn(coord);
+            try ctx.world.createSpawn(TileCoord.initSignedWorld(obj.x, obj.y));
         } else if (std.mem.eql(u8, obj.class, "construction_blocker")) {
-            const tile_start = TileCoord{
-                .x = @intCast(usize, @divExact(obj.x, 16)),
-                .y = @intCast(usize, @divExact(obj.y, 16)),
-            };
-            const tile_end = TileCoord{
-                .x = tile_start.x + @intCast(usize, @divExact(obj.width, 16)),
-                .y = tile_start.y + @intCast(usize, @divExact(obj.height, 16)),
-            };
-
+            const tile_start = TileCoord.initSignedWorld(obj.x, obj.y);
+            const tile_end = TileCoord.initSignedWorld(obj.x + obj.width, obj.y + obj.height);
             var ty: usize = tile_start.y;
             while (ty < tile_end.y) : (ty += 1) {
                 var tx: usize = tile_start.x;
@@ -681,11 +670,7 @@ fn loadObjectGroup(layer: TiledObjectGroup, ctx: LoadContext) !void {
                 }
             }
         } else if (std.mem.eql(u8, obj.class, "goal")) {
-            const coord = TileCoord{
-                .x = @intCast(usize, @divExact(obj.x, 16)),
-                .y = @intCast(usize, @divExact(obj.y, 16)),
-            };
-            ctx.world.setGoal(coord);
+            ctx.world.setGoal(TileCoord.initSignedWorld(obj.x, obj.y));
         }
     }
 }

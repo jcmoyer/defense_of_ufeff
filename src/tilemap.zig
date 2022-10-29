@@ -6,6 +6,18 @@ pub const TileCoord = struct {
     x: usize,
     y: usize,
 
+    pub fn initWorld(world_x: u32, world_y: u32) TileCoord {
+        return .{
+            .x = world_x / 16,
+            .y = world_y / 16,
+        };
+    }
+
+    /// Casts parameters to `u32`. Negative values are invalid.
+    pub fn initSignedWorld(world_x: i32, world_y: i32) TileCoord {
+        return initWorld(@intCast(u32, world_x), @intCast(u32, world_y));
+    }
+
     pub fn worldX(self: TileCoord) u32 {
         return @intCast(u32, self.x * 16);
     }
