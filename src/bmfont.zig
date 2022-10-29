@@ -7,6 +7,7 @@ const Allocator = std.mem.Allocator;
 
 pub const BitmapFontSpec = struct {
     allocator: Allocator,
+    space: i32,
     map: std.AutoArrayHashMapUnmanaged(u8, Rect),
 
     pub fn initJson(allocator: Allocator, json: []const u8) !BitmapFontSpec {
@@ -15,6 +16,7 @@ pub const BitmapFontSpec = struct {
             rect: Rect,
         };
         const Document = struct {
+            space: i32 = 0,
             glyphs: []GlyphDef,
         };
         var ts = std.json.TokenStream.init(json);
@@ -33,6 +35,7 @@ pub const BitmapFontSpec = struct {
 
         return BitmapFontSpec{
             .allocator = allocator,
+            .space = doc.space,
             .map = map,
         };
     }
@@ -88,7 +91,7 @@ pub const BitmapFont = struct {
                 src.h,
             );
             self.r_batch.drawQuad(src, dest);
-            dx += src.w;
+            dx += src.w + self.fontspec.space;
         }
     }
 

@@ -54,6 +54,7 @@ foam_anim_u: anim.Animator,
 foam_anim_d: anim.Animator,
 world: wo.World,
 fontspec: bmfont.BitmapFontSpec,
+fontspec_numbers: bmfont.BitmapFontSpec,
 r_finger: FingerRenderer,
 
 deb_render_tile_collision: bool = false,
@@ -75,6 +76,7 @@ pub fn create(game: *Game) !*PlayState {
         .world = wo.World.init(self.game.allocator),
         .r_font = undefined,
         .fontspec = undefined,
+        .fontspec_numbers = undefined,
         .r_finger = FingerRenderer.create(),
         .r_quad = QuadBatch.create(),
     };
@@ -82,16 +84,22 @@ pub fn create(game: *Game) !*PlayState {
 
     // TODO probably want a better way to manage this, direct IO shouldn't be here
     // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
-    var font_file = try std.fs.cwd().openFile("assets/tables/text16.json", .{});
-    defer font_file.close();
-    var spec_json = try font_file.readToEndAlloc(self.game.allocator, 1024 * 1024);
-    defer self.game.allocator.free(spec_json);
-    self.fontspec = try bmfont.BitmapFontSpec.initJson(self.game.allocator, spec_json);
+    self.fontspec = try loadFontSpec(self.game.allocator, "assets/tables/text16.json");
+    self.fontspec_numbers = try loadFontSpec(self.game.allocator, "assets/tables/number3x5.json");
     return self;
+}
+
+fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.BitmapFontSpec {
+    var font_file = try std.fs.cwd().openFile(filename, .{});
+    defer font_file.close();
+    var spec_json = try font_file.readToEndAlloc(allocator, 1024 * 1024);
+    defer allocator.free(spec_json);
+    return try bmfont.BitmapFontSpec.initJson(allocator, spec_json);
 }
 
 pub fn destroy(self: *PlayState) void {
     self.fontspec.deinit();
+    self.fontspec_numbers.deinit();
     self.r_quad.destroy();
     self.game.allocator.free(self.water_buf);
     self.game.allocator.free(self.foam_buf);
@@ -159,6 +167,12 @@ pub fn render(self: *PlayState, alpha: f64) void {
         .spec = &self.fontspec,
     });
     self.r_font.drawText("HELLO WORLD", 0, 0);
+    self.r_font.end();
+    self.r_font.begin(.{
+        .texture = self.game.texman.getNamedTexture("text16.png"),
+        .spec = &self.fontspec_numbers,
+    });
+    self.r_font.drawText("0123456789", 0, 50);
     self.r_font.end();
 
     self.r_finger.beginTextured(.{
