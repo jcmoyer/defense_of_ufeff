@@ -2,8 +2,8 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 pub const FrameTimer = struct {
-    frame_start: u64,
-    frame_end: u64,
+    frame_start: u64 = std.math.maxInt(u64),
+    frame_end: u64 = std.math.maxInt(u64),
 
     pub fn initSeconds(current_frame: u64, sec: f32) FrameTimer {
         return FrameTimer{

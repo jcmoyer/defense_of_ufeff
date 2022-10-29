@@ -146,6 +146,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.renderTilemap(cam_interp);
     self.renderMonsters(cam_interp, alpha);
     self.renderTowers(cam_interp);
+    self.renderProjectiles(cam_interp, alpha);
     self.renderBlockedConstructionRects(cam_interp);
     self.renderPlacementIndicator(cam_interp);
 
@@ -186,9 +187,28 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
         const tile_y = @divFloor(loc[1], 16);
         const tile_coord = tilemap.TileCoord{ .x = @intCast(usize, tile_x), .y = @intCast(usize, tile_y) };
         if (self.world.canBuildAt(tile_coord)) {
-            self.world.spawnTower(tile_coord) catch unreachable;
+            self.world.spawnTower(tile_coord, self.game.frame_counter) catch unreachable;
         }
     }
+}
+
+fn renderProjectiles(
+    self: *PlayState,
+    cam: Camera,
+    alpha: f64,
+) void {
+    const t_special = self.game.texman.getNamedTexture("special.png");
+    self.r_batch.begin(.{
+        .texture = t_special,
+    });
+    for (self.world.projectiles.items) |t| {
+        const dest = t.getInterpWorldPosition(alpha);
+        self.r_batch.drawQuad(
+            Rect.init(8 * 16, 5 * 16, 16, 16),
+            Rect.init(@intCast(i32, dest[0]) - cam.view.left(), @intCast(i32, dest[1]) - cam.view.top(), 16, 16),
+        );
+    }
+    self.r_batch.end();
 }
 
 fn renderTowers(
@@ -485,6 +505,16 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
                 16,
                 16,
             ),
+            [4]f32{ 0, 0, 1, 0.5 },
+        );
+        self.game.imm.drawQuadRGBA(
+            m.getWorldCollisionRect(),
+            [4]f32{ 0, 0, 1, 0.5 },
+        );
+    }
+    for (self.world.projectiles.items) |p| {
+        self.game.imm.drawQuadRGBA(
+            p.getWorldCollisionRect(),
             [4]f32{ 0, 0, 1, 0.5 },
         );
     }

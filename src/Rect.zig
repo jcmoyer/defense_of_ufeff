@@ -1,5 +1,7 @@
 const Rect = @This();
 
+const std = @import("std");
+
 x: i32 = 0,
 y: i32 = 0,
 w: i32 = 0,
@@ -68,4 +70,19 @@ pub fn inflate(self: *Rect, dx: c_int, dy: c_int) void {
     self.y -= dy;
     self.w += 2 * dx;
     self.h += 2 * dy;
+}
+
+pub fn intersect(self: Rect, other: Rect, subrect: ?*Rect) bool {
+    const xmin = std.math.max(self.x, other.x);
+    const ymin = std.math.max(self.y, other.y);
+    const xmax = std.math.min(self.right(), other.right());
+    const ymax = std.math.min(self.bottom(), other.bottom());
+    if (xmax < xmin or ymax < ymin) {
+        return false;
+    } else {
+        if (subrect) |ptr| {
+            ptr.* = Rect.init(xmin, ymin, xmax - xmin, ymax - ymin);
+        }
+        return true;
+    }
 }

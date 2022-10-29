@@ -25,6 +25,36 @@ pub const MoveState = enum {
     down,
 };
 
+pub const Projectile = struct {
+    p_world_x: f32 = 0,
+    p_world_y: f32 = 0,
+    world_x: f32 = 0,
+    world_y: f32 = 0,
+    vel_x: f32 = 0,
+    vel_y: f32 = 0,
+
+    fn update(self: *Projectile) void {
+        self.p_world_x = self.world_x;
+        self.p_world_y = self.world_y;
+        self.world_x += self.vel_x;
+        self.world_y += self.vel_y;
+    }
+
+    pub fn getWorldCollisionRect(self: Projectile) Rect {
+        var r = Rect.init(@floatToInt(i32, self.world_x), @floatToInt(i32, self.world_y), 0, 0);
+        // TODO: replace with projectile size?
+        r.inflate(4, 4);
+        return r;
+    }
+
+    // TODO proper return value
+    pub fn getInterpWorldPosition(self: Projectile, t: f64) [2]u32 {
+        const ix = zm.lerpV(self.p_world_x, self.world_x, @floatCast(f32, t));
+        const iy = zm.lerpV(self.p_world_y, self.world_y, @floatCast(f32, t));
+        return [2]u32{ @floatToInt(u32, ix), @floatToInt(u32, iy) };
+    }
+};
+
 pub const Monster = struct {
     p_world_x: u32 = 0,
     p_world_y: u32 = 0,
@@ -123,11 +153,19 @@ pub const Monster = struct {
         const iy = zm.lerpV(@intToFloat(f64, self.p_world_y), @intToFloat(f64, self.world_y), t);
         return [2]u32{ @floatToInt(u32, ix), @floatToInt(u32, iy) };
     }
+
+    pub fn getWorldCollisionRect(self: Monster) Rect {
+        // TODO: origin is top left, this may change
+        return Rect.init(@intCast(i32, self.world_x), @intCast(i32, self.world_y), 16, 16);
+    }
 };
 
 pub const Tower = struct {
+    world: *World,
     world_x: u32,
     world_y: u32,
+    target_mobid: usize = 0,
+    cooldown: timing.FrameTimer = .{},
 
     pub fn setWorldPosition(self: *Tower, new_x: u32, new_y: u32) void {
         self.world_x = new_x;
@@ -136,6 +174,19 @@ pub const Tower = struct {
 
     pub fn getTilePosition(self: Tower) TileCoord {
         return TileCoord.initWorld(self.world_x, self.world_y);
+    }
+
+    pub fn fireProjectile(self: Tower) void {
+        var proj = self.world.spawnProjectile(self.world_x + 8, self.world_y + 8) catch unreachable;
+        proj.vel_x = 1;
+        proj.vel_y = 0;
+    }
+
+    fn update(self: *Tower, frame: u64) void {
+        if (self.cooldown.expired(frame)) {
+            self.fireProjectile();
+            self.cooldown.restart(frame);
+        }
     }
 };
 
@@ -179,6 +230,7 @@ pub const World = struct {
     monsters: std.ArrayListUnmanaged(Monster) = .{},
     towers: std.ArrayListUnmanaged(Tower) = .{},
     spawns: std.ArrayListUnmanaged(Spawn) = .{},
+    projectiles: std.ArrayListUnmanaged(Projectile) = .{},
     pathfinder: PathfindingState,
     path_cache: PathfindingCache,
     goal: ?TileCoord = null,
@@ -201,6 +253,7 @@ pub const World = struct {
         self.spawns.deinit(self.allocator);
         self.monsters.deinit(self.allocator);
         self.towers.deinit(self.allocator);
+        self.projectiles.deinit(self.allocator);
         self.map.deinit(self.allocator);
         self.scratch_map.deinit(self.allocator);
         self.scratch_cache.deinit();
@@ -259,13 +312,27 @@ pub const World = struct {
         return true;
     }
 
-    pub fn spawnTower(self: *World, coord: TileCoord) !void {
+    pub fn spawnTower(self: *World, coord: TileCoord, frame: u64) !void {
         self.map.at2DPtr(.base, coord.x, coord.y).flags.contains_tower = true;
         try self.spawnTowerWorld(
             @intCast(u32, coord.x * 16),
             @intCast(u32, coord.y * 16),
+            frame,
         );
         self.invalidatePathCache();
+    }
+
+    pub fn spawnProjectile(self: *World, world_x: u32, world_y: u32) !*Projectile {
+        var proj = Projectile{
+            .world_x = @intToFloat(f32, world_x),
+            .world_y = @intToFloat(f32, world_y),
+            .p_world_x = @intToFloat(f32, world_x),
+            .p_world_y = @intToFloat(f32, world_y),
+            .vel_x = @intToFloat(f32, 0),
+            .vel_y = @intToFloat(f32, 0),
+        };
+        self.projectiles.append(self.allocator, proj) catch unreachable;
+        return &self.projectiles.items[self.projectiles.items.len - 1];
     }
 
     fn invalidatePathCache(self: *World) void {
@@ -277,10 +344,12 @@ pub const World = struct {
         }
     }
 
-    fn spawnTowerWorld(self: *World, world_x: u32, world_y: u32) !void {
+    fn spawnTowerWorld(self: *World, world_x: u32, world_y: u32, frame: u64) !void {
         try self.towers.append(self.allocator, Tower{
+            .world = self,
             .world_x = world_x,
             .world_y = world_y,
+            .cooldown = timing.FrameTimer.initSeconds(frame, 3),
         });
     }
 
@@ -328,8 +397,23 @@ pub const World = struct {
             }
             s.emitter.update();
         }
+        for (self.towers.items) |*t| {
+            t.update(frame);
+        }
         for (self.monsters.items) |*m| {
             m.update();
+        }
+        for (self.projectiles.items) |*p| {
+            p.update();
+            var mobid: usize = 0;
+            while (mobid < self.monsters.items.len) {
+                var monster = &self.monsters.items[mobid];
+                if (p.getWorldCollisionRect().intersect(monster.getWorldCollisionRect(), null)) {
+                    _ = self.monsters.swapRemove(mobid);
+                } else {
+                    mobid += 1;
+                }
+            }
         }
     }
 
