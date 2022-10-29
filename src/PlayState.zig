@@ -15,6 +15,7 @@ const bmfont = @import("bmfont.zig");
 const QuadBatch = @import("QuadBatch.zig");
 const BitmapFont = bmfont.BitmapFont;
 const particle = @import("particle.zig");
+const audio = @import("audio.zig");
 // eventually should probably eliminate this dependency
 const sdl = @import("sdl.zig");
 
@@ -131,6 +132,7 @@ pub fn update(self: *PlayState) void {
         _ = self.world.tryMove(0, .down);
     }
 
+    self.world.view = self.camera.view;
     self.world.update(self.game.frame_counter);
 }
 
@@ -510,6 +512,10 @@ fn loadWorld(self: *PlayState, mapid: []const u8) void {
         @intCast(i32, self.world.getHeight() * 16),
     );
     self.prev_camera = self.camera;
+
+    // must be set before calling spawnMonster since it's used for audio parameters...
+    // should probably clean this up eventually
+    self.world.view = self.camera.view;
 
     // TODO: just for testing
     self.world.spawnMonster(0) catch unreachable;

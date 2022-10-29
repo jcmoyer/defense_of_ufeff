@@ -56,6 +56,13 @@ pub fn centerOn(self: *Rect, x: c_int, y: c_int) void {
     self.y = y - @divFloor(self.h, 2);
 }
 
+pub fn centerPoint(self: Rect) [2]i32 {
+    return .{
+        @divFloor(self.right() - self.left(), 2),
+        @divFloor(self.bottom() - self.top(), 2),
+    };
+}
+
 pub fn inflate(self: *Rect, dx: c_int, dy: c_int) void {
     self.x -= dx;
     self.y -= dy;

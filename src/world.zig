@@ -6,6 +6,8 @@ const Direction = @import("direction.zig").Direction;
 const zm = @import("zmath");
 const timing = @import("timing.zig");
 const particle = @import("particle.zig");
+const audio = @import("audio.zig");
+const Rect = @import("Rect.zig");
 
 const Tile = tmod.Tile;
 const TileBank = tmod.TileBank;
@@ -180,6 +182,7 @@ pub const World = struct {
     pathfinder: PathfindingState,
     path_cache: PathfindingCache,
     goal: ?TileCoord = null,
+    view: Rect = .{},
 
     pub fn init(allocator: Allocator) World {
         return .{
@@ -297,8 +300,16 @@ pub const World = struct {
             .animator = anim.a_chara.createAnimator("down"),
         };
         mon.setTilePosition(pos);
-        AudioSystem.instance.playSound("assets/sounds/spawn.ogg").release();
         try self.monsters.append(self.allocator, mon);
+
+        // sfx
+        var params = audio.AudioSystem.instance.playSound("assets/sounds/spawn.ogg");
+        defer params.release();
+
+        const sound_position = [2]i32{
+            @intCast(i32, pos.worldX()), @intCast(i32, pos.worldY()),
+        };
+        audio.computePositionalParameters(self.view, sound_position, params);
     }
 
     pub fn getSpawnPosition(self: *World, spawn_id: usize) TileCoord {

@@ -23,6 +23,7 @@ const AudioParameters = struct {
     allocator: Allocator,
     refcount: std.atomic.Atomic(u32) = .{ .value = 1 },
     volume: std.atomic.Atomic(f32) = .{ .value = 1 },
+    pan: std.atomic.Atomic(f32) = .{ .value = 0.5 },
     done: std.atomic.Atomic(bool) = .{ .value = false },
     paused: std.atomic.Atomic(bool) = .{ .value = false },
 
@@ -244,6 +245,7 @@ pub const AudioSystem = struct {
         for (self.tracks.items) |*track| {
             const input_buffer = track.buffer;
             const volume = track.parameters.volume.load(.SeqCst);
+            const pan = track.parameters.pan.load(.SeqCst);
 
             if (track.parameters.paused.load(.SeqCst)) {
                 continue;
@@ -258,29 +260,47 @@ pub const AudioSystem = struct {
             // stereo. This may need to change in the future.
             const buffer_sample_count = 2 * input_buffer.sample_count.load(.SeqCst);
 
-            for (buffer) |*output| {
+            var i: usize = 0;
+            while (i < buffer.len) : (i += 2) {
                 if (track.done) {
                     break;
                 }
+
+                const output_left = &buffer[i];
+                const m_left = 1 - pan;
+                const output_right = &buffer[i + 1];
+                const m_right = pan;
 
                 // Here we do the math using 32-bit integers and then clamp the
                 // result to 16-bits. This is not really correct since we can "clip"
                 // the sample in this track and continue adding/subtracting
                 // the pre-clipped value in the next. It would be more correct to
                 // clamp once at the end, but then we would need another buffer.
-                const sample_to_mix = @floatToInt(
+                const left_sample_to_mix = @floatToInt(
                     i32,
-                    @intToFloat(f32, input_buffer.samples.?[track.cursor]) * volume,
+                    @intToFloat(f32, input_buffer.samples.?[track.cursor]) * volume * m_left,
                 );
-                const sample_in_mix = @intCast(i32, output.*);
-                const mixed = sample_to_mix + sample_in_mix;
-                output.* = @intCast(i16, std.math.clamp(
-                    mixed,
+                const left_sample_in_mix = @intCast(i32, output_left.*);
+                const left_mixed = left_sample_to_mix + left_sample_in_mix;
+                output_left.* = @intCast(i16, std.math.clamp(
+                    left_mixed,
                     std.math.minInt(i16),
                     std.math.maxInt(i16),
                 ));
 
-                track.cursor += 1;
+                const right_sample_to_mix = @floatToInt(
+                    i32,
+                    @intToFloat(f32, input_buffer.samples.?[track.cursor]) * volume * m_right,
+                );
+                const right_sample_in_mix = @intCast(i32, output_right.*);
+                const right_mixed = right_sample_to_mix + right_sample_in_mix;
+                output_right.* = @intCast(i16, std.math.clamp(
+                    right_mixed,
+                    std.math.minInt(i16),
+                    std.math.maxInt(i16),
+                ));
+
+                track.cursor += 2;
                 if (track.cursor == buffer_sample_count) {
                     if (track.loop) {
                         track.cursor = 0;
@@ -369,3 +389,20 @@ pub const AudioSystem = struct {
         self.decode_cv.signal();
     }
 };
+
+const Rect = @import("Rect.zig");
+const mathutil = @import("mathutil.zig");
+
+pub fn computePositionalParameters(view: Rect, audio_position: [2]i32, output: *AudioParameters) void {
+    const pan = std.math.max(0, @intToFloat(f32, audio_position[0] - view.left())) / @intToFloat(f32, view.right());
+
+    const d_center = mathutil.dist(view.centerPoint(), audio_position);
+    const d_edge = mathutil.dist(
+        view.centerPoint(),
+        [2]i32{ view.left(), view.centerPoint()[1] },
+    );
+    const volume = 1 - (d_center / d_edge);
+
+    output.pan.store(pan, .SeqCst);
+    output.volume.store(volume, .SeqCst);
+}
