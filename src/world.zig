@@ -26,7 +26,16 @@ pub const MoveState = enum {
     down,
 };
 
+pub const ProjectileSpec = struct {
+    spawnFn: ?*const fn (*Projectile, u64) void = null,
+    updateFn: ?*const fn (*Projectile, u64) void = null,
+};
+
+pub const pspec_test = ProjectileSpec{};
+
 pub const Projectile = struct {
+    world: *World,
+    spec: *const ProjectileSpec,
     p_world_x: f32 = 0,
     p_world_y: f32 = 0,
     world_x: f32 = 0,
@@ -34,11 +43,20 @@ pub const Projectile = struct {
     vel_x: f32 = 0,
     vel_y: f32 = 0,
 
-    fn update(self: *Projectile) void {
+    fn spawn(self: *Projectile, frame: u64) void {
+        if (self.spec.spawnFn) |spawnFn| {
+            spawnFn(self, frame);
+        }
+    }
+
+    fn update(self: *Projectile, frame: u64) void {
         self.p_world_x = self.world_x;
         self.p_world_y = self.world_y;
         self.world_x += self.vel_x;
         self.world_y += self.vel_y;
+        if (self.spec.updateFn) |updateFn| {
+            updateFn(self, frame);
+        }
     }
 
     pub fn getWorldCollisionRect(self: Projectile) Rect {
@@ -174,13 +192,12 @@ pub const tspec_test = TowerSpec{
 };
 
 fn tspecTestSpawn(self: *Tower, frame: u64) void {
-    _ = frame;
-    self.fireProjectile();
+    self.fireProjectile(frame);
 }
 
 fn tspecTestUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
-        self.fireProjectile();
+        self.fireProjectile(frame);
         self.cooldown.restart(frame);
     }
 }
@@ -202,9 +219,9 @@ pub const Tower = struct {
         return TileCoord.initWorld(self.world_x, self.world_y);
     }
 
-    pub fn fireProjectile(self: Tower) void {
+    pub fn fireProjectile(self: Tower, frame: u64) void {
         const id = self.world.pickClosestMonster(self.world_x, self.world_y, 100) orelse return;
-        var proj = self.world.spawnProjectile(self.world_x + 8, self.world_y + 8) catch unreachable;
+        var proj = self.world.spawnProjectile(&pspec_test, self.world_x + 8, self.world_y + 8, frame) catch unreachable;
         const r = mu.angleBetween(
             @Vector(2, f32){ @intToFloat(f32, self.world_x), @intToFloat(f32, self.world_y) },
             @Vector(2, f32){ @intToFloat(f32, self.world.monsters.items[id].world_x), @intToFloat(f32, self.world.monsters.items[id].world_y) },
@@ -351,8 +368,10 @@ pub const World = struct {
         self.invalidatePathCache();
     }
 
-    pub fn spawnProjectile(self: *World, world_x: u32, world_y: u32) !*Projectile {
+    pub fn spawnProjectile(self: *World, spec: *const ProjectileSpec, world_x: u32, world_y: u32, frame: u64) !*Projectile {
         var proj = Projectile{
+            .world = self,
+            .spec = spec,
             .world_x = @intToFloat(f32, world_x),
             .world_y = @intToFloat(f32, world_y),
             .p_world_x = @intToFloat(f32, world_x),
@@ -361,7 +380,9 @@ pub const World = struct {
             .vel_y = @intToFloat(f32, 0),
         };
         self.projectiles.append(self.allocator, proj) catch unreachable;
-        return &self.projectiles.items[self.projectiles.items.len - 1];
+        var ptr = &self.projectiles.items[self.projectiles.items.len - 1];
+        ptr.spawn(frame);
+        return ptr;
     }
 
     pub fn pickClosestMonster(self: World, world_x: u32, world_y: u32, range: f32) ?usize {
@@ -457,7 +478,7 @@ pub const World = struct {
             m.update();
         }
         for (self.projectiles.items) |*p| {
-            p.update();
+            p.update(frame);
             var mobid: usize = 0;
             while (mobid < self.monsters.items.len) {
                 var monster = &self.monsters.items[mobid];
