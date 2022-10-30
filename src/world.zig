@@ -181,9 +181,10 @@ pub const Tower = struct {
 
     pub fn fireProjectile(self: Tower) void {
         var proj = self.world.spawnProjectile(self.world_x + 8, self.world_y + 8) catch unreachable;
+        const id = self.world.pickClosestMonster(self.world_x, self.world_y).?;
         const r = mu.angleBetween(
             @Vector(2, f32){ @intToFloat(f32, self.world_x), @intToFloat(f32, self.world_y) },
-            @Vector(2, f32){ @intToFloat(f32, self.world.monsters.items[0].world_x), @intToFloat(f32, self.world.monsters.items[0].world_y) },
+            @Vector(2, f32){ @intToFloat(f32, self.world.monsters.items[id].world_x), @intToFloat(f32, self.world.monsters.items[id].world_y) },
         );
         proj.vel_x = std.math.cos(r);
         proj.vel_y = std.math.sin(r);
@@ -340,6 +341,26 @@ pub const World = struct {
         };
         self.projectiles.append(self.allocator, proj) catch unreachable;
         return &self.projectiles.items[self.projectiles.items.len - 1];
+    }
+
+    pub fn pickClosestMonster(self: World, world_x: u32, world_y: u32) ?usize {
+        if (self.monsters.items.len == 0) {
+            return null;
+        }
+        var closest: usize = 0;
+        var best_dist = std.math.inf_f32;
+        const fx = @intToFloat(f32, world_x);
+        const fy = @intToFloat(f32, world_y);
+        for (self.monsters.items) |m, id| {
+            const mx = @intToFloat(f32, m.world_x);
+            const my = @intToFloat(f32, m.world_y);
+            const dist = mu.dist([2]f32{ fx, fy }, [2]f32{ mx, my });
+            if (dist < best_dist) {
+                closest = id;
+                best_dist = dist;
+            }
+        }
+        return closest;
     }
 
     fn invalidatePathCache(self: *World) void {
