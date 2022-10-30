@@ -1,0 +1,149 @@
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+
+/// Very basic slot map. Guarantees dense storage, index stability, amortized
+/// O(1) insert, lookup, erase. Does not implement generational indexing.
+pub fn SlotMap(comptime T: type) type {
+    return struct {
+        const Self = @This();
+
+        const TaggedT = struct {
+            value: T,
+            index: u32,
+        };
+
+        const Index = struct {
+            item_index: u32,
+            next_free: ?u32,
+        };
+
+        allocator: Allocator,
+        items: std.MultiArrayList(TaggedT) = .{},
+        indices: std.ArrayListUnmanaged(Index) = .{},
+        free_first: ?u32 = null,
+        free_last: ?u32 = null,
+
+        pub fn init(allocator: Allocator) Self {
+            return Self{
+                .allocator = allocator,
+            };
+        }
+
+        pub fn deinit(self: *Self) void {
+            self.items.deinit(self.allocator);
+            self.indices.deinit(self.allocator);
+        }
+
+        fn allocateIndex(self: *Self) !u32 {
+            const internal_index = @intCast(u32, self.items.len);
+            try self.indices.append(self.allocator, .{
+                .item_index = internal_index,
+                // we set null here because it is intended for the item_index's storage to be written immediately
+                // (i.e. this index is *not* a hole)
+                .next_free = null,
+            });
+            return @intCast(u32, self.indices.items.len - 1);
+        }
+
+        pub fn put(self: *Self, value: T) !u32 {
+            var external_index: u32 = undefined;
+            if (self.free_first) |first| {
+                external_index = first;
+                self.indices.items[first].item_index = @intCast(u32, self.items.len);
+                self.free_first = self.indices.items[first].next_free;
+                self.indices.items[first].next_free = null;
+                if (self.free_first == null) {
+                    self.free_last = null;
+                }
+            } else {
+                external_index = try self.allocateIndex();
+            }
+            try self.items.append(self.allocator, TaggedT{
+                .value = value,
+                .index = external_index,
+            });
+            return external_index;
+        }
+
+        pub fn get(self: Self, handle: u32) T {
+            const index = self.indices.items[handle];
+            return self.items.items(.value)[index.item_index];
+        }
+
+        pub fn getPtr(self: Self, handle: u32) *T {
+            const index = self.indices.items[handle];
+            return &self.items.items(.value)[index.item_index];
+        }
+
+        pub fn erase(self: *Self, handle: u32) void {
+            // erase will *always* introduce a new hole in the indices table at `handle`
+            if (self.free_last) |last| {
+                self.indices.items[last].next_free = handle;
+                self.free_last = handle;
+                // the existence of free_last implies the existence of free_first, so we don't need to set it
+            } else {
+                // if free_last does not exist, then there is also no free_first; they both should point to the same hole
+                self.free_last = handle;
+                self.free_first = self.free_last;
+            }
+
+            var index = self.indices.items[handle];
+            self.items.swapRemove(index.item_index);
+
+            // if the element being removed is also the last element, there's nothing to update
+            if (index.item_index == self.items.len) {
+                return;
+            }
+
+            const swapped_index = self.items.items(.index)[index.item_index];
+            self.indices.items[swapped_index].item_index = index.item_index;
+        }
+
+        pub fn slice(self: Self) []T {
+            return self.items.items(.value);
+        }
+    };
+}
+
+test "slotmap" {
+    var map = SlotMap([]const u8).init(std.testing.allocator);
+    defer map.deinit();
+
+    const i = try map.put("hello");
+    const j = try map.put("world");
+    const k = try map.put("zig");
+
+    try std.testing.expectEqualStrings("hello", map.get(i));
+    try std.testing.expectEqualStrings("world", map.get(j));
+    try std.testing.expectEqualStrings("zig", map.get(k));
+
+    map.erase(j);
+
+    try std.testing.expectEqualStrings("hello", map.get(i));
+    try std.testing.expectEqualStrings("zig", map.get(k));
+
+    map.erase(k);
+
+    try std.testing.expectEqualStrings("hello", map.get(i));
+
+    const a = try map.put("wow");
+
+    try std.testing.expectEqualStrings("hello", map.get(i));
+    try std.testing.expectEqualStrings("wow", map.get(a));
+
+    const b = try map.put("abc");
+    const c = try map.put("123");
+
+    try std.testing.expectEqualStrings("abc", map.get(b));
+    try std.testing.expectEqualStrings("123", map.get(c));
+
+    // put 3 elements, erased 2, putting us to 1
+    // then put 3 more elements
+    // so indices should be (3-2)+3
+    try std.testing.expect(map.indices.items.len == 4);
+
+    try std.testing.expectEqualStrings("hello", map.slice()[0]);
+    try std.testing.expectEqualStrings("wow", map.slice()[1]);
+    try std.testing.expectEqualStrings("abc", map.slice()[2]);
+    try std.testing.expectEqualStrings("123", map.slice()[3]);
+}
