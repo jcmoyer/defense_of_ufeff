@@ -164,12 +164,19 @@ pub const Monster = struct {
 };
 
 pub const TowerSpec = struct {
+    spawnFn: ?*const fn (*Tower, u64) void = null,
     updateFn: *const fn (*Tower, u64) void,
 };
 
 pub const tspec_test = TowerSpec{
+    .spawnFn = tspecTestSpawn,
     .updateFn = tspecTestUpdate,
 };
+
+fn tspecTestSpawn(self: *Tower, frame: u64) void {
+    _ = frame;
+    self.fireProjectile();
+}
 
 fn tspecTestUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
@@ -394,6 +401,9 @@ pub const World = struct {
             .world_y = world_y,
             .cooldown = timing.FrameTimer.initSeconds(frame, 3),
         });
+        if (spec.spawnFn) |spawnFn| {
+            spawnFn(&self.towers.items[self.towers.items.len - 1], frame);
+        }
     }
 
     fn spawnMonsterWorld(self: *World, world_x: u32, world_y: u32) !void {
