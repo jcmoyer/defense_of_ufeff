@@ -219,8 +219,8 @@ fn renderProjectiles(
         const dest = t.getInterpWorldPosition(alpha);
         self.r_batch.drawQuadRotated(
             Rect.init(8 * 16, 5 * 16, 16, 16),
-            @intToFloat(f32, @intCast(i32, dest[0]) - cam.view.left()),
-            @intToFloat(f32, @intCast(i32, dest[1]) - cam.view.top()),
+            @intToFloat(f32, dest[0] - cam.view.left()),
+            @intToFloat(f32, dest[1] - cam.view.top()),
             16,
             16,
             @intToFloat(f32, self.game.frame_counter) / 30.0,

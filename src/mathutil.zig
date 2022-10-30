@@ -1,3 +1,5 @@
+const std = @import("std");
+
 /// Exact euclidean distance between two vector-likes.
 pub fn dist(v0: anytype, v1: anytype) f32 {
     comptime if (v0.len != v1.len) {
@@ -20,4 +22,9 @@ pub fn dist(v0: anytype, v1: anytype) f32 {
     }
 
     return @sqrt(r);
+}
+
+pub fn angleBetween(v0: anytype, v1: anytype) f32 {
+    const d = v1 - v0;
+    return std.math.atan2(f32, d[1], d[0]);
 }

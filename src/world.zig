@@ -8,6 +8,7 @@ const timing = @import("timing.zig");
 const particle = @import("particle.zig");
 const audio = @import("audio.zig");
 const Rect = @import("Rect.zig");
+const mu = @import("mathutil.zig");
 
 const Tile = tmod.Tile;
 const TileBank = tmod.TileBank;
@@ -48,10 +49,12 @@ pub const Projectile = struct {
     }
 
     // TODO proper return value
-    pub fn getInterpWorldPosition(self: Projectile, t: f64) [2]u32 {
+    // This function returns a signed integer because it's valid for projectiles
+    // to go off the edge of the world (e.g. negative X)
+    pub fn getInterpWorldPosition(self: Projectile, t: f64) [2]i32 {
         const ix = zm.lerpV(self.p_world_x, self.world_x, @floatCast(f32, t));
         const iy = zm.lerpV(self.p_world_y, self.world_y, @floatCast(f32, t));
-        return [2]u32{ @floatToInt(u32, ix), @floatToInt(u32, iy) };
+        return [2]i32{ @floatToInt(i32, ix), @floatToInt(i32, iy) };
     }
 };
 
@@ -178,8 +181,12 @@ pub const Tower = struct {
 
     pub fn fireProjectile(self: Tower) void {
         var proj = self.world.spawnProjectile(self.world_x + 8, self.world_y + 8) catch unreachable;
-        proj.vel_x = 1;
-        proj.vel_y = 0;
+        const r = mu.angleBetween(
+            @Vector(2, f32){ @intToFloat(f32, self.world_x), @intToFloat(f32, self.world_y) },
+            @Vector(2, f32){ @intToFloat(f32, self.world.monsters.items[0].world_x), @intToFloat(f32, self.world.monsters.items[0].world_y) },
+        );
+        proj.vel_x = std.math.cos(r);
+        proj.vel_y = std.math.sin(r);
     }
 
     fn update(self: *Tower, frame: u64) void {
