@@ -201,7 +201,7 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
         const tile_y = @divFloor(loc[1], 16);
         const tile_coord = tilemap.TileCoord{ .x = @intCast(usize, tile_x), .y = @intCast(usize, tile_y) };
         if (self.world.canBuildAt(tile_coord)) {
-            self.world.spawnTower(tile_coord, self.game.frame_counter) catch unreachable;
+            self.world.spawnTower(&wo.tspec_test, tile_coord, self.game.frame_counter) catch unreachable;
         }
     }
 }

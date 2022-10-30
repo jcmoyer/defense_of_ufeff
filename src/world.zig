@@ -163,8 +163,24 @@ pub const Monster = struct {
     }
 };
 
+pub const TowerSpec = struct {
+    updateFn: *const fn (*Tower, u64) void,
+};
+
+pub const tspec_test = TowerSpec{
+    .updateFn = tspecTestUpdate,
+};
+
+fn tspecTestUpdate(self: *Tower, frame: u64) void {
+    if (self.cooldown.expired(frame)) {
+        self.fireProjectile();
+        self.cooldown.restart(frame);
+    }
+}
+
 pub const Tower = struct {
     world: *World,
+    spec: *const TowerSpec,
     world_x: u32,
     world_y: u32,
     target_mobid: usize = 0,
@@ -191,10 +207,7 @@ pub const Tower = struct {
     }
 
     fn update(self: *Tower, frame: u64) void {
-        if (self.cooldown.expired(frame)) {
-            self.fireProjectile();
-            self.cooldown.restart(frame);
-        }
+        self.spec.updateFn(self, frame);
     }
 };
 
@@ -320,9 +333,10 @@ pub const World = struct {
         return true;
     }
 
-    pub fn spawnTower(self: *World, coord: TileCoord, frame: u64) !void {
+    pub fn spawnTower(self: *World, spec: *const TowerSpec, coord: TileCoord, frame: u64) !void {
         self.map.at2DPtr(.base, coord.x, coord.y).flags.contains_tower = true;
         try self.spawnTowerWorld(
+            spec,
             @intCast(u32, coord.x * 16),
             @intCast(u32, coord.y * 16),
             frame,
@@ -372,9 +386,10 @@ pub const World = struct {
         }
     }
 
-    fn spawnTowerWorld(self: *World, world_x: u32, world_y: u32, frame: u64) !void {
+    fn spawnTowerWorld(self: *World, spec: *const TowerSpec, world_x: u32, world_y: u32, frame: u64) !void {
         try self.towers.append(self.allocator, Tower{
             .world = self,
+            .spec = spec,
             .world_x = world_x,
             .world_y = world_y,
             .cooldown = timing.FrameTimer.initSeconds(frame, 3),
