@@ -27,10 +27,9 @@ pub fn SlotMap(comptime T: type) type {
             self.indices.deinit(allocator);
         }
 
-        fn allocateIndex(self: *Self, allocator: Allocator) !u32 {
-            const internal_index = @intCast(u32, self.items.len);
+        fn allocateIndex(self: *Self, allocator: Allocator, item_index: u32) !u32 {
             try self.indices.append(allocator, .{
-                .item_index = internal_index,
+                .item_index = item_index,
                 // we set null here because it is intended for the item_index's storage to be written immediately
                 // (i.e. this index is *not* a hole)
                 .next_free = null,
@@ -38,24 +37,24 @@ pub fn SlotMap(comptime T: type) type {
             return @intCast(u32, self.indices.items.len - 1);
         }
 
-        fn getNextIndex(self: *Self, allocator: Allocator) !u32 {
+        fn reserveNextIndex(self: *Self, allocator: Allocator, item_index: u32) !u32 {
             var external_index: u32 = undefined;
             if (self.free_first) |first| {
                 external_index = first;
-                self.indices.items[first].item_index = @intCast(u32, self.items.len);
+                self.indices.items[first].item_index = item_index;
                 self.free_first = self.indices.items[first].next_free;
                 self.indices.items[first].next_free = null;
                 if (self.free_first == null) {
                     self.free_last = null;
                 }
             } else {
-                external_index = try self.allocateIndex(allocator);
+                external_index = try self.allocateIndex(allocator, item_index);
             }
             return external_index;
         }
 
         pub fn put(self: *Self, allocator: Allocator, value: T) !u32 {
-            const external_index = try self.getNextIndex(allocator);
+            const external_index = try self.reserveNextIndex(allocator, @intCast(u32, self.items.len));
             try self.items.append(allocator, TaggedT{
                 .value = value,
                 .index = external_index,
