@@ -256,7 +256,7 @@ fn renderTowers(
 ) void {
     const t_special = self.game.texman.getNamedTexture("special.png");
     const t_characters = self.game.texman.getNamedTexture("characters.png");
-    _ = t_characters;
+
     // render tower bases
     self.r_batch.begin(.{
         .texture = t_special,
@@ -266,6 +266,21 @@ fn renderTowers(
             Rect.init(0, 7 * 16, 16, 16),
             Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - cam.view.top(), 16, 16),
         );
+    }
+    self.r_batch.end();
+
+    // render tower characters
+    self.r_batch.begin(.{
+        .texture = t_characters,
+    });
+    for (self.world.towers.items) |t| {
+        if (t.animator) |animator| {
+            // shift up on Y so the character is standing in the center of the tile
+            self.r_batch.drawQuad(
+                animator.getCurrentRect(),
+                Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - 4 - cam.view.top(), 16, 16),
+            );
+        }
     }
     self.r_batch.end();
 }

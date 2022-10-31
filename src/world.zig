@@ -206,11 +206,13 @@ pub const Monster = struct {
 };
 
 pub const TowerSpec = struct {
+    anim_set: ?anim.AnimationSet = null,
     spawnFn: ?*const fn (*Tower, u64) void = null,
     updateFn: *const fn (*Tower, u64) void,
 };
 
 pub const tspec_test = TowerSpec{
+    .anim_set = anim.a_chara.animationSet(),
     .spawnFn = tspecTestSpawn,
     .updateFn = tspecTestUpdate,
 };
@@ -231,6 +233,7 @@ fn tspecTestUpdate(self: *Tower, frame: u64) void {
 pub const Tower = struct {
     world: *World,
     spec: *const TowerSpec,
+    animator: ?anim.Animator = null,
     world_x: u32,
     world_y: u32,
     target_mobid: usize = 0,
@@ -245,20 +248,53 @@ pub const Tower = struct {
         return TileCoord.initWorld(self.world_x, self.world_y);
     }
 
-    pub fn fireProjectile(self: Tower, frame: u64) void {
+    pub fn fireProjectile(self: *Tower, frame: u64) void {
         _ = frame;
         const id = self.world.pickClosestMonster(self.world_x, self.world_y, 100) orelse return;
         var proj = self.world.spawnProjectile(&proj_arrow, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8)) catch unreachable;
-        const r = mu.angleBetween(
+        var r = mu.angleBetween(
             @Vector(2, f32){ @intToFloat(f32, self.world_x), @intToFloat(f32, self.world_y) },
             @Vector(2, f32){ @intToFloat(f32, self.world.monsters.get(id).world_x), @intToFloat(f32, self.world.monsters.get(id).world_y) },
         );
-        proj.vel_x = std.math.cos(r);
-        proj.vel_y = std.math.sin(r);
+
+        const cos_r = std.math.cos(r);
+        const sin_r = std.math.sin(r);
+
+        proj.vel_x = cos_r;
+        proj.vel_y = sin_r;
+
+        if (self.animator) |*animator| {
+            if (std.math.fabs(sin_r) < 0.7) {
+                if (cos_r < 0) {
+                    animator.setAnimation("left");
+                } else {
+                    animator.setAnimation("right");
+                }
+            } else {
+                // Flipped because we're Y-down
+                if (sin_r > 0) {
+                    animator.setAnimation("down");
+                } else {
+                    animator.setAnimation("up");
+                }
+            }
+        }
+    }
+
+    fn spawn(self: *Tower, frame: u64) void {
+        if (self.spec.anim_set) |as| {
+            self.animator = as.createAnimator("down");
+        }
+        if (self.spec.spawnFn) |spawnFn| {
+            spawnFn(self, frame);
+        }
     }
 
     fn update(self: *Tower, frame: u64) void {
         self.spec.updateFn(self, frame);
+        if (self.animator) |*animator| {
+            animator.update();
+        }
     }
 };
 
@@ -444,16 +480,15 @@ pub const World = struct {
     }
 
     fn spawnTowerWorld(self: *World, spec: *const TowerSpec, world_x: u32, world_y: u32, frame: u64) !void {
-        try self.towers.append(self.allocator, Tower{
+        var ptr = try self.towers.addOne(self.allocator);
+        ptr.* = Tower{
             .world = self,
             .spec = spec,
             .world_x = world_x,
             .world_y = world_y,
-            .cooldown = timing.FrameTimer.initSeconds(frame, 3),
-        });
-        if (spec.spawnFn) |spawnFn| {
-            spawnFn(&self.towers.items[self.towers.items.len - 1], frame);
-        }
+            .cooldown = timing.FrameTimer.initSeconds(frame, 0.3),
+        };
+        ptr.spawn(frame);
     }
 
     fn spawnMonsterWorld(self: *World, world_x: u32, world_y: u32) !void {
@@ -508,15 +543,15 @@ pub const World = struct {
         // API is designed to support this use case with a couple changes.
         for (self.projectiles.slice()) |*p| {
             p.update(frame);
-            var mob_index: usize = self.monsters.items.len -% 1;
-            while (mob_index < self.monsters.items.len) : (mob_index -%= 1) {
-                // kinda nasty, maybe we do want an intrusive slotmap
-                var monster = &self.monsters.items.items(.value)[mob_index];
-                var monster_id = self.monsters.items.items(.handle)[mob_index];
-                if (p.getWorldCollisionRect().intersect(monster.getWorldCollisionRect(), null)) {
-                    self.monsters.erase(monster_id);
-                }
-            }
+            // var mob_index: usize = self.monsters.items.len -% 1;
+            // while (mob_index < self.monsters.items.len) : (mob_index -%= 1) {
+            //     // kinda nasty, maybe we do want an intrusive slotmap
+            //     var monster = &self.monsters.items.items(.value)[mob_index];
+            //     var monster_id = self.monsters.items.items(.handle)[mob_index];
+            //     if (p.getWorldCollisionRect().intersect(monster.getWorldCollisionRect(), null)) {
+            //         self.monsters.erase(monster_id);
+            //     }
+            // }
         }
 
         new_projectile_ids.ensureTotalCapacity(frame_arena, self.pending_projectiles.items.len) catch unreachable;
