@@ -56,6 +56,7 @@ world: wo.World,
 fontspec: bmfont.BitmapFontSpec,
 fontspec_numbers: bmfont.BitmapFontSpec,
 r_finger: FingerRenderer,
+frame_arena: std.heap.ArenaAllocator,
 
 deb_render_tile_collision: bool = false,
 
@@ -79,6 +80,8 @@ pub fn create(game: *Game) !*PlayState {
         .fontspec_numbers = undefined,
         .r_finger = FingerRenderer.create(),
         .r_quad = QuadBatch.create(),
+        // Created/destroyed in update()
+        .frame_arena = undefined,
     };
     self.r_font = BitmapFont.init(&self.r_batch);
 
@@ -119,6 +122,10 @@ pub fn leave(self: *PlayState, to: ?Game.StateId) void {
 }
 
 pub fn update(self: *PlayState) void {
+    self.frame_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer self.frame_arena.deinit();
+    var arena = self.frame_arena.allocator();
+
     self.prev_camera = self.camera;
     self.foam_anim_l.update();
     self.foam_anim_r.update();
@@ -141,7 +148,7 @@ pub fn update(self: *PlayState) void {
     }
 
     self.world.view = self.camera.view;
-    self.world.update(self.game.frame_counter);
+    self.world.update(self.game.frame_counter, arena);
 }
 
 pub fn render(self: *PlayState, alpha: f64) void {
@@ -215,7 +222,7 @@ fn renderProjectiles(
     self.r_batch.begin(.{
         .texture = t_special,
     });
-    for (self.world.projectiles.items) |t| {
+    for (self.world.projectiles.slice()) |t| {
         const dest = t.getInterpWorldPosition(alpha);
         self.r_batch.drawQuadRotated(
             Rect.init(8 * 16, 5 * 16, 16, 16),
@@ -258,7 +265,7 @@ fn renderMonsters(
     self.r_batch.begin(.{
         .texture = t_chara,
     });
-    for (self.world.monsters.items) |m| {
+    for (self.world.monsters.slice()) |m| {
         const w = m.getInterpWorldPosition(a);
         self.r_batch.drawQuad(
             m.animator.?.getCurrentRect(),
@@ -513,7 +520,7 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
     }
 
     self.game.imm.beginUntextured();
-    for (self.world.monsters.items) |m| {
+    for (self.world.monsters.slice()) |m| {
         const wx = m.getTilePosition().x * 16;
         const wy = m.getTilePosition().y * 16;
         self.game.imm.drawQuadRGBA(
@@ -530,7 +537,7 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
             [4]f32{ 0, 0, 1, 0.5 },
         );
     }
-    for (self.world.projectiles.items) |p| {
+    for (self.world.projectiles.slice()) |p| {
         self.game.imm.drawQuadRGBA(
             p.getWorldCollisionRect(),
             [4]f32{ 0, 0, 1, 0.5 },

@@ -9,6 +9,7 @@ const particle = @import("particle.zig");
 const audio = @import("audio.zig");
 const Rect = @import("Rect.zig");
 const mu = @import("mathutil.zig");
+const SlotMap = @import("slotmap.zig").SlotMap;
 
 const Tile = tmod.Tile;
 const TileBank = tmod.TileBank;
@@ -31,7 +32,29 @@ pub const ProjectileSpec = struct {
     updateFn: ?*const fn (*Projectile, u64) void = null,
 };
 
-pub const pspec_test = ProjectileSpec{};
+pub const pspec_test = ProjectileSpec{
+    .spawnFn = testSpawn,
+    .updateFn = testUpdate,
+};
+
+const TestData = struct {
+    clone_timer: timing.FrameTimer,
+};
+
+fn testSpawn(self: *Projectile, frame: u64) void {
+    var data = @ptrCast(*TestData, &self.userbuf);
+    data.clone_timer = timing.FrameTimer.initSeconds(frame, 1);
+}
+
+fn testUpdate(self: *Projectile, frame: u64) void {
+    var data = @ptrCast(*TestData, &self.userbuf);
+    if (data.clone_timer.expired(frame)) {
+        var p = self.world.spawnProjectile(&pspec_test, @floatToInt(i32, self.world_x), @floatToInt(i32, self.world_y)) catch unreachable;
+        p.vel_x = self.vel_x * std.math.cos(@intToFloat(f32, frame));
+        p.vel_y = self.vel_y * std.math.sin(@intToFloat(f32, frame));
+        data.clone_timer.restart(frame);
+    }
+}
 
 pub const Projectile = struct {
     world: *World,
@@ -42,6 +65,8 @@ pub const Projectile = struct {
     world_y: f32 = 0,
     vel_x: f32 = 0,
     vel_y: f32 = 0,
+    // storage that ProjectileSpecs can use
+    userbuf: [16]u8 align(16) = undefined,
 
     fn spawn(self: *Projectile, frame: u64) void {
         if (self.spec.spawnFn) |spawnFn| {
@@ -220,11 +245,12 @@ pub const Tower = struct {
     }
 
     pub fn fireProjectile(self: Tower, frame: u64) void {
+        _ = frame;
         const id = self.world.pickClosestMonster(self.world_x, self.world_y, 100) orelse return;
-        var proj = self.world.spawnProjectile(&pspec_test, self.world_x + 8, self.world_y + 8, frame) catch unreachable;
+        var proj = self.world.spawnProjectile(&pspec_test, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8)) catch unreachable;
         const r = mu.angleBetween(
             @Vector(2, f32){ @intToFloat(f32, self.world_x), @intToFloat(f32, self.world_y) },
-            @Vector(2, f32){ @intToFloat(f32, self.world.monsters.items[id].world_x), @intToFloat(f32, self.world.monsters.items[id].world_y) },
+            @Vector(2, f32){ @intToFloat(f32, self.world.monsters.get(id).world_x), @intToFloat(f32, self.world.monsters.get(id).world_y) },
         );
         proj.vel_x = std.math.cos(r);
         proj.vel_y = std.math.sin(r);
@@ -272,10 +298,11 @@ pub const World = struct {
     map: Tilemap = .{},
     scratch_map: Tilemap = .{},
     scratch_cache: PathfindingCache,
-    monsters: std.ArrayListUnmanaged(Monster) = .{},
+    monsters: SlotMap(Monster) = .{},
     towers: std.ArrayListUnmanaged(Tower) = .{},
     spawns: std.ArrayListUnmanaged(Spawn) = .{},
-    projectiles: std.ArrayListUnmanaged(Projectile) = .{},
+    projectiles: SlotMap(Projectile) = .{},
+    pending_projectiles: std.ArrayListUnmanaged(Projectile) = .{},
     pathfinder: PathfindingState,
     path_cache: PathfindingCache,
     goal: ?TileCoord = null,
@@ -303,6 +330,7 @@ pub const World = struct {
         self.scratch_map.deinit(self.allocator);
         self.scratch_cache.deinit();
         self.pathfinder.deinit();
+        self.pending_projectiles.deinit(self.allocator);
     }
 
     pub fn getWidth(self: World) usize {
@@ -339,7 +367,7 @@ pub const World = struct {
         if (tile_flags.construction_blocked or tile_flags.contains_tower) {
             return false;
         }
-        for (self.monsters.items) |m| {
+        for (self.monsters.slice()) |m| {
             const blocked_coord = m.getTilePosition();
             if (std.meta.eql(coord, blocked_coord)) {
                 return false;
@@ -348,7 +376,7 @@ pub const World = struct {
         self.map.copyInto(&self.scratch_map);
         self.scratch_map.at2DPtr(.base, coord.x, coord.y).flags.contains_tower = true;
         self.scratch_cache.clear();
-        for (self.monsters.items) |*m| {
+        for (self.monsters.slice()) |*m| {
             if (!self.findTheoreticalPath(m.getTilePosition(), self.goal.?)) {
                 return false;
             }
@@ -368,8 +396,10 @@ pub const World = struct {
         self.invalidatePathCache();
     }
 
-    pub fn spawnProjectile(self: *World, spec: *const ProjectileSpec, world_x: u32, world_y: u32, frame: u64) !*Projectile {
-        var proj = Projectile{
+    /// Returned pointer is valid for the current frame only.
+    pub fn spawnProjectile(self: *World, spec: *const ProjectileSpec, world_x: i32, world_y: i32) !*Projectile {
+        var ptr = try self.pending_projectiles.addOne(self.allocator);
+        ptr.* = Projectile{
             .world = self,
             .spec = spec,
             .world_x = @intToFloat(f32, world_x),
@@ -379,26 +409,24 @@ pub const World = struct {
             .vel_x = @intToFloat(f32, 0),
             .vel_y = @intToFloat(f32, 0),
         };
-        self.projectiles.append(self.allocator, proj) catch unreachable;
-        var ptr = &self.projectiles.items[self.projectiles.items.len - 1];
-        ptr.spawn(frame);
         return ptr;
     }
 
-    pub fn pickClosestMonster(self: World, world_x: u32, world_y: u32, range: f32) ?usize {
-        if (self.monsters.items.len == 0) {
+    pub fn pickClosestMonster(self: World, world_x: u32, world_y: u32, range: f32) ?u32 {
+        if (self.monsters.slice().len == 0) {
             return null;
         }
-        var closest: ?usize = null;
+        var closest: ?u32 = null;
         var best_dist = std.math.inf_f32;
         const fx = @intToFloat(f32, world_x);
         const fy = @intToFloat(f32, world_y);
-        for (self.monsters.items) |m, id| {
+        var mslice = self.monsters.items.slice();
+        for (mslice.items(.value)) |m, i| {
             const mx = @intToFloat(f32, m.world_x);
             const my = @intToFloat(f32, m.world_y);
             const dist = mu.dist([2]f32{ fx, fy }, [2]f32{ mx, my });
             if (dist <= range and dist < best_dist) {
-                closest = id;
+                closest = mslice.items(.handle)[i];
                 best_dist = dist;
             }
         }
@@ -407,7 +435,7 @@ pub const World = struct {
 
     fn invalidatePathCache(self: *World) void {
         self.path_cache.clear();
-        for (self.monsters.items) |*m| {
+        for (self.monsters.slice()) |*m| {
             const coord = m.getTilePosition();
             m.path_index = 0;
             m.path = self.findPath(coord, self.goal.?).?;
@@ -443,7 +471,7 @@ pub const World = struct {
             .animator = anim.a_chara.createAnimator("down"),
         };
         mon.setTilePosition(pos);
-        try self.monsters.append(self.allocator, mon);
+        _ = try self.monsters.put(self.allocator, mon);
 
         // sfx
         var params = audio.AudioSystem.instance.playSound("assets/sounds/spawn.ogg");
@@ -463,7 +491,9 @@ pub const World = struct {
         return &self.spawns.items[spawn_id];
     }
 
-    pub fn update(self: *World, frame: u64) void {
+    pub fn update(self: *World, frame: u64, frame_arena: Allocator) void {
+        var new_projectile_ids = std.ArrayListUnmanaged(u32){};
+
         for (self.spawns.items) |*s, id| {
             if (s.timer.expired(frame)) {
                 s.timer.restart(frame);
@@ -474,25 +504,40 @@ pub const World = struct {
         for (self.towers.items) |*t| {
             t.update(frame);
         }
-        for (self.monsters.items) |*m| {
+        for (self.monsters.slice()) |*m| {
             m.update();
         }
-        for (self.projectiles.items) |*p| {
+
+        // We have to be very careful here, spawning new projectiles can invalidate pointers into self.projectiles.
+        // This can happen if a projectile spawns a projectile. Since this seems like a cool feature, we will support
+        // it. Projectiles cannot get spawned projectile handles, but if it turns out to be a feature we need, slotmap
+        // API is designed to support this use case with a couple changes.
+        for (self.projectiles.slice()) |*p| {
             p.update(frame);
-            var mobid: usize = 0;
-            while (mobid < self.monsters.items.len) {
-                var monster = &self.monsters.items[mobid];
+            var mob_index: usize = self.monsters.items.len -% 1;
+            while (mob_index < self.monsters.items.len) : (mob_index -%= 1) {
+                // kinda nasty, maybe we do want an intrusive slotmap
+                var monster = &self.monsters.items.items(.value)[mob_index];
+                var monster_id = self.monsters.items.items(.handle)[mob_index];
                 if (p.getWorldCollisionRect().intersect(monster.getWorldCollisionRect(), null)) {
-                    _ = self.monsters.swapRemove(mobid);
-                } else {
-                    mobid += 1;
+                    self.monsters.erase(monster_id);
                 }
             }
         }
+
+        new_projectile_ids.ensureTotalCapacity(frame_arena, self.pending_projectiles.items.len) catch unreachable;
+        for (self.pending_projectiles.items) |proj| {
+            const id = self.projectiles.put(self.allocator, proj) catch unreachable;
+            new_projectile_ids.append(frame_arena, id) catch unreachable;
+        }
+        for (new_projectile_ids.items) |id| {
+            self.projectiles.getPtr(id).spawn(frame);
+        }
+        self.pending_projectiles.clearRetainingCapacity();
     }
 
-    pub fn tryMove(self: *World, mobid: usize, dir: Direction) bool {
-        var m = &self.monsters.items[mobid];
+    pub fn tryMove(self: *World, mobid: u32, dir: Direction) bool {
+        var m = self.monsters.getPtr(mobid);
 
         m.setFacing(dir);
 
