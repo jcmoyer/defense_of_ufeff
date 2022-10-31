@@ -427,7 +427,7 @@ fn renderBlockedConstructionRects(
     );
     const map = self.world.map;
 
-    self.game.imm.beginUntextured();
+    self.r_quad.begin(.{});
     var y: usize = min_tile_y;
     var x: usize = 0;
     while (y < max_tile_y) : (y += 1) {
@@ -445,9 +445,10 @@ fn renderBlockedConstructionRects(
             };
             var a = 0.3 * @sin(@intToFloat(f32, self.game.frame_counter) / 15.0);
             a = std.math.max(a, 0);
-            self.game.imm.drawQuadRGBA(dest, [_]f32{ 1, 0, 0, a });
+            self.r_quad.drawQuadRGBA(dest, 255, 0, 0, @floatToInt(u8, a * 255.0));
         }
     }
+    self.r_quad.end();
 }
 
 fn renderTilemap(self: *PlayState, cam: Camera) void {
@@ -511,6 +512,7 @@ fn renderPlacementIndicator(self: *PlayState, cam: Camera) void {
         16,
         16,
     );
+    self.game.imm.beginUntextured();
     self.game.imm.drawQuadRGBA(dest, color);
 }
 
