@@ -37,6 +37,8 @@ pub fn SlotMap(comptime T: type) type {
             return @intCast(u32, self.indices.items.len - 1);
         }
 
+        /// Returns a handle that can be used to access item storage at `item_index`.
+        /// Caller promises to write `self.items[item_index]` sometime in the future.
         fn reserveNextHandle(self: *Self, allocator: Allocator, item_index: u32) !u32 {
             var handle: u32 = undefined;
             if (self.free_first) |first| {
