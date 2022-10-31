@@ -27,48 +27,41 @@ pub const MoveState = enum {
     down,
 };
 
+pub const RotationBehavior = enum {
+    no_rotation,
+    rotation_from_velocity,
+};
+
 pub const ProjectileSpec = struct {
+    anim_set: ?anim.AnimationSet = null,
+    rotation: RotationBehavior = .no_rotation,
     spawnFn: ?*const fn (*Projectile, u64) void = null,
     updateFn: ?*const fn (*Projectile, u64) void = null,
 };
 
-pub const pspec_test = ProjectileSpec{
-    .spawnFn = testSpawn,
-    .updateFn = testUpdate,
+pub const proj_arrow = ProjectileSpec{
+    .anim_set = anim.a_proj_arrow.animationSet(),
+    .rotation = .rotation_from_velocity,
 };
-
-const TestData = struct {
-    clone_timer: timing.FrameTimer,
-};
-
-fn testSpawn(self: *Projectile, frame: u64) void {
-    var data = @ptrCast(*TestData, &self.userbuf);
-    data.clone_timer = timing.FrameTimer.initSeconds(frame, 1);
-}
-
-fn testUpdate(self: *Projectile, frame: u64) void {
-    var data = @ptrCast(*TestData, &self.userbuf);
-    if (data.clone_timer.expired(frame)) {
-        var p = self.world.spawnProjectile(&pspec_test, @floatToInt(i32, self.world_x), @floatToInt(i32, self.world_y)) catch unreachable;
-        p.vel_x = self.vel_x * std.math.cos(@intToFloat(f32, frame));
-        p.vel_y = self.vel_y * std.math.sin(@intToFloat(f32, frame));
-        data.clone_timer.restart(frame);
-    }
-}
 
 pub const Projectile = struct {
     world: *World,
     spec: *const ProjectileSpec,
+    animator: ?anim.Animator = null,
     p_world_x: f32 = 0,
     p_world_y: f32 = 0,
     world_x: f32 = 0,
     world_y: f32 = 0,
     vel_x: f32 = 0,
     vel_y: f32 = 0,
+    angle: f32 = 0,
     // storage that ProjectileSpecs can use
     userbuf: [16]u8 align(16) = undefined,
 
     fn spawn(self: *Projectile, frame: u64) void {
+        if (self.spec.anim_set) |as| {
+            self.animator = as.createAnimator("default");
+        }
         if (self.spec.spawnFn) |spawnFn| {
             spawnFn(self, frame);
         }
@@ -79,8 +72,14 @@ pub const Projectile = struct {
         self.p_world_y = self.world_y;
         self.world_x += self.vel_x;
         self.world_y += self.vel_y;
+        if (self.animator) |*an| {
+            an.update();
+        }
         if (self.spec.updateFn) |updateFn| {
             updateFn(self, frame);
+        }
+        if (self.spec.rotation == .rotation_from_velocity) {
+            self.angle = std.math.atan2(f32, self.vel_y, self.vel_x);
         }
     }
 
@@ -217,11 +216,21 @@ pub const tspec_test = TowerSpec{
 };
 
 fn tspecTestSpawn(self: *Tower, frame: u64) void {
-    self.fireProjectile(frame);
+    _ = self;
+    _ = frame;
 }
 
 fn tspecTestUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
+        // sfx
+        var params = audio.AudioSystem.instance.playSound("assets/sounds/bow.ogg");
+        defer params.release();
+
+        const sound_position = [2]i32{
+            @intCast(i32, self.world_x), @intCast(i32, self.world_y),
+        };
+        audio.computePositionalParameters(self.world.view, sound_position, params);
+
         self.fireProjectile(frame);
         self.cooldown.restart(frame);
     }
@@ -247,7 +256,7 @@ pub const Tower = struct {
     pub fn fireProjectile(self: Tower, frame: u64) void {
         _ = frame;
         const id = self.world.pickClosestMonster(self.world_x, self.world_y, 100) orelse return;
-        var proj = self.world.spawnProjectile(&pspec_test, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8)) catch unreachable;
+        var proj = self.world.spawnProjectile(&proj_arrow, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8)) catch unreachable;
         const r = mu.angleBetween(
             @Vector(2, f32){ @intToFloat(f32, self.world_x), @intToFloat(f32, self.world_y) },
             @Vector(2, f32){ @intToFloat(f32, self.world.monsters.get(id).world_x), @intToFloat(f32, self.world.monsters.get(id).world_y) },
@@ -468,7 +477,7 @@ pub const World = struct {
         self.getSpawn(spawn_id).emit();
         var mon = Monster{
             .path = self.findPath(pos, self.goal.?).?,
-            .animator = anim.a_chara.createAnimator("down"),
+            .animator = anim.a_chara.animationSet().createAnimator("down"),
         };
         mon.setTilePosition(pos);
         _ = try self.monsters.put(self.allocator, mon);

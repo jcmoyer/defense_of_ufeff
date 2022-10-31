@@ -70,10 +70,10 @@ pub fn create(game: *Game) !*PlayState {
         .r_water = WaterRenderer.create(),
         .water_buf = try game.allocator.alloc(WaterDraw, max_onscreen_tiles),
         .foam_buf = try game.allocator.alloc(FoamDraw, max_onscreen_tiles),
-        .foam_anim_l = anim.a_foam.createAnimator("l"),
-        .foam_anim_r = anim.a_foam.createAnimator("r"),
-        .foam_anim_u = anim.a_foam.createAnimator("u"),
-        .foam_anim_d = anim.a_foam.createAnimator("d"),
+        .foam_anim_l = anim.a_foam.animationSet().createAnimator("l"),
+        .foam_anim_r = anim.a_foam.animationSet().createAnimator("r"),
+        .foam_anim_u = anim.a_foam.animationSet().createAnimator("u"),
+        .foam_anim_d = anim.a_foam.animationSet().createAnimator("d"),
         .world = wo.World.init(self.game.allocator),
         .r_font = undefined,
         .fontspec = undefined,
@@ -223,15 +223,29 @@ fn renderProjectiles(
         .texture = t_special,
     });
     for (self.world.projectiles.slice()) |t| {
+        var animator = t.animator orelse continue;
         const dest = t.getInterpWorldPosition(alpha);
-        self.r_batch.drawQuadRotated(
-            Rect.init(8 * 16, 5 * 16, 16, 16),
-            @intToFloat(f32, dest[0] - cam.view.left()),
-            @intToFloat(f32, dest[1] - cam.view.top()),
-            16,
-            16,
-            @intToFloat(f32, self.game.frame_counter) / 30.0,
-        );
+
+        if (t.spec.rotation == .no_rotation) {
+            // TODO: use non-rotated variant
+            self.r_batch.drawQuadRotated(
+                animator.getCurrentRect(),
+                @intToFloat(f32, dest[0] - cam.view.left()),
+                @intToFloat(f32, dest[1] - cam.view.top()),
+                16,
+                16,
+                0,
+            );
+        } else {
+            self.r_batch.drawQuadRotated(
+                animator.getCurrentRect(),
+                @intToFloat(f32, dest[0] - cam.view.left()),
+                @intToFloat(f32, dest[1] - cam.view.top()),
+                16,
+                16,
+                t.angle,
+            );
+        }
     }
     self.r_batch.end();
 }

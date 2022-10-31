@@ -28,6 +28,13 @@ pub const AnimationSet = struct {
     pub fn hasAnimation(self: AnimationSet, name: []const u8) bool {
         return self.vtbl.hasAnimationFn(self.ptr, name);
     }
+
+    pub fn createAnimator(self: AnimationSet, name: []const u8) Animator {
+        return Animator{
+            .anim_set = self,
+            .current_anim = name,
+        };
+    }
 };
 
 pub const MappedAnimationSet = struct {
@@ -85,16 +92,13 @@ pub fn StaticAnimationSet(comptime defs: []const StaticAnimationDef) type {
     return struct {
         const Self = @This();
 
-        pub fn createAnimator(self: *const Self, name: []const u8) Animator {
-            return Animator{
-                .anim_set = .{
-                    .ptr = self,
-                    .vtbl = .{
-                        .getAnimationFn = vGetAnimation,
-                        .hasAnimationFn = vHasAnimation,
-                    },
+        pub fn animationSet(self: *const Self) AnimationSet {
+            return .{
+                .ptr = self,
+                .vtbl = .{
+                    .getAnimationFn = vGetAnimation,
+                    .hasAnimationFn = vHasAnimation,
                 },
-                .current_anim = name,
             };
         }
 
@@ -244,3 +248,15 @@ fn makeStandardCharacter(comptime x0: i32, comptime y0: i32) [4]StaticAnimationD
 }
 
 pub const a_chara = StaticAnimationSet(&makeStandardCharacter(0, 0)){};
+
+pub const a_proj_arrow = StaticAnimationSet(&[1]StaticAnimationDef{.{
+    .name = "default",
+    .animation = Animation{
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(10 * 16, 0, 16, 16),
+                .time = 8,
+            },
+        },
+    },
+}}){};
