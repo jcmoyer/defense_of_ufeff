@@ -222,15 +222,7 @@ fn tspecTestSpawn(self: *Tower, frame: u64) void {
 
 fn tspecTestUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
-        // sfx
-        var params = audio.AudioSystem.instance.playSound("assets/sounds/bow.ogg");
-        defer params.release();
-
-        const sound_position = [2]i32{
-            @intCast(i32, self.world_x), @intCast(i32, self.world_y),
-        };
-        audio.computePositionalParameters(self.world.view, sound_position, params);
-
+        self.world.playPositionalSound("assets/sounds/bow.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
         self.fireProjectile(frame);
         self.cooldown.restart(frame);
     }
@@ -482,14 +474,7 @@ pub const World = struct {
         mon.setTilePosition(pos);
         _ = try self.monsters.put(self.allocator, mon);
 
-        // sfx
-        var params = audio.AudioSystem.instance.playSound("assets/sounds/spawn.ogg");
-        defer params.release();
-
-        const sound_position = [2]i32{
-            @intCast(i32, pos.worldX()), @intCast(i32, pos.worldY()),
-        };
-        audio.computePositionalParameters(self.view, sound_position, params);
+        self.playPositionalSound("assets/sounds/spawn.ogg", @intCast(i32, pos.worldX()), @intCast(i32, pos.worldY()));
     }
 
     pub fn getSpawnPosition(self: *World, spawn_id: usize) TileCoord {
@@ -591,6 +576,14 @@ pub const World = struct {
             std.process.exit(1);
         };
         return has_path;
+    }
+
+    fn playPositionalSound(self: World, sound: [:0]const u8, world_x: i32, world_y: i32) void {
+        var params = audio.AudioSystem.instance.playSound(sound);
+        defer params.release();
+
+        const sound_position = [2]i32{ world_x, world_y };
+        audio.computePositionalParameters(self.view, sound_position, params);
     }
 };
 
