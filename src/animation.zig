@@ -260,3 +260,15 @@ pub const a_proj_arrow = StaticAnimationSet(&[1]StaticAnimationDef{.{
         },
     },
 }}){};
+
+pub const a_proj_bow = StaticAnimationSet(&[1]StaticAnimationDef{.{
+    .name = "default",
+    .animation = Animation{
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(7 * 16, 8 * 16, 16, 16),
+                .time = 8,
+            },
+        },
+    },
+}}){};

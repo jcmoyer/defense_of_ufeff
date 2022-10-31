@@ -161,6 +161,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.renderTilemap(cam_interp);
     self.renderMonsters(cam_interp, alpha);
     self.renderTowers(cam_interp);
+    self.renderSpriteEffects(cam_interp, alpha);
     self.renderProjectiles(cam_interp, alpha);
     self.renderBlockedConstructionRects(cam_interp);
     self.renderPlacementIndicator(cam_interp);
@@ -211,6 +212,30 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
             self.world.spawnTower(&wo.tspec_test, tile_coord, self.game.frame_counter) catch unreachable;
         }
     }
+}
+
+fn renderSpriteEffects(
+    self: *PlayState,
+    cam: Camera,
+    alpha: f64,
+) void {
+    _ = alpha;
+    const t_special = self.game.texman.getNamedTexture("special.png");
+    self.r_batch.begin(.{
+        .texture = t_special,
+    });
+    for (self.world.sprite_effects.slice()) |t| {
+        var animator = t.animator orelse continue;
+        self.r_batch.drawQuadRotated(
+            animator.getCurrentRect(),
+            t.world_x - @intToFloat(f32, cam.view.left()),
+            t.world_y - @intToFloat(f32, cam.view.top()),
+            16,
+            16,
+            t.angle,
+        );
+    }
+    self.r_batch.end();
 }
 
 fn renderProjectiles(

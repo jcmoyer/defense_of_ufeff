@@ -238,6 +238,7 @@ pub const Tower = struct {
     world_y: u32,
     target_mobid: usize = 0,
     cooldown: timing.FrameTimer = .{},
+    assoc_effect: ?u32 = null,
 
     pub fn setWorldPosition(self: *Tower, new_x: u32, new_y: u32) void {
         self.world_x = new_x;
@@ -249,7 +250,6 @@ pub const Tower = struct {
     }
 
     pub fn fireProjectile(self: *Tower, frame: u64) void {
-        _ = frame;
         const id = self.world.pickClosestMonster(self.world_x, self.world_y, 100) orelse return;
         var proj = self.world.spawnProjectile(&proj_arrow, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8)) catch unreachable;
         var r = mu.angleBetween(
@@ -279,6 +279,17 @@ pub const Tower = struct {
                 }
             }
         }
+
+        const ex = @floatToInt(i32, (cos_r * 6) + @intToFloat(f32, self.world_x + 8));
+        const ey = @floatToInt(i32, (sin_r * 6) + @intToFloat(f32, self.world_y + 8));
+
+        if (self.assoc_effect == null) {
+            self.assoc_effect = self.world.spawnSpriteEffect(&se_bow, ex, ey, frame) catch unreachable;
+        }
+
+        self.world.sprite_effects.getPtr(self.assoc_effect.?).angle = r;
+        self.world.sprite_effects.getPtr(self.assoc_effect.?).world_x = @intToFloat(f32, ex);
+        self.world.sprite_effects.getPtr(self.assoc_effect.?).world_y = @intToFloat(f32, ey);
     }
 
     fn spawn(self: *Tower, frame: u64) void {
@@ -330,6 +341,40 @@ pub const Spawn = struct {
     }
 };
 
+const se_bow = SpriteEffectSpec{
+    .anim_set = anim.a_proj_bow.animationSet(),
+};
+
+pub const SpriteEffectSpec = struct {
+    anim_set: ?anim.AnimationSet = null,
+    spawnFn: ?*const fn (*SpriteEffect, u64) void = null,
+    updateFn: ?*const fn (*SpriteEffect, u64) void = null,
+};
+
+pub const SpriteEffect = struct {
+    world: *World,
+    spec: *const SpriteEffectSpec,
+    animator: ?anim.Animator = null,
+    world_x: f32,
+    world_y: f32,
+    angle: f32 = 0,
+
+    fn spawn(self: *SpriteEffect, frame: u64) void {
+        if (self.spec.anim_set) |as| {
+            self.animator = as.createAnimator("default");
+        }
+        if (self.spec.spawnFn) |spawnFn| {
+            spawnFn(self, frame);
+        }
+    }
+
+    fn update(self: *SpriteEffect, frame: u64) void {
+        if (self.spec.updateFn) |updateFn| {
+            updateFn(self, frame);
+        }
+    }
+};
+
 pub const World = struct {
     allocator: Allocator,
     map: Tilemap = .{},
@@ -340,6 +385,7 @@ pub const World = struct {
     spawns: std.ArrayListUnmanaged(Spawn) = .{},
     projectiles: SlotMap(Projectile) = .{},
     pending_projectiles: std.ArrayListUnmanaged(Projectile) = .{},
+    sprite_effects: SlotMap(SpriteEffect) = .{},
     pathfinder: PathfindingState,
     path_cache: PathfindingCache,
     goal: ?TileCoord = null,
@@ -368,6 +414,7 @@ pub const World = struct {
         self.scratch_cache.deinit();
         self.pathfinder.deinit();
         self.pending_projectiles.deinit(self.allocator);
+        self.sprite_effects.deinit(self.allocator);
     }
 
     pub fn getWidth(self: World) usize {
@@ -431,6 +478,17 @@ pub const World = struct {
             frame,
         );
         self.invalidatePathCache();
+    }
+
+    pub fn spawnSpriteEffect(self: *World, spec: *const SpriteEffectSpec, world_x: i32, world_y: i32, frame: u64) !u32 {
+        const id = try self.sprite_effects.put(self.allocator, SpriteEffect{
+            .world = self,
+            .spec = spec,
+            .world_x = @intToFloat(f32, world_x),
+            .world_y = @intToFloat(f32, world_y),
+        });
+        self.sprite_effects.getPtr(id).spawn(frame);
+        return id;
     }
 
     /// Returned pointer is valid for the current frame only.
@@ -535,6 +593,9 @@ pub const World = struct {
         }
         for (self.monsters.slice()) |*m| {
             m.update();
+        }
+        for (self.sprite_effects.slice()) |*e| {
+            e.update(frame);
         }
 
         // We have to be very careful here, spawning new projectiles can invalidate pointers into self.projectiles.
