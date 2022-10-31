@@ -38,7 +38,7 @@ pub fn SlotMap(comptime T: type) type {
             return @intCast(u32, self.indices.items.len - 1);
         }
 
-        pub fn put(self: *Self, allocator: Allocator, value: T) !u32 {
+        fn getNextIndex(self: *Self, allocator: Allocator) !u32 {
             var external_index: u32 = undefined;
             if (self.free_first) |first| {
                 external_index = first;
@@ -51,6 +51,11 @@ pub fn SlotMap(comptime T: type) type {
             } else {
                 external_index = try self.allocateIndex(allocator);
             }
+            return external_index;
+        }
+
+        pub fn put(self: *Self, allocator: Allocator, value: T) !u32 {
+            const external_index = try self.getNextIndex(allocator);
             try self.items.append(allocator, TaggedT{
                 .value = value,
                 .index = external_index,
