@@ -17,26 +17,19 @@ pub fn SlotMap(comptime T: type) type {
             next_free: ?u32,
         };
 
-        allocator: Allocator,
         items: std.MultiArrayList(TaggedT) = .{},
         indices: std.ArrayListUnmanaged(Index) = .{},
         free_first: ?u32 = null,
         free_last: ?u32 = null,
 
-        pub fn init(allocator: Allocator) Self {
-            return Self{
-                .allocator = allocator,
-            };
+        pub fn deinit(self: *Self, allocator: Allocator) void {
+            self.items.deinit(allocator);
+            self.indices.deinit(allocator);
         }
 
-        pub fn deinit(self: *Self) void {
-            self.items.deinit(self.allocator);
-            self.indices.deinit(self.allocator);
-        }
-
-        fn allocateIndex(self: *Self) !u32 {
+        fn allocateIndex(self: *Self, allocator: Allocator) !u32 {
             const internal_index = @intCast(u32, self.items.len);
-            try self.indices.append(self.allocator, .{
+            try self.indices.append(allocator, .{
                 .item_index = internal_index,
                 // we set null here because it is intended for the item_index's storage to be written immediately
                 // (i.e. this index is *not* a hole)
@@ -45,7 +38,7 @@ pub fn SlotMap(comptime T: type) type {
             return @intCast(u32, self.indices.items.len - 1);
         }
 
-        pub fn put(self: *Self, value: T) !u32 {
+        pub fn put(self: *Self, allocator: Allocator, value: T) !u32 {
             var external_index: u32 = undefined;
             if (self.free_first) |first| {
                 external_index = first;
@@ -56,9 +49,9 @@ pub fn SlotMap(comptime T: type) type {
                     self.free_last = null;
                 }
             } else {
-                external_index = try self.allocateIndex();
+                external_index = try self.allocateIndex(allocator);
             }
-            try self.items.append(self.allocator, TaggedT{
+            try self.items.append(allocator, TaggedT{
                 .value = value,
                 .index = external_index,
             });
@@ -106,12 +99,13 @@ pub fn SlotMap(comptime T: type) type {
 }
 
 test "slotmap" {
-    var map = SlotMap([]const u8).init(std.testing.allocator);
-    defer map.deinit();
+    var allocator = std.testing.allocator;
+    var map = SlotMap([]const u8){};
+    defer map.deinit(allocator);
 
-    const i = try map.put("hello");
-    const j = try map.put("world");
-    const k = try map.put("zig");
+    const i = try map.put(allocator, "hello");
+    const j = try map.put(allocator, "world");
+    const k = try map.put(allocator, "zig");
 
     try std.testing.expectEqualStrings("hello", map.get(i));
     try std.testing.expectEqualStrings("world", map.get(j));
@@ -126,13 +120,13 @@ test "slotmap" {
 
     try std.testing.expectEqualStrings("hello", map.get(i));
 
-    const a = try map.put("wow");
+    const a = try map.put(allocator, "wow");
 
     try std.testing.expectEqualStrings("hello", map.get(i));
     try std.testing.expectEqualStrings("wow", map.get(a));
 
-    const b = try map.put("abc");
-    const c = try map.put("123");
+    const b = try map.put(allocator, "abc");
+    const c = try map.put(allocator, "123");
 
     try std.testing.expectEqualStrings("abc", map.get(b));
     try std.testing.expectEqualStrings("123", map.get(c));
