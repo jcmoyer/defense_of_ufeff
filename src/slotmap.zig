@@ -9,7 +9,7 @@ pub fn SlotMap(comptime T: type) type {
 
         const TaggedT = struct {
             value: T,
-            index: u32,
+            handle: u32,
         };
 
         const Index = struct {
@@ -27,7 +27,7 @@ pub fn SlotMap(comptime T: type) type {
             self.indices.deinit(allocator);
         }
 
-        fn allocateIndex(self: *Self, allocator: Allocator, item_index: u32) !u32 {
+        fn allocateHandle(self: *Self, allocator: Allocator, item_index: u32) !u32 {
             try self.indices.append(allocator, .{
                 .item_index = item_index,
                 // we set null here because it is intended for the item_index's storage to be written immediately
@@ -37,10 +37,10 @@ pub fn SlotMap(comptime T: type) type {
             return @intCast(u32, self.indices.items.len - 1);
         }
 
-        fn reserveNextIndex(self: *Self, allocator: Allocator, item_index: u32) !u32 {
-            var external_index: u32 = undefined;
+        fn reserveNextHandle(self: *Self, allocator: Allocator, item_index: u32) !u32 {
+            var handle: u32 = undefined;
             if (self.free_first) |first| {
-                external_index = first;
+                handle = first;
                 self.indices.items[first].item_index = item_index;
                 self.free_first = self.indices.items[first].next_free;
                 self.indices.items[first].next_free = null;
@@ -48,18 +48,18 @@ pub fn SlotMap(comptime T: type) type {
                     self.free_last = null;
                 }
             } else {
-                external_index = try self.allocateIndex(allocator, item_index);
+                handle = try self.allocateHandle(allocator, item_index);
             }
-            return external_index;
+            return handle;
         }
 
         pub fn put(self: *Self, allocator: Allocator, value: T) !u32 {
-            const external_index = try self.reserveNextIndex(allocator, @intCast(u32, self.items.len));
+            const handle = try self.reserveNextHandle(allocator, @intCast(u32, self.items.len));
             try self.items.append(allocator, TaggedT{
                 .value = value,
-                .index = external_index,
+                .handle = handle,
             });
-            return external_index;
+            return handle;
         }
 
         pub fn get(self: Self, handle: u32) T {
@@ -92,8 +92,8 @@ pub fn SlotMap(comptime T: type) type {
                 return;
             }
 
-            const swapped_index = self.items.items(.index)[index.item_index];
-            self.indices.items[swapped_index].item_index = index.item_index;
+            const swapped_handle = self.items.items(.handle)[index.item_index];
+            self.indices.items[swapped_handle].item_index = index.item_index;
         }
 
         pub fn slice(self: Self) []T {
