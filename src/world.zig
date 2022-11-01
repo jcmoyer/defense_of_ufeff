@@ -239,7 +239,6 @@ fn tspecTestSpawn(self: *Tower, frame: u64) void {
 
 fn tspecTestUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
-        self.world.playPositionalSound("assets/sounds/bow.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
         self.fireProjectile(frame);
         self.cooldown.restart(frame);
     }
@@ -266,6 +265,7 @@ pub const Tower = struct {
 
     pub fn fireProjectile(self: *Tower, frame: u64) void {
         const id = self.world.pickClosestMonster(self.world_x, self.world_y, 100) orelse return;
+        self.world.playPositionalSound("assets/sounds/bow.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
         var proj = self.world.spawnProjectile(&proj_arrow, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8)) catch unreachable;
         var r = mu.angleBetween(
             @Vector(2, f32){ @intToFloat(f32, self.world_x), @intToFloat(f32, self.world_y) },
@@ -275,8 +275,8 @@ pub const Tower = struct {
         const cos_r = std.math.cos(r);
         const sin_r = std.math.sin(r);
 
-        proj.vel_x = cos_r;
-        proj.vel_y = sin_r;
+        proj.vel_x = cos_r * 2;
+        proj.vel_y = sin_r * 2;
 
         if (self.animator) |*animator| {
             if (std.math.fabs(sin_r) < 0.7) {
@@ -570,7 +570,7 @@ pub const World = struct {
             .spec = spec,
             .world_x = world_x,
             .world_y = world_y,
-            .cooldown = timing.FrameTimer.initSeconds(frame, 0.3),
+            .cooldown = timing.FrameTimer.initSeconds(frame, 1),
         };
         ptr.spawn(frame);
     }
