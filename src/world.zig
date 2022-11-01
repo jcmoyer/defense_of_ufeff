@@ -360,6 +360,10 @@ const se_bow = SpriteEffectSpec{
     .anim_set = anim.a_proj_bow.animationSet(),
 };
 
+const se_hurt_generic = SpriteEffectSpec{
+    .anim_set = anim.a_hurt_generic.animationSet(),
+};
+
 pub const SpriteEffectSpec = struct {
     anim_set: ?anim.AnimationSet = null,
     spawnFn: ?*const fn (*SpriteEffect, u64) void = null,
@@ -374,6 +378,7 @@ pub const SpriteEffect = struct {
     world_x: f32,
     world_y: f32,
     angle: f32 = 0,
+    dead: bool = false,
 
     fn spawn(self: *SpriteEffect, frame: u64) void {
         if (self.spec.anim_set) |as| {
@@ -385,6 +390,12 @@ pub const SpriteEffect = struct {
     }
 
     fn update(self: *SpriteEffect, frame: u64) void {
+        if (self.animator) |*animator| {
+            animator.update();
+            if (animator.done) {
+                self.dead = true;
+            }
+        }
         if (self.spec.updateFn) |updateFn| {
             updateFn(self, frame);
         }
@@ -597,6 +608,7 @@ pub const World = struct {
         var new_projectile_ids = std.ArrayListUnmanaged(u32){};
         var proj_pending_removal = std.ArrayListUnmanaged(u32){};
         var mon_pending_removal = std.ArrayListUnmanaged(u32){};
+        var effect_pending_removal = std.ArrayListUnmanaged(u32){};
 
         for (self.spawns.items) |*s, id| {
             if (s.timer.expired(frame)) {
@@ -613,6 +625,9 @@ pub const World = struct {
         }
         for (self.sprite_effects.slice()) |*e| {
             e.update(frame);
+            if (e.dead) {
+                effect_pending_removal.append(frame_arena, e.id) catch unreachable;
+            }
         }
 
         // We have to be very careful here, spawning new projectiles can invalidate pointers into self.projectiles.
@@ -622,7 +637,8 @@ pub const World = struct {
         for (self.projectiles.slice()) |*p| {
             p.update(frame);
             for (self.monsters.slice()) |*m| {
-                if (p.getWorldCollisionRect().intersect(m.getWorldCollisionRect(), null)) {
+                var rect: Rect = undefined;
+                if (p.getWorldCollisionRect().intersect(m.getWorldCollisionRect(), &rect)) {
                     if (m.dead) {
                         continue;
                     }
@@ -636,6 +652,8 @@ pub const World = struct {
                         if (m.dead) {
                             mon_pending_removal.append(frame_arena, m.id) catch unreachable;
                         }
+                        const se_id = self.spawnSpriteEffect(&se_hurt_generic, @floatToInt(i32, p.world_x), @floatToInt(i32, p.world_y), frame) catch unreachable;
+                        self.sprite_effects.getPtr(se_id).angle = std.math.atan2(f32, p.vel_y, p.vel_x);
                     }
                 }
             }
@@ -647,6 +665,10 @@ pub const World = struct {
 
         for (mon_pending_removal.items) |id| {
             self.monsters.erase(id);
+        }
+
+        for (effect_pending_removal.items) |id| {
+            self.sprite_effects.erase(id);
         }
 
         new_projectile_ids.ensureTotalCapacity(frame_arena, self.pending_projectiles.items.len) catch unreachable;

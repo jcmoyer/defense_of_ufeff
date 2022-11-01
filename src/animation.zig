@@ -10,6 +10,7 @@ pub const Frame = struct {
 pub const Animation = struct {
     frames: []const Frame,
     next: ?[]const u8 = null,
+    loop: bool = true,
 };
 
 pub const AnimationSetVtbl = struct {
@@ -138,6 +139,7 @@ pub const Animator = struct {
     current_anim: []const u8,
     frame_index: usize = 0,
     counter: u32 = 0,
+    done: bool = false,
 
     pub fn getCurrentAnimation(self: Animator) Animation {
         return self.anim_set.getAnimation(self.current_anim).?;
@@ -162,6 +164,10 @@ pub const Animator = struct {
                 if (self.getCurrentAnimation().next) |next_name| {
                     if (self.anim_set.hasAnimation(next_name)) {
                         self.current_anim = next_name;
+                    }
+                } else {
+                    if (!self.getCurrentAnimation().loop) {
+                        self.done = true;
                     }
                 }
             }
@@ -268,6 +274,27 @@ pub const a_proj_bow = StaticAnimationSet(&[1]StaticAnimationDef{.{
             .{
                 .rect = Rect.init(7 * 16, 8 * 16, 16, 16),
                 .time = 8,
+            },
+        },
+    },
+}}){};
+
+pub const a_hurt_generic = StaticAnimationSet(&[1]StaticAnimationDef{.{
+    .name = "default",
+    .animation = Animation{
+        .loop = false,
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(16, 128, 16, 16),
+                .time = 1,
+            },
+            .{
+                .rect = Rect.init(32, 128, 16, 16),
+                .time = 1,
+            },
+            .{
+                .rect = Rect.init(48, 128, 16, 16),
+                .time = 1,
             },
         },
     },
