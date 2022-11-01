@@ -163,6 +163,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.renderTowers(cam_interp);
     self.renderSpriteEffects(cam_interp, alpha);
     self.renderProjectiles(cam_interp, alpha);
+    self.renderHealthBars(cam_interp, alpha);
     self.renderFloatingText(cam_interp, alpha);
     self.renderBlockedConstructionRects(cam_interp);
     self.renderPlacementIndicator(cam_interp);
@@ -351,6 +352,24 @@ fn renderMonsters(
         );
     }
     self.r_batch.end();
+}
+
+fn renderHealthBars(
+    self: *PlayState,
+    cam: Camera,
+    a: f64,
+) void {
+    self.r_quad.begin(.{});
+    for (self.world.monsters.slice()) |m| {
+        const w = m.getInterpWorldPosition(a);
+        var dest_red = Rect.init(w[0] - cam.view.left(), w[1] - 4 - cam.view.top(), 16, 1);
+        var dest_border = dest_red;
+        dest_border.inflate(1, 1);
+        dest_red.w = @floatToInt(i32, @intToFloat(f32, dest_red.w) * @intToFloat(f32, m.hp) / 3.0);
+        self.r_quad.drawQuadRGBA(dest_border, 0, 0, 0, 255);
+        self.r_quad.drawQuadRGBA(dest_red, 255, 0, 0, 255);
+    }
+    self.r_quad.end();
 }
 
 fn renderTilemapLayer(

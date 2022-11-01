@@ -201,10 +201,10 @@ pub const Monster = struct {
     }
 
     // TODO: this return type is bad, need a proper vec abstraction
-    pub fn getInterpWorldPosition(self: Monster, t: f64) [2]u32 {
+    pub fn getInterpWorldPosition(self: Monster, t: f64) [2]i32 {
         const ix = zm.lerpV(@intToFloat(f64, self.p_world_x), @intToFloat(f64, self.world_x), t);
         const iy = zm.lerpV(@intToFloat(f64, self.p_world_y), @intToFloat(f64, self.world_y), t);
-        return [2]u32{ @floatToInt(u32, ix), @floatToInt(u32, iy) };
+        return [2]i32{ @floatToInt(i32, ix), @floatToInt(i32, iy) };
     }
 
     pub fn getWorldCollisionRect(self: Monster) Rect {
