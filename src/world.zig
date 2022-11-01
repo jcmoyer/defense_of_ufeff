@@ -422,6 +422,8 @@ pub const FloatingText = struct {
         self.p_world_y = self.world_y;
         self.world_x += self.vel_x;
         self.world_y += self.vel_y;
+        self.vel_x *= 0.9;
+        self.vel_y *= 0.9;
         self.life -|= 1;
         if (self.life == 0) {
             self.dead = true;

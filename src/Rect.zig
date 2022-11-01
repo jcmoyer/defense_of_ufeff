@@ -1,6 +1,7 @@
 const Rect = @This();
 
 const std = @import("std");
+const Rectf = @import("Rectf.zig");
 
 x: i32 = 0,
 y: i32 = 0,
@@ -85,4 +86,13 @@ pub fn intersect(self: Rect, other: Rect, subrect: ?*Rect) bool {
         }
         return true;
     }
+}
+
+pub fn toRectf(self: Rect) Rectf {
+    return Rectf.init(
+        @intToFloat(f32, self.x),
+        @intToFloat(f32, self.y),
+        @intToFloat(f32, self.w),
+        @intToFloat(f32, self.h),
+    );
 }

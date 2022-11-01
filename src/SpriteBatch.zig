@@ -6,6 +6,7 @@ const shader = @import("shader.zig");
 const texmod = @import("texture.zig");
 const Texture = texmod.Texture;
 const Rect = @import("Rect.zig");
+const Rectf = @import("Rectf.zig");
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
@@ -14,8 +15,8 @@ const fssrc = @embedFile("SpriteBatch.frag");
 
 const Vertex = extern struct {
     xyuv: zm.F32x4,
-    rgba: @Vector(4, u8) = @splat(4, @as(u8, 255)),
-    flash: u8 = 0,
+    rgba: @Vector(4, u8),
+    flash: u8,
     pad: [3]u8 = undefined,
 };
 
@@ -181,27 +182,92 @@ fn flush(self: *SpriteBatch, remap: bool) void {
 }
 
 pub fn drawQuad(self: *SpriteBatch, src: Rect, dest: Rect) void {
-    const left = @intToFloat(f32, dest.left());
-    const right = @intToFloat(f32, dest.right());
-    const top = @intToFloat(f32, dest.top());
-    const bottom = @intToFloat(f32, dest.bottom());
+    self.drawQuadOptions(.{
+        .src = src.toRectf(),
+        .dest = dest.toRectf(),
+    });
+}
 
-    const uv_left = @intToFloat(f32, src.left()) / self.ref_width;
-    const uv_right = @intToFloat(f32, src.right()) / self.ref_width;
-    const uv_top = 1.0 - @intToFloat(f32, src.top()) / self.ref_height;
-    const uv_bottom = 1.0 - @intToFloat(f32, src.bottom()) / self.ref_height;
+pub const DrawQuadOptions = struct {
+    src: Rectf,
+    dest: Rectf,
+    color: @Vector(4, u8) = @splat(4, @as(u8, 255)),
+    flash: bool = false,
+    angle: f32 = 0,
+    /// When true, use matrix multiplication to rotate the quad. This centers
+    /// the quad on <dest.x, dest.y> using dest.w and dest.h to size it.
+    rotated: bool = false,
+};
+
+pub fn drawQuadOptions(self: *SpriteBatch, opts: DrawQuadOptions) void {
+    const uv_left = opts.src.left() / self.ref_width;
+    const uv_right = opts.src.right() / self.ref_width;
+    const uv_top = 1.0 - opts.src.top() / self.ref_height;
+    const uv_bottom = 1.0 - opts.src.bottom() / self.ref_height;
+
+    const f_val: u8 = if (opts.flash) 255 else 0;
+
+    var p0: zm.Vec = undefined;
+    var p1: zm.Vec = undefined;
+    var p2: zm.Vec = undefined;
+    var p3: zm.Vec = undefined;
+
+    if (!opts.rotated) {
+        const left = opts.dest.left();
+        const right = opts.dest.right();
+        const top = opts.dest.top();
+        const bottom = opts.dest.bottom();
+
+        p0 = zm.f32x4(left, top, uv_left, uv_top);
+        p1 = zm.f32x4(left, bottom, uv_left, uv_bottom);
+        p2 = zm.f32x4(right, top, uv_right, uv_top);
+        p3 = zm.f32x4(right, bottom, uv_right, uv_bottom);
+    } else {
+        const dest_x = opts.dest.x;
+        const dest_y = opts.dest.y;
+        const w = opts.dest.w;
+        const h = opts.dest.h;
+
+        const transform = zm.mul(zm.rotationZ(opts.angle), zm.translation(dest_x, dest_y, 0));
+
+        const hw = w / 2;
+        const hh = h / 2;
+
+        p0 = zm.mul(zm.f32x4(-hw, -hh, 0, 1), transform);
+        p1 = zm.mul(zm.f32x4(-hw, hh, 0, 1), transform);
+        p2 = zm.mul(zm.f32x4(hw, -hh, 0, 1), transform);
+        p3 = zm.mul(zm.f32x4(hw, hh, 0, 1), transform);
+
+        // that was just the transform, now we need to write in UV coords
+        p0[2] = uv_left;
+        p0[3] = uv_top;
+        p1[2] = uv_left;
+        p1[3] = uv_bottom;
+        p2[2] = uv_right;
+        p2[3] = uv_top;
+        p3[2] = uv_right;
+        p3[3] = uv_bottom;
+    }
 
     self.vertices[self.vertex_head + 0] = .{
-        .xyuv = zm.f32x4(left, top, uv_left, uv_top),
+        .xyuv = p0,
+        .rgba = opts.color,
+        .flash = f_val,
     };
     self.vertices[self.vertex_head + 1] = .{
-        .xyuv = zm.f32x4(left, bottom, uv_left, uv_bottom),
+        .xyuv = p1,
+        .rgba = opts.color,
+        .flash = f_val,
     };
     self.vertices[self.vertex_head + 2] = .{
-        .xyuv = zm.f32x4(right, top, uv_right, uv_top),
+        .xyuv = p2,
+        .rgba = opts.color,
+        .flash = f_val,
     };
     self.vertices[self.vertex_head + 3] = .{
-        .xyuv = zm.f32x4(right, bottom, uv_right, uv_bottom),
+        .xyuv = p3,
+        .rgba = opts.color,
+        .flash = f_val,
     };
     self.vertex_head += 4;
 
@@ -211,72 +277,18 @@ pub fn drawQuad(self: *SpriteBatch, src: Rect, dest: Rect) void {
 }
 
 pub fn drawQuadFlash(self: *SpriteBatch, src: Rect, dest: Rect, flash: bool) void {
-    const left = @intToFloat(f32, dest.left());
-    const right = @intToFloat(f32, dest.right());
-    const top = @intToFloat(f32, dest.top());
-    const bottom = @intToFloat(f32, dest.bottom());
-
-    const uv_left = @intToFloat(f32, src.left()) / self.ref_width;
-    const uv_right = @intToFloat(f32, src.right()) / self.ref_width;
-    const uv_top = 1.0 - @intToFloat(f32, src.top()) / self.ref_height;
-    const uv_bottom = 1.0 - @intToFloat(f32, src.bottom()) / self.ref_height;
-
-    const f_val: u8 = if (flash) 255 else 0;
-
-    self.vertices[self.vertex_head + 0] = .{
-        .xyuv = zm.f32x4(left, top, uv_left, uv_top),
-        .flash = f_val,
-    };
-    self.vertices[self.vertex_head + 1] = .{
-        .xyuv = zm.f32x4(left, bottom, uv_left, uv_bottom),
-        .flash = f_val,
-    };
-    self.vertices[self.vertex_head + 2] = .{
-        .xyuv = zm.f32x4(right, top, uv_right, uv_top),
-        .flash = f_val,
-    };
-    self.vertices[self.vertex_head + 3] = .{
-        .xyuv = zm.f32x4(right, bottom, uv_right, uv_bottom),
-        .flash = f_val,
-    };
-    self.vertex_head += 4;
-
-    if (self.vertex_head == vertex_count) {
-        self.flush(true);
-    }
+    self.drawQuadOptions(.{
+        .src = src.toRectf(),
+        .dest = dest.toRectf(),
+        .flash = flash,
+    });
 }
 
 pub fn drawQuadRotated(self: *SpriteBatch, src: Rect, dest_x: f32, dest_y: f32, w: f32, h: f32, angle: f32) void {
-    const transform = zm.mul(zm.rotationZ(angle), zm.translation(dest_x, dest_y, 0));
-
-    const hw = w / 2;
-    const hh = h / 2;
-
-    const p0 = zm.mul(zm.f32x4(-hw, -hh, 0, 1), transform);
-    const p1 = zm.mul(zm.f32x4(-hw, hh, 0, 1), transform);
-    const p2 = zm.mul(zm.f32x4(hw, -hh, 0, 1), transform);
-    const p3 = zm.mul(zm.f32x4(hw, hh, 0, 1), transform);
-
-    const uv_left = @intToFloat(f32, src.left()) / self.ref_width;
-    const uv_right = @intToFloat(f32, src.right()) / self.ref_width;
-    const uv_top = 1.0 - @intToFloat(f32, src.top()) / self.ref_height;
-    const uv_bottom = 1.0 - @intToFloat(f32, src.bottom()) / self.ref_height;
-
-    self.vertices[self.vertex_head + 0] = .{
-        .xyuv = zm.f32x4(p0[0], p0[1], uv_left, uv_top),
-    };
-    self.vertices[self.vertex_head + 1] = .{
-        .xyuv = zm.f32x4(p1[0], p1[1], uv_left, uv_bottom),
-    };
-    self.vertices[self.vertex_head + 2] = .{
-        .xyuv = zm.f32x4(p2[0], p2[1], uv_right, uv_top),
-    };
-    self.vertices[self.vertex_head + 3] = .{
-        .xyuv = zm.f32x4(p3[0], p3[1], uv_right, uv_bottom),
-    };
-    self.vertex_head += 4;
-
-    if (self.vertex_head == vertex_count) {
-        self.flush(true);
-    }
+    self.drawQuadOptions(.{
+        .src = src.toRectf(),
+        .dest = Rectf.init(dest_x, dest_y, w, h),
+        .angle = angle,
+        .rotated = true,
+    });
 }
