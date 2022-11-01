@@ -402,6 +402,44 @@ pub const SpriteEffect = struct {
     }
 };
 
+pub const FloatingText = struct {
+    id: u32 = undefined,
+    world: *World,
+    text: [16]u8,
+    textlen: u8 = 0,
+    p_world_x: f32,
+    p_world_y: f32,
+    world_x: f32,
+    world_y: f32,
+    vel_x: f32,
+    vel_y: f32,
+    max_life: u32 = 30,
+    life: u32 = 30,
+    dead: bool = false,
+
+    fn update(self: *FloatingText) void {
+        self.p_world_x = self.world_x;
+        self.p_world_y = self.world_y;
+        self.world_x += self.vel_x;
+        self.world_y += self.vel_y;
+        self.life -|= 1;
+        if (self.life == 0) {
+            self.dead = true;
+        }
+    }
+
+    pub fn textSlice(self: FloatingText) []const u8 {
+        return self.text[0..self.textlen];
+    }
+
+    // TODO proper return value
+    pub fn getInterpWorldPosition(self: FloatingText, t: f64) [2]i32 {
+        const ix = zm.lerpV(self.p_world_x, self.world_x, @floatCast(f32, t));
+        const iy = zm.lerpV(self.p_world_y, self.world_y, @floatCast(f32, t));
+        return [2]i32{ @floatToInt(i32, ix), @floatToInt(i32, iy) };
+    }
+};
+
 pub const World = struct {
     allocator: Allocator,
     map: Tilemap = .{},
@@ -413,6 +451,7 @@ pub const World = struct {
     projectiles: IntrusiveSlotMap(Projectile) = .{},
     pending_projectiles: std.ArrayListUnmanaged(Projectile) = .{},
     sprite_effects: IntrusiveSlotMap(SpriteEffect) = .{},
+    floating_text: IntrusiveSlotMap(FloatingText) = .{},
     pathfinder: PathfindingState,
     path_cache: PathfindingCache,
     goal: ?TileCoord = null,
@@ -440,6 +479,7 @@ pub const World = struct {
         self.scratch_map.deinit(self.allocator);
         self.scratch_cache.deinit();
         self.pathfinder.deinit();
+        self.floating_text.deinit(self.allocator);
         self.pending_projectiles.deinit(self.allocator);
         self.sprite_effects.deinit(self.allocator);
     }
@@ -494,6 +534,34 @@ pub const World = struct {
         }
 
         return true;
+    }
+
+    pub fn spawnFloatingText(self: *World, text: []const u8, world_x: i32, world_y: i32) !u32 {
+        if (text.len > 16) {
+            return error.TextTooLong;
+        }
+        const id = try self.floating_text.put(self.allocator, FloatingText{
+            .world = self,
+            .text = undefined,
+            .world_x = @intToFloat(f32, world_x),
+            .world_y = @intToFloat(f32, world_y),
+            .p_world_x = @intToFloat(f32, world_x),
+            .p_world_y = @intToFloat(f32, world_y),
+            .vel_x = 0,
+            .vel_y = 0,
+        });
+        var ptr = self.floating_text.getPtr(id);
+        std.mem.copy(u8, &ptr.text, text);
+        ptr.textlen = @intCast(u8, text.len);
+        return id;
+    }
+
+    pub fn spawnPrintFloatingText(self: *World, comptime fmt: []const u8, args: anytype, world_x: i32, world_y: i32) !u32 {
+        var buf: [16]u8 = undefined;
+        var s = std.io.fixedBufferStream(&buf);
+        var w = s.writer();
+        try w.print(fmt, args);
+        return self.spawnFloatingText(s.getWritten(), world_x, world_y);
     }
 
     pub fn spawnTower(self: *World, spec: *const TowerSpec, coord: TileCoord, frame: u64) !void {
@@ -609,6 +677,7 @@ pub const World = struct {
         var proj_pending_removal = std.ArrayListUnmanaged(u32){};
         var mon_pending_removal = std.ArrayListUnmanaged(u32){};
         var effect_pending_removal = std.ArrayListUnmanaged(u32){};
+        var text_pending_removal = std.ArrayListUnmanaged(u32){};
 
         for (self.spawns.items) |*s, id| {
             if (s.timer.expired(frame)) {
@@ -627,6 +696,12 @@ pub const World = struct {
             e.update(frame);
             if (e.dead) {
                 effect_pending_removal.append(frame_arena, e.id) catch unreachable;
+            }
+        }
+        for (self.floating_text.slice()) |*t| {
+            t.update();
+            if (t.dead) {
+                text_pending_removal.append(frame_arena, t.id) catch unreachable;
             }
         }
 
@@ -654,6 +729,9 @@ pub const World = struct {
                         }
                         const se_id = self.spawnSpriteEffect(&se_hurt_generic, @floatToInt(i32, p.world_x), @floatToInt(i32, p.world_y), frame) catch unreachable;
                         self.sprite_effects.getPtr(se_id).angle = std.math.atan2(f32, p.vel_y, p.vel_x);
+                        const text_id = self.spawnPrintFloatingText("{d}", .{1}, @intCast(i32, m.world_x), @intCast(i32, m.world_y)) catch unreachable;
+                        self.floating_text.getPtr(text_id).vel_x = p.vel_x;
+                        self.floating_text.getPtr(text_id).vel_y = p.vel_y;
                     }
                 }
             }
@@ -669,6 +747,10 @@ pub const World = struct {
 
         for (effect_pending_removal.items) |id| {
             self.sprite_effects.erase(id);
+        }
+
+        for (text_pending_removal.items) |id| {
+            self.floating_text.erase(id);
         }
 
         new_projectile_ids.ensureTotalCapacity(frame_arena, self.pending_projectiles.items.len) catch unreachable;

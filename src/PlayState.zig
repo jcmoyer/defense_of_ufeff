@@ -163,6 +163,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.renderTowers(cam_interp);
     self.renderSpriteEffects(cam_interp, alpha);
     self.renderProjectiles(cam_interp, alpha);
+    self.renderFloatingText(cam_interp, alpha);
     self.renderBlockedConstructionRects(cam_interp);
     self.renderPlacementIndicator(cam_interp);
 
@@ -273,6 +274,22 @@ fn renderProjectiles(
         }
     }
     self.r_batch.end();
+}
+
+fn renderFloatingText(
+    self: *PlayState,
+    cam: Camera,
+    alpha: f64,
+) void {
+    self.r_font.begin(.{
+        .texture = self.game.texman.getNamedTexture("text16.png"),
+        .spec = &self.fontspec_numbers,
+    });
+    for (self.world.floating_text.slice()) |t| {
+        const dest = t.getInterpWorldPosition(alpha);
+        self.r_font.drawText(t.textSlice(), dest[0] - cam.view.left(), dest[1] - cam.view.top());
+    }
+    self.r_font.end();
 }
 
 fn renderTowers(
