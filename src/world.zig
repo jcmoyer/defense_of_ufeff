@@ -103,8 +103,22 @@ pub const Projectile = struct {
     }
 };
 
+pub const MonsterSpec = struct {
+    anim_set: ?anim.AnimationSet = null,
+    spawnFn: ?*const fn (*Monster, u64) void = null,
+    updateFn: ?*const fn (*Monster, u64) void = null,
+    max_hp: u32,
+};
+
+pub const mon_human = MonsterSpec{
+    .anim_set = anim.a_chara.animationSet(),
+    .max_hp = 5,
+};
+
 pub const Monster = struct {
     id: u32 = undefined,
+    world: *World,
+    spec: *const MonsterSpec,
     p_world_x: u32 = 0,
     p_world_y: u32 = 0,
     world_x: u32 = 0,
@@ -119,7 +133,7 @@ pub const Monster = struct {
     path_index: usize = 0,
     path_forward: bool = true,
     flash_frames: u32 = 0,
-    hp: u32 = 3,
+    hp: u32 = 0,
     dead: bool = false,
 
     pub fn setTilePosition(self: *Monster, coord: TileCoord) void {
@@ -138,7 +152,17 @@ pub const Monster = struct {
         return self.tile_pos;
     }
 
-    pub fn update(self: *Monster) void {
+    fn spawn(self: *Monster, frame: u64) void {
+        self.hp = self.spec.max_hp;
+        if (self.spec.spawnFn) |spawnFn| {
+            spawnFn(self, frame);
+        }
+        if (self.spec.anim_set) |as| {
+            self.animator = as.createAnimator("down");
+        }
+    }
+
+    pub fn update(self: *Monster, frame: u64) void {
         self.flash_frames -|= 1;
         self.p_world_x = self.world_x;
         self.p_world_y = self.world_y;
@@ -174,7 +198,13 @@ pub const Monster = struct {
             },
         }
 
-        self.animator.?.update();
+        if (self.spec.updateFn) |updateFn| {
+            updateFn(self, frame);
+        }
+
+        if (self.animator) |*animator| {
+            animator.update();
+        }
     }
 
     pub fn beginMove(self: *Monster, f: Direction) void {
@@ -653,17 +683,21 @@ pub const World = struct {
         });
     }
 
-    pub fn spawnMonster(self: *World, spawn_id: usize) !void {
+    pub fn spawnMonster(self: *World, spec: *const MonsterSpec, spawn_id: usize, frame: u64) !u32 {
         const pos = self.getSpawnPosition(spawn_id);
         self.getSpawn(spawn_id).emit();
         var mon = Monster{
+            .world = self,
+            .spec = spec,
             .path = self.findPath(pos, self.goal.?).?,
             .animator = anim.a_chara.animationSet().createAnimator("down"),
         };
         mon.setTilePosition(pos);
-        _ = try self.monsters.put(self.allocator, mon);
+        const id = try self.monsters.put(self.allocator, mon);
+        self.monsters.getPtr(id).spawn(frame);
 
         self.playPositionalSound("assets/sounds/spawn.ogg", @intCast(i32, pos.worldX()), @intCast(i32, pos.worldY()));
+        return id;
     }
 
     pub fn getSpawnPosition(self: *World, spawn_id: usize) TileCoord {
@@ -684,7 +718,7 @@ pub const World = struct {
         for (self.spawns.items) |*s, id| {
             if (s.timer.expired(frame)) {
                 s.timer.restart(frame);
-                self.spawnMonster(id) catch unreachable;
+                _ = self.spawnMonster(&mon_human, id, frame) catch unreachable;
             }
             s.emitter.update();
         }
@@ -692,7 +726,7 @@ pub const World = struct {
             t.update(frame);
         }
         for (self.monsters.slice()) |*m| {
-            m.update();
+            m.update(frame);
         }
         for (self.sprite_effects.slice()) |*e| {
             e.update(frame);

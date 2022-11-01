@@ -365,7 +365,7 @@ fn renderHealthBars(
         var dest_red = Rect.init(w[0] - cam.view.left(), w[1] - 4 - cam.view.top(), 16, 1);
         var dest_border = dest_red;
         dest_border.inflate(1, 1);
-        dest_red.w = @floatToInt(i32, @intToFloat(f32, dest_red.w) * @intToFloat(f32, m.hp) / 3.0);
+        dest_red.w = @floatToInt(i32, @intToFloat(f32, dest_red.w) * @intToFloat(f32, m.hp) / @intToFloat(f32, m.spec.max_hp));
         self.r_quad.drawQuadRGBA(dest_border, 0, 0, 0, 255);
         self.r_quad.drawQuadRGBA(dest_red, 255, 0, 0, 255);
     }
@@ -670,10 +670,6 @@ fn loadWorld(self: *PlayState, mapid: []const u8) void {
     // must be set before calling spawnMonster since it's used for audio parameters...
     // should probably clean this up eventually
     self.world.view = self.camera.view;
-
-    // TODO: just for testing
-    self.world.spawnMonster(0) catch unreachable;
-    self.world.spawnMonster(1) catch unreachable;
 }
 
 fn renderFoam(
