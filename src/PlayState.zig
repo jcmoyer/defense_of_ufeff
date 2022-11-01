@@ -286,8 +286,14 @@ fn renderFloatingText(
         .spec = &self.fontspec_numbers,
     });
     for (self.world.floating_text.slice()) |t| {
+        const dims = self.r_font.measureText(t.textSlice());
+        const text_center = dims.centerPoint();
         const dest = t.getInterpWorldPosition(alpha);
-        self.r_font.drawText(t.textSlice(), dest[0] - cam.view.left(), dest[1] - cam.view.top());
+        self.r_font.drawText(
+            t.textSlice(),
+            dest[0] - cam.view.left() - text_center[0],
+            dest[1] - cam.view.top() - text_center[1],
+        );
     }
     self.r_font.end();
 }

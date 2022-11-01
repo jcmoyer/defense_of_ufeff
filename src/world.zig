@@ -729,7 +729,7 @@ pub const World = struct {
                         }
                         const se_id = self.spawnSpriteEffect(&se_hurt_generic, @floatToInt(i32, p.world_x), @floatToInt(i32, p.world_y), frame) catch unreachable;
                         self.sprite_effects.getPtr(se_id).angle = std.math.atan2(f32, p.vel_y, p.vel_x);
-                        const text_id = self.spawnPrintFloatingText("{d}", .{1}, @intCast(i32, m.world_x), @intCast(i32, m.world_y)) catch unreachable;
+                        const text_id = self.spawnPrintFloatingText("{d}", .{1}, @intCast(i32, m.world_x + 8), @intCast(i32, m.world_y + 8)) catch unreachable;
                         self.floating_text.getPtr(text_id).vel_x = p.vel_x;
                         self.floating_text.getPtr(text_id).vel_y = p.vel_y;
                     }

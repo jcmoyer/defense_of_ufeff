@@ -95,6 +95,21 @@ pub const BitmapFont = struct {
         }
     }
 
+    pub fn measureText(self: BitmapFont, text: []const u8) Rect {
+        var width: i32 = 0;
+        var height: i32 = 0;
+        var height_this_line: i32 = 0;
+        for (text) |ch| {
+            const glyph_rect = self.mapGlyph(ch);
+            width += glyph_rect.w + self.fontspec.space;
+            height_this_line = std.math.max(height_this_line, glyph_rect.h);
+            // TODO: handle \n
+        }
+        width -= self.fontspec.space;
+        height += height_this_line;
+        return Rect.init(0, 0, width, height);
+    }
+
     pub fn mapGlyph(self: BitmapFont, glyph: u8) Rect {
         return self.fontspec.mapGlyph(glyph);
 
