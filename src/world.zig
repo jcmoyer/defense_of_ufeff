@@ -497,6 +497,7 @@ pub const World = struct {
     path_cache: PathfindingCache,
     goal: ?TileCoord = null,
     view: Rect = .{},
+    play_area: ?Rect = null,
 
     pub fn init(allocator: Allocator) World {
         return .{
@@ -1155,6 +1156,8 @@ fn loadObjectGroup(layer: TiledObjectGroup, ctx: LoadContext) !void {
             }
         } else if (std.mem.eql(u8, obj.class, "goal")) {
             ctx.world.setGoal(TileCoord.initSignedWorld(obj.x, obj.y));
+        } else if (std.mem.eql(u8, obj.class, "play_area")) {
+            ctx.world.play_area = Rect.init(obj.x, obj.y, obj.width, obj.height);
         }
     }
 }

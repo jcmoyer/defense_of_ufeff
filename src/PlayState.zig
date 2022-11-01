@@ -127,6 +127,8 @@ pub fn update(self: *PlayState) void {
     var arena = self.frame_arena.allocator();
 
     self.prev_camera = self.camera;
+    self.camera.clampToBounds();
+
     self.foam_anim_l.update();
     self.foam_anim_r.update();
     self.foam_anim_u.update();
@@ -188,13 +190,7 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
     }
 
     if (ev.type == .SDL_MOUSEBUTTONDOWN and ev.button.button == sdl.SDL_BUTTON_LEFT) {
-        const loc = self.game.unproject(
-            ev.button.x,
-            ev.button.y,
-        );
-        const tile_x = @divFloor(loc[0], 16);
-        const tile_y = @divFloor(loc[1], 16);
-        const tile_coord = tilemap.TileCoord{ .x = @intCast(usize, tile_x), .y = @intCast(usize, tile_y) };
+        const tile_coord = self.mouseToTile();
         if (self.world.canBuildAt(tile_coord)) {
             self.world.spawnTower(&wo.tspec_test, tile_coord, self.game.frame_counter) catch unreachable;
         }
@@ -534,15 +530,24 @@ fn renderTilemap(self: *PlayState, cam: Camera) void {
     self.renderTilemapLayer(.detail, .special, min_tile_x, max_tile_x, min_tile_y, max_tile_y, -cam.view.left(), -cam.view.top());
 }
 
-fn renderPlacementIndicator(self: *PlayState, cam: Camera) void {
-    var m = self.game.unproject(
+fn mouseToWorld(self: *PlayState) [2]i32 {
+    const p = self.game.unproject(
         self.game.input.mouse.client_x,
         self.game.input.mouse.client_y,
     );
-    var tc = tilemap.TileCoord{
-        .x = @intCast(usize, @divFloor(m[0], 16)),
-        .y = @intCast(usize, @divFloor(m[1], 16)),
+    return [2]i32{
+        p[0] + self.camera.view.left(),
+        p[1] + self.camera.view.top(),
     };
+}
+
+fn mouseToTile(self: *PlayState) tilemap.TileCoord {
+    const p = self.mouseToWorld();
+    return tilemap.TileCoord.initSignedWorld(p[0], p[1]);
+}
+
+fn renderPlacementIndicator(self: *PlayState, cam: Camera) void {
+    const tc = self.mouseToTile();
     const color = if (self.world.canBuildAt(tc)) [4]f32{ 0, 1, 0, 0.5 } else [4]f32{ 1, 0, 0, 0.5 };
     const dest = Rect.init(
         @intCast(i32, tc.x * 16) - cam.view.left(),
@@ -654,12 +659,17 @@ fn loadWorld(self: *PlayState, mapid: []const u8) void {
 
     // Init camera for this map
 
-    self.camera.bounds = Rect.init(
-        0,
-        0,
-        @intCast(i32, self.world.getWidth() * 16),
-        @intCast(i32, self.world.getHeight() * 16),
-    );
+    if (self.world.play_area) |area| {
+        self.camera.bounds = area;
+    } else {
+        self.camera.bounds = Rect.init(
+            0,
+            0,
+            @intCast(i32, self.world.getWidth() * 16),
+            @intCast(i32, self.world.getHeight() * 16),
+        );
+    }
+
     self.prev_camera = self.camera;
 
     // must be set before calling spawnMonster since it's used for audio parameters...
