@@ -460,7 +460,7 @@ pub const FloatingText = struct {
         }
     }
 
-    pub fn textSlice(self: FloatingText) []const u8 {
+    pub fn textSlice(self: *const FloatingText) []const u8 {
         return self.text[0..self.textlen];
     }
 
@@ -469,6 +469,15 @@ pub const FloatingText = struct {
         const ix = zm.lerpV(self.p_world_x, self.world_x, @floatCast(f32, t));
         const iy = zm.lerpV(self.p_world_y, self.world_y, @floatCast(f32, t));
         return [2]i32{ @floatToInt(i32, ix), @floatToInt(i32, iy) };
+    }
+
+    pub fn lifePercent(self: FloatingText) f32 {
+        return @intToFloat(f32, self.life) / @intToFloat(f32, self.max_life);
+    }
+
+    /// 0 at start, 1 at end
+    pub fn invLifePercent(self: FloatingText) f32 {
+        return 1 - self.lifePercent();
     }
 };
 

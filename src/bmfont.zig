@@ -79,9 +79,15 @@ pub const BitmapFont = struct {
         self.r_batch.end();
     }
 
-    pub fn drawText(self: BitmapFont, text: []const u8, x: i32, y: i32) void {
-        var dx = x;
-        var dy = y;
+    pub const DrawTextOptions = struct {
+        x: i32,
+        y: i32,
+        color: @Vector(4, u8) = @splat(4, @as(u8, 255)),
+    };
+
+    pub fn drawText(self: BitmapFont, text: []const u8, opts: DrawTextOptions) void {
+        var dx = opts.x;
+        var dy = opts.y;
         for (text) |ch| {
             const src = self.mapGlyph(ch);
             const dest = Rect.init(
@@ -90,7 +96,11 @@ pub const BitmapFont = struct {
                 src.w,
                 src.h,
             );
-            self.r_batch.drawQuad(src, dest);
+            self.r_batch.drawQuadOptions(.{
+                .src = src.toRectf(),
+                .dest = dest.toRectf(),
+                .color = opts.color,
+            });
             dx += src.w + self.fontspec.space;
         }
     }

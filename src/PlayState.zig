@@ -132,21 +132,6 @@ pub fn update(self: *PlayState) void {
     self.foam_anim_u.update();
     self.foam_anim_d.update();
 
-    // TODO: for testing collision, remove eventually
-    // var m = &self.world.monsters.items[0];
-    if (self.game.input.isKeyDown(sdl.SDL_SCANCODE_LEFT)) {
-        _ = self.world.tryMove(0, .left);
-    }
-    if (self.game.input.isKeyDown(sdl.SDL_SCANCODE_RIGHT)) {
-        _ = self.world.tryMove(0, .right);
-    }
-    if (self.game.input.isKeyDown(sdl.SDL_SCANCODE_UP)) {
-        _ = self.world.tryMove(0, .up);
-    }
-    if (self.game.input.isKeyDown(sdl.SDL_SCANCODE_DOWN)) {
-        _ = self.world.tryMove(0, .down);
-    }
-
     self.world.view = self.camera.view;
     self.world.update(self.game.frame_counter, arena);
 }
@@ -176,13 +161,13 @@ pub fn render(self: *PlayState, alpha: f64) void {
         .texture = self.game.texman.getNamedTexture("text16.png"),
         .spec = &self.fontspec,
     });
-    self.r_font.drawText("HELLO WORLD", 0, 0);
+    self.r_font.drawText("HELLO WORLD", .{ .x = 0, .y = 0 });
     self.r_font.end();
     self.r_font.begin(.{
         .texture = self.game.texman.getNamedTexture("text16.png"),
         .spec = &self.fontspec_numbers,
     });
-    self.r_font.drawText("0123456789", 0, 50);
+    self.r_font.drawText("0123456789", .{ .x = 0, .y = 50 });
     self.r_font.end();
 
     self.r_finger.beginTextured(.{
@@ -286,14 +271,24 @@ fn renderFloatingText(
         .texture = self.game.texman.getNamedTexture("text16.png"),
         .spec = &self.fontspec_numbers,
     });
-    for (self.world.floating_text.slice()) |t| {
+    for (self.world.floating_text.slice()) |*t| {
         const dims = self.r_font.measureText(t.textSlice());
         const text_center = dims.centerPoint();
         const dest = t.getInterpWorldPosition(alpha);
+        // a nice curve that fades rapidly around 70%
+        const a_coef = 1 - std.math.pow(f32, t.invLifePercent(), 5);
         self.r_font.drawText(
             t.textSlice(),
-            dest[0] - cam.view.left() - text_center[0],
-            dest[1] - cam.view.top() - text_center[1],
+            .{
+                .x = dest[0] - cam.view.left() - text_center[0],
+                .y = dest[1] - cam.view.top() - text_center[1],
+                .color = @Vector(4, u8){
+                    255,
+                    255,
+                    255,
+                    @floatToInt(u8, 255 * a_coef),
+                },
+            },
         );
     }
     self.r_font.end();
