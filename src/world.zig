@@ -10,6 +10,7 @@ const audio = @import("audio.zig");
 const Rect = @import("Rect.zig");
 const mu = @import("mathutil.zig");
 const SlotMap = @import("slotmap.zig").SlotMap;
+const IntrusiveSlotMap = @import("slotmap.zig").IntrusiveSlotMap;
 
 const Tile = tmod.Tile;
 const TileBank = tmod.TileBank;
@@ -45,6 +46,7 @@ pub const proj_arrow = ProjectileSpec{
 };
 
 pub const Projectile = struct {
+    id: u32 = undefined,
     world: *World,
     spec: *const ProjectileSpec,
     animator: ?anim.Animator = null,
@@ -55,6 +57,7 @@ pub const Projectile = struct {
     vel_x: f32 = 0,
     vel_y: f32 = 0,
     angle: f32 = 0,
+    dead: bool = false,
     // storage that ProjectileSpecs can use
     userbuf: [16]u8 align(16) = undefined,
 
@@ -101,6 +104,7 @@ pub const Projectile = struct {
 };
 
 pub const Monster = struct {
+    id: u32 = undefined,
     p_world_x: u32 = 0,
     p_world_y: u32 = 0,
     world_x: u32 = 0,
@@ -354,6 +358,7 @@ pub const SpriteEffectSpec = struct {
 };
 
 pub const SpriteEffect = struct {
+    id: u32 = undefined,
     world: *World,
     spec: *const SpriteEffectSpec,
     animator: ?anim.Animator = null,
@@ -382,12 +387,12 @@ pub const World = struct {
     map: Tilemap = .{},
     scratch_map: Tilemap = .{},
     scratch_cache: PathfindingCache,
-    monsters: SlotMap(Monster) = .{},
+    monsters: IntrusiveSlotMap(Monster) = .{},
     towers: std.ArrayListUnmanaged(Tower) = .{},
     spawns: std.ArrayListUnmanaged(Spawn) = .{},
-    projectiles: SlotMap(Projectile) = .{},
+    projectiles: IntrusiveSlotMap(Projectile) = .{},
     pending_projectiles: std.ArrayListUnmanaged(Projectile) = .{},
-    sprite_effects: SlotMap(SpriteEffect) = .{},
+    sprite_effects: IntrusiveSlotMap(SpriteEffect) = .{},
     pathfinder: PathfindingState,
     path_cache: PathfindingCache,
     goal: ?TileCoord = null,
@@ -517,13 +522,12 @@ pub const World = struct {
         var best_dist = std.math.inf_f32;
         const fx = @intToFloat(f32, world_x);
         const fy = @intToFloat(f32, world_y);
-        var mslice = self.monsters.items.slice();
-        for (mslice.items(.value)) |m, i| {
+        for (self.monsters.slice()) |m| {
             const mx = @intToFloat(f32, m.world_x);
             const my = @intToFloat(f32, m.world_y);
             const dist = mu.dist([2]f32{ fx, fy }, [2]f32{ mx, my });
             if (dist <= range and dist < best_dist) {
-                closest = mslice.items(.handle)[i];
+                closest = m.id;
                 best_dist = dist;
             }
         }
@@ -582,6 +586,7 @@ pub const World = struct {
 
     pub fn update(self: *World, frame: u64, frame_arena: Allocator) void {
         var new_projectile_ids = std.ArrayListUnmanaged(u32){};
+        var proj_pending_removal = std.ArrayListUnmanaged(u32){};
 
         for (self.spawns.items) |*s, id| {
             if (s.timer.expired(frame)) {
@@ -606,16 +611,21 @@ pub const World = struct {
         // API is designed to support this use case with a couple changes.
         for (self.projectiles.slice()) |*p| {
             p.update(frame);
-            var mob_index: usize = self.monsters.items.len -% 1;
-            while (mob_index < self.monsters.items.len) : (mob_index -%= 1) {
-                // kinda nasty, maybe we do want an intrusive slotmap
-                var monster = &self.monsters.items.items(.value)[mob_index];
-                // var monster_id = self.monsters.items.items(.handle)[mob_index];
-                if (p.getWorldCollisionRect().intersect(monster.getWorldCollisionRect(), null)) {
-                    // self.monsters.erase(monster_id);
-                    monster.flash_frames = 1;
+            for (self.monsters.slice()) |*m| {
+                if (p.getWorldCollisionRect().intersect(m.getWorldCollisionRect(), null)) {
+                    // take care to not double-delete
+                    if (!p.dead) {
+                        m.flash_frames = 1;
+                        self.playPositionalSound("assets/sounds/hit.ogg", @intCast(i32, m.world_x), @intCast(i32, m.world_y));
+                        proj_pending_removal.append(frame_arena, p.id) catch unreachable;
+                        p.dead = true;
+                    }
                 }
             }
+        }
+
+        for (proj_pending_removal.items) |id| {
+            self.projectiles.erase(id);
         }
 
         new_projectile_ids.ensureTotalCapacity(frame_arena, self.pending_projectiles.items.len) catch unreachable;
