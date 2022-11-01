@@ -315,7 +315,6 @@ pub const AudioSystem = struct {
         var i: usize = 0;
         while (i < self.tracks.items.len) : (i += 1) {
             if (self.tracks.items[i].done) {
-                log.debug("Erase audio track {d}", .{i});
                 var t = self.tracks.swapRemove(i);
                 t.deinit();
             }
