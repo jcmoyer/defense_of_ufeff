@@ -119,6 +119,8 @@ pub const Monster = struct {
     path_index: usize = 0,
     path_forward: bool = true,
     flash_frames: u32 = 0,
+    hp: u32 = 3,
+    dead: bool = false,
 
     pub fn setTilePosition(self: *Monster, coord: TileCoord) void {
         self.setWorldPosition(@intCast(u32, coord.x * 16), @intCast(u32, coord.y * 16));
@@ -208,6 +210,13 @@ pub const Monster = struct {
     pub fn getWorldCollisionRect(self: Monster) Rect {
         // TODO: origin is top left, this may change
         return Rect.init(@intCast(i32, self.world_x), @intCast(i32, self.world_y), 16, 16);
+    }
+
+    pub fn hurt(self: *Monster, amt: u32) void {
+        self.hp -|= amt;
+        if (self.hp == 0) {
+            self.dead = true;
+        }
     }
 };
 
@@ -587,6 +596,7 @@ pub const World = struct {
     pub fn update(self: *World, frame: u64, frame_arena: Allocator) void {
         var new_projectile_ids = std.ArrayListUnmanaged(u32){};
         var proj_pending_removal = std.ArrayListUnmanaged(u32){};
+        var mon_pending_removal = std.ArrayListUnmanaged(u32){};
 
         for (self.spawns.items) |*s, id| {
             if (s.timer.expired(frame)) {
@@ -613,12 +623,19 @@ pub const World = struct {
             p.update(frame);
             for (self.monsters.slice()) |*m| {
                 if (p.getWorldCollisionRect().intersect(m.getWorldCollisionRect(), null)) {
+                    if (m.dead) {
+                        continue;
+                    }
                     // take care to not double-delete
                     if (!p.dead) {
                         m.flash_frames = 1;
                         self.playPositionalSound("assets/sounds/hit.ogg", @intCast(i32, m.world_x), @intCast(i32, m.world_y));
                         proj_pending_removal.append(frame_arena, p.id) catch unreachable;
                         p.dead = true;
+                        m.hurt(1);
+                        if (m.dead) {
+                            mon_pending_removal.append(frame_arena, m.id) catch unreachable;
+                        }
                     }
                 }
             }
@@ -626,6 +643,10 @@ pub const World = struct {
 
         for (proj_pending_removal.items) |id| {
             self.projectiles.erase(id);
+        }
+
+        for (mon_pending_removal.items) |id| {
+            self.monsters.erase(id);
         }
 
         new_projectile_ids.ensureTotalCapacity(frame_arena, self.pending_projectiles.items.len) catch unreachable;
