@@ -14,7 +14,9 @@ const fssrc = @embedFile("SpriteBatch.frag");
 
 const Vertex = extern struct {
     xyuv: zm.F32x4,
-    rgba: zm.F32x4,
+    rgba: @Vector(4, u8) = @splat(4, @as(u8, 255)),
+    flash: u8 = 0,
+    pad: [3]u8 = undefined,
 };
 
 const Uniforms = struct {
@@ -61,10 +63,13 @@ pub fn create() SpriteBatch {
 
     gl.bindVertexArray(self.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer);
-    gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*anyopaque, 0));
-    gl.vertexAttribPointer(1, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*anyopaque, 16));
+    gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "xyuv")));
+    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "rgba")));
+    gl.vertexAttribPointer(2, 1, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "flash")));
+
     gl.enableVertexAttribArray(0);
     gl.enableVertexAttribArray(1);
+    gl.enableVertexAttribArray(2);
 
     self.createIndices();
     self.createVertexStorage();
@@ -188,19 +193,51 @@ pub fn drawQuad(self: *SpriteBatch, src: Rect, dest: Rect) void {
 
     self.vertices[self.vertex_head + 0] = .{
         .xyuv = zm.f32x4(left, top, uv_left, uv_top),
-        .rgba = zm.f32x4s(1),
     };
     self.vertices[self.vertex_head + 1] = .{
         .xyuv = zm.f32x4(left, bottom, uv_left, uv_bottom),
-        .rgba = zm.f32x4s(1),
     };
     self.vertices[self.vertex_head + 2] = .{
         .xyuv = zm.f32x4(right, top, uv_right, uv_top),
-        .rgba = zm.f32x4s(1),
     };
     self.vertices[self.vertex_head + 3] = .{
         .xyuv = zm.f32x4(right, bottom, uv_right, uv_bottom),
-        .rgba = zm.f32x4s(1),
+    };
+    self.vertex_head += 4;
+
+    if (self.vertex_head == vertex_count) {
+        self.flush(true);
+    }
+}
+
+pub fn drawQuadFlash(self: *SpriteBatch, src: Rect, dest: Rect, flash: bool) void {
+    const left = @intToFloat(f32, dest.left());
+    const right = @intToFloat(f32, dest.right());
+    const top = @intToFloat(f32, dest.top());
+    const bottom = @intToFloat(f32, dest.bottom());
+
+    const uv_left = @intToFloat(f32, src.left()) / self.ref_width;
+    const uv_right = @intToFloat(f32, src.right()) / self.ref_width;
+    const uv_top = 1.0 - @intToFloat(f32, src.top()) / self.ref_height;
+    const uv_bottom = 1.0 - @intToFloat(f32, src.bottom()) / self.ref_height;
+
+    const f_val: u8 = if (flash) 255 else 0;
+
+    self.vertices[self.vertex_head + 0] = .{
+        .xyuv = zm.f32x4(left, top, uv_left, uv_top),
+        .flash = f_val,
+    };
+    self.vertices[self.vertex_head + 1] = .{
+        .xyuv = zm.f32x4(left, bottom, uv_left, uv_bottom),
+        .flash = f_val,
+    };
+    self.vertices[self.vertex_head + 2] = .{
+        .xyuv = zm.f32x4(right, top, uv_right, uv_top),
+        .flash = f_val,
+    };
+    self.vertices[self.vertex_head + 3] = .{
+        .xyuv = zm.f32x4(right, bottom, uv_right, uv_bottom),
+        .flash = f_val,
     };
     self.vertex_head += 4;
 
@@ -227,19 +264,15 @@ pub fn drawQuadRotated(self: *SpriteBatch, src: Rect, dest_x: f32, dest_y: f32, 
 
     self.vertices[self.vertex_head + 0] = .{
         .xyuv = zm.f32x4(p0[0], p0[1], uv_left, uv_top),
-        .rgba = zm.f32x4s(1),
     };
     self.vertices[self.vertex_head + 1] = .{
         .xyuv = zm.f32x4(p1[0], p1[1], uv_left, uv_bottom),
-        .rgba = zm.f32x4s(1),
     };
     self.vertices[self.vertex_head + 2] = .{
         .xyuv = zm.f32x4(p2[0], p2[1], uv_right, uv_top),
-        .rgba = zm.f32x4s(1),
     };
     self.vertices[self.vertex_head + 3] = .{
         .xyuv = zm.f32x4(p3[0], p3[1], uv_right, uv_bottom),
-        .rgba = zm.f32x4s(1),
     };
     self.vertex_head += 4;
 

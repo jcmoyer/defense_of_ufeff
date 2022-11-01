@@ -114,6 +114,7 @@ pub const Monster = struct {
     path: []TileCoord,
     path_index: usize = 0,
     path_forward: bool = true,
+    flash_frames: u32 = 0,
 
     pub fn setTilePosition(self: *Monster, coord: TileCoord) void {
         self.setWorldPosition(@intCast(u32, coord.x * 16), @intCast(u32, coord.y * 16));
@@ -132,6 +133,7 @@ pub const Monster = struct {
     }
 
     pub fn update(self: *Monster) void {
+        self.flash_frames -|= 1;
         self.p_world_x = self.world_x;
         self.p_world_y = self.world_y;
 
@@ -604,15 +606,16 @@ pub const World = struct {
         // API is designed to support this use case with a couple changes.
         for (self.projectiles.slice()) |*p| {
             p.update(frame);
-            // var mob_index: usize = self.monsters.items.len -% 1;
-            // while (mob_index < self.monsters.items.len) : (mob_index -%= 1) {
-            //     // kinda nasty, maybe we do want an intrusive slotmap
-            //     var monster = &self.monsters.items.items(.value)[mob_index];
-            //     var monster_id = self.monsters.items.items(.handle)[mob_index];
-            //     if (p.getWorldCollisionRect().intersect(monster.getWorldCollisionRect(), null)) {
-            //         self.monsters.erase(monster_id);
-            //     }
-            // }
+            var mob_index: usize = self.monsters.items.len -% 1;
+            while (mob_index < self.monsters.items.len) : (mob_index -%= 1) {
+                // kinda nasty, maybe we do want an intrusive slotmap
+                var monster = &self.monsters.items.items(.value)[mob_index];
+                // var monster_id = self.monsters.items.items(.handle)[mob_index];
+                if (p.getWorldCollisionRect().intersect(monster.getWorldCollisionRect(), null)) {
+                    // self.monsters.erase(monster_id);
+                    monster.flash_frames = 1;
+                }
+            }
         }
 
         new_projectile_ids.ensureTotalCapacity(frame_arena, self.pending_projectiles.items.len) catch unreachable;

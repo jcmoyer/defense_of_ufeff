@@ -321,9 +321,10 @@ fn renderMonsters(
     });
     for (self.world.monsters.slice()) |m| {
         const w = m.getInterpWorldPosition(a);
-        self.r_batch.drawQuad(
+        self.r_batch.drawQuadFlash(
             m.animator.?.getCurrentRect(),
             Rect.init(@intCast(i32, w[0]) - cam.view.left(), @intCast(i32, w[1]) - cam.view.top(), 16, 16),
+            m.flash_frames > 0,
         );
     }
     self.r_batch.end();
