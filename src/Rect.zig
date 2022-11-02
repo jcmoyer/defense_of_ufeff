@@ -61,8 +61,8 @@ pub fn centerOn(self: *Rect, x: c_int, y: c_int) void {
 
 pub fn centerPoint(self: Rect) [2]i32 {
     return .{
-        @divFloor(self.right() - self.left(), 2),
-        @divFloor(self.bottom() - self.top(), 2),
+        @divFloor(self.right() + self.left(), 2),
+        @divFloor(self.bottom() + self.top(), 2),
     };
 }
 

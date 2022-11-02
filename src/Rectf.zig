@@ -61,8 +61,8 @@ pub fn centerOn(self: *Rectf, x: f32, y: f32) void {
 
 pub fn centerPoint(self: Rectf) [2]f32 {
     return .{
-        (self.right() - self.left()) / 2,
-        (self.bottom() - self.top()) / 2,
+        (self.right() + self.left()) / 2,
+        (self.bottom() + self.top()) / 2,
     };
 }
 
