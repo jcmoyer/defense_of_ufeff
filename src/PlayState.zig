@@ -620,25 +620,18 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
 
     self.game.imm.beginUntextured();
     for (self.world.monsters.slice()) |m| {
-        const wx = m.getTilePosition().x * 16;
-        const wy = m.getTilePosition().y * 16;
+        var wc = m.getWorldCollisionRect();
+        wc.translate(-cam.view.left(), -cam.view.top());
         self.game.imm.drawQuadRGBA(
-            Rect.init(
-                @intCast(i32, wx) - cam.view.left(),
-                @intCast(i32, wy) - cam.view.top(),
-                16,
-                16,
-            ),
-            [4]f32{ 0, 0, 1, 0.5 },
-        );
-        self.game.imm.drawQuadRGBA(
-            m.getWorldCollisionRect(),
+            wc,
             [4]f32{ 0, 0, 1, 0.5 },
         );
     }
     for (self.world.projectiles.slice()) |p| {
+        var wc = p.getWorldCollisionRect();
+        wc.translate(-cam.view.left(), -cam.view.top());
         self.game.imm.drawQuadRGBA(
-            p.getWorldCollisionRect(),
+            wc,
             [4]f32{ 0, 0, 1, 0.5 },
         );
     }
