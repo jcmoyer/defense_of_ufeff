@@ -253,8 +253,10 @@ pub const Monster = struct {
 pub const TowerSpec = struct {
     anim_set: ?anim.AnimationSet = null,
     spawnFn: ?*const fn (*Tower, u64) void = null,
-    updateFn: *const fn (*Tower, u64) void,
+    updateFn: ?*const fn (*Tower, u64) void = null,
 };
+
+pub const t_wall = TowerSpec{};
 
 pub const tspec_test = TowerSpec{
     .anim_set = anim.a_chara.animationSet(),
@@ -347,7 +349,9 @@ pub const Tower = struct {
     }
 
     fn update(self: *Tower, frame: u64) void {
-        self.spec.updateFn(self, frame);
+        if (self.spec.updateFn) |updateFn| {
+            updateFn(self, frame);
+        }
         if (self.animator) |*animator| {
             animator.update();
         }
