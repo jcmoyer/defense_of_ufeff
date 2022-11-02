@@ -59,6 +59,7 @@ fontspec_numbers: bmfont.BitmapFontSpec,
 r_finger: FingerRenderer,
 frame_arena: std.heap.ArenaAllocator,
 ui_root: ui.Root,
+ui_buttons: [8]*ui.Button,
 
 deb_render_tile_collision: bool = false,
 
@@ -85,6 +86,7 @@ pub fn create(game: *Game) !*PlayState {
         // Created/destroyed in update()
         .frame_arena = undefined,
         .ui_root = ui.Root.init(game.allocator),
+        .ui_buttons = undefined,
     };
     self.r_font = BitmapFont.init(&self.r_batch);
 
@@ -94,6 +96,16 @@ pub fn create(game: *Game) !*PlayState {
     ui_panel.rect.alignRight(Game.INTERNAL_WIDTH);
     ui_panel.texture = t_panel;
     try self.ui_root.addChild(ui_panel.control());
+    for (self.ui_buttons) |*b, i| {
+        b.* = try self.ui_root.createButton();
+        try ui_panel.addChild(b.*.control());
+
+        const x: i32 = if (i % 2 == 0) 16 else 48;
+        const y: i32 = 112 + @intCast(i32, i / 2) * 32;
+
+        b.*.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
+        b.*.rect = Rect.init(x, y, 32, 32);
+    }
 
     // TODO probably want a better way to manage this, direct IO shouldn't be here
     // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
@@ -190,28 +202,51 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
     }
 
     if (ev.type == .SDL_MOUSEBUTTONDOWN and ev.button.button == sdl.SDL_BUTTON_LEFT) {
-        const tile_coord = self.mouseToTile();
-        if (self.world.canBuildAt(tile_coord)) {
-            self.world.spawnTower(&wo.t_wall, tile_coord, self.game.frame_counter) catch unreachable;
+        const mouse_p = self.game.unproject(
+            self.game.input.mouse.client_x,
+            self.game.input.mouse.client_y,
+        );
+        if (self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
+            self.ui_root.handleMouseClick(mouse_p[0], mouse_p[1]);
+        } else {
+            const tile_coord = self.mouseToTile();
+            if (self.world.canBuildAt(tile_coord)) {
+                self.world.spawnTower(&wo.t_wall, tile_coord, self.game.frame_counter) catch unreachable;
+            }
         }
     }
 }
 
-fn renderControl(self: *PlayState, control: ui.Control) void {
+const ControlRenderState = struct {
+    translate_x: i32 = 0,
+    translate_y: i32 = 0,
+};
+
+fn renderControl(self: *PlayState, control: ui.Control, renderstate: ControlRenderState) void {
     if (control.interactRect()) |rect| {
         if (control.getTexture()) |t| {
+            var render_dest = rect;
+            render_dest.translate(renderstate.translate_x, renderstate.translate_y);
             self.r_batch.begin(.{
                 .texture = t,
             });
-            self.r_batch.drawQuad(Rect.init(0, 0, @intCast(i32, t.width), @intCast(i32, t.height)), rect);
+            self.r_batch.drawQuad(Rect.init(0, 0, @intCast(i32, t.width), @intCast(i32, t.height)), render_dest);
             self.r_batch.end();
+        }
+    }
+    if (control.getChildren()) |children| {
+        for (children) |child| {
+            self.renderControl(child, .{
+                .translate_x = renderstate.translate_x + control.interactRect().?.x,
+                .translate_y = renderstate.translate_y + control.interactRect().?.y,
+            });
         }
     }
 }
 
 fn renderUI(self: *PlayState) void {
     for (self.ui_root.children.items) |child| {
-        self.renderControl(child);
+        self.renderControl(child, .{});
     }
 }
 

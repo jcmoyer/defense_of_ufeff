@@ -11,6 +11,7 @@ pub const Panel = struct {
     texture: ?*const Texture = null,
 
     pub fn deinit(self: *Panel) void {
+        self.children.deinit(self.root.allocator);
         self.root.allocator.destroy(self);
     }
 
@@ -28,8 +29,8 @@ pub const Panel = struct {
         }
     }
 
-    pub fn addChild(self: *Panel, c: Control) void {
-        self.children.append(self.root.allocator, c);
+    pub fn addChild(self: *Panel, c: Control) !void {
+        try self.children.append(self.root.allocator, c);
     }
 
     pub fn interactRect(self: *Panel) ?Rect {
@@ -47,11 +48,16 @@ pub const Panel = struct {
         return self.texture;
     }
 
+    pub fn getChildren(self: *Panel) []Control {
+        return self.children.items;
+    }
+
     const vtable = ControlVtbl{
         .deinitFn = @ptrCast(*const fn (*anyopaque) void, &deinit),
         .handleMouseClickFn = @ptrCast(*const fn (*anyopaque, x: i32, y: i32) void, &handleMouseClick),
         .interactRectFn = @ptrCast(*const fn (self: *anyopaque) ?Rect, &interactRect),
         .getTextureFn = @ptrCast(*const fn (self: *anyopaque) ?*const Texture, &getTexture),
+        .getChildrenFn = @ptrCast(?*const fn (self: *anyopaque) []Control, &getChildren),
     };
 };
 
@@ -60,6 +66,43 @@ pub const Button = struct {
     text: []const u8,
     rect: Rect,
     texture: ?*const Texture = null,
+    userdata: ?*anyopaque = null,
+    callback: ?*const fn (?*anyopaque) void = null,
+
+    pub fn deinit(self: *Button) void {
+        self.root.allocator.destroy(self);
+    }
+
+    pub fn handleMouseClick(self: *const Button, x: i32, y: i32) void {
+        _ = x;
+        _ = y;
+        std.log.debug("Button clicked", .{});
+        if (self.callback) |cb| {
+            cb(self.userdata);
+        }
+    }
+
+    pub fn interactRect(self: *Button) ?Rect {
+        return self.rect;
+    }
+
+    pub fn control(self: *Button) Control {
+        return Control{
+            .instance = self,
+            .vtable = &vtable,
+        };
+    }
+
+    pub fn getTexture(self: *Button) ?*const Texture {
+        return self.texture;
+    }
+
+    const vtable = ControlVtbl{
+        .deinitFn = @ptrCast(*const fn (*anyopaque) void, &deinit),
+        .handleMouseClickFn = @ptrCast(*const fn (*anyopaque, x: i32, y: i32) void, &handleMouseClick),
+        .interactRectFn = @ptrCast(*const fn (self: *anyopaque) ?Rect, &interactRect),
+        .getTextureFn = @ptrCast(*const fn (self: *anyopaque) ?*const Texture, &getTexture),
+    };
 };
 
 pub const ControlVtbl = struct {
@@ -67,6 +110,7 @@ pub const ControlVtbl = struct {
     handleMouseClickFn: ?*const fn (*anyopaque, x: i32, y: i32) void = null,
     interactRectFn: ?*const fn (self: *anyopaque) ?Rect = null,
     getTextureFn: ?*const fn (self: *anyopaque) ?*const Texture = null,
+    getChildrenFn: ?*const fn (self: *anyopaque) []Control = null,
 };
 
 pub const Control = struct {
@@ -92,6 +136,13 @@ pub const Control = struct {
 
     pub fn getTexture(self: Control) ?*const Texture {
         if (self.vtable.getTextureFn) |f| {
+            return f(self.instance);
+        }
+        return null;
+    }
+
+    pub fn getChildren(self: Control) ?[]Control {
+        if (self.vtable.getChildrenFn) |f| {
             return f(self.instance);
         }
         return null;
@@ -162,8 +213,10 @@ pub const Root = struct {
         var ptr = try self.allocator.create(Button);
         ptr.* = Button{
             .root = self,
+            .text = "button",
+            .rect = Rect.init(0, 0, 0, 0),
         };
-        try self.controls.append(self.allocator, ptr);
+        try self.controls.append(self.allocator, ptr.control());
         return ptr;
     }
 };
