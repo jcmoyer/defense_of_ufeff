@@ -5,6 +5,7 @@ const Game = @import("Game.zig");
 const gl = @import("gl33");
 const tilemap = @import("tilemap.zig");
 const Rect = @import("Rect.zig");
+const Rectf = @import("Rectf.zig");
 const Camera = @import("Camera.zig");
 const SpriteBatch = @import("SpriteBatch.zig");
 const WaterRenderer = @import("WaterRenderer.zig");
@@ -738,46 +739,75 @@ fn loadWorld(self: *PlayState, mapid: []const u8) void {
 }
 
 fn createMinimap(self: *PlayState) !void {
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, self.t_minimap.handle);
-
     self.t_minimap.width = @intCast(u32, self.world.getWidth());
     self.t_minimap.height = @intCast(u32, self.world.getHeight());
 
-    var pixels = try self.game.allocator.alloc(u32, self.t_minimap.width * self.t_minimap.height);
-    defer self.game.allocator.free(pixels);
+    var fbo: gl.GLuint = 0;
+    gl.genFramebuffers(1, &fbo);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
-    var y: u32 = 0;
-    var x: u32 = 0;
-    while (y < self.t_minimap.height) : (y += 1) {
-        x = 0;
-        while (x < self.t_minimap.width) : (x += 1) {
-            // flip vertically for OpenGL
-            const dest_y = self.t_minimap.height - y - 1;
-            if (self.world.map.at2DPtr(.base, x, y).isWater()) {
-                pixels[dest_y * self.t_minimap.width + x] = 0xffff0000;
-            } else {
-                pixels[dest_y * self.t_minimap.width + x] = 0xff00ff00;
-            }
-        }
-    }
-
-    gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.RGBA,
-        @intCast(gl.GLsizei, self.t_minimap.width),
-        @intCast(gl.GLsizei, self.t_minimap.height),
-        0,
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
-        pixels.ptr,
-    );
-
+    gl.bindTexture(gl.TEXTURE_2D, self.t_minimap.handle);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @intCast(gl.GLsizei, self.t_minimap.width), @intCast(gl.GLsizei, self.t_minimap.height), 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.t_minimap.handle, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
+        std.log.err("createMinimap: failed to create framebuffer", .{});
+        std.process.exit(1);
+    }
+    gl.viewport(0, 0, @intCast(c_int, self.t_minimap.width), @intCast(c_int, self.t_minimap.height));
+    self.r_batch.setOutputDimensions(self.t_minimap.width, self.t_minimap.height);
+    self.renderMinimapLayer(.base, .terrain);
+    self.renderMinimapLayer(.base, .special);
+    self.renderMinimapLayer(.detail, .terrain);
+    self.renderMinimapLayer(.detail, .special);
+}
+
+fn renderMinimapLayer(
+    self: *PlayState,
+    layer: tilemap.TileLayer,
+    bank: tilemap.TileBank,
+) void {
+    const map = self.world.map;
+    const source_texture = switch (bank) {
+        .none => return,
+        .terrain => self.game.texman.getNamedTexture("terrain.png"),
+        .special => self.game.texman.getNamedTexture("special.png"),
+    };
+    const n_tiles_wide = @intCast(u16, source_texture.width / 16);
+    self.r_batch.begin(SpriteBatch.SpriteBatchParams{
+        .texture = source_texture,
+    });
+    var y: usize = 0;
+    var x: usize = 0;
+    while (y < self.world.getHeight()) : (y += 1) {
+        x = 0;
+        while (x < self.world.getWidth()) : (x += 1) {
+            const t = map.at2DPtr(layer, x, y);
+            if (t.bank != bank) {
+                continue;
+            }
+            const src = Rect{
+                .x = (t.id % n_tiles_wide) * 16,
+                .y = (t.id / n_tiles_wide) * 16,
+                .w = 16,
+                .h = 16,
+            };
+            const dest = Rectf.init(
+                @intToFloat(f32, x),
+                @intToFloat(f32, y),
+                1.0,
+                1.0,
+            );
+            self.r_batch.drawQuadOptions(.{
+                .src = src.toRectf(),
+                .dest = dest,
+            });
+        }
+    }
+    self.r_batch.end();
 }
 
 fn renderFoam(
