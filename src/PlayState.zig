@@ -18,6 +18,7 @@ const particle = @import("particle.zig");
 const audio = @import("audio.zig");
 // eventually should probably eliminate this dependency
 const sdl = @import("sdl.zig");
+const ui = @import("ui.zig");
 
 const DEFAULT_CAMERA = Camera{
     .view = Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT),
@@ -57,6 +58,7 @@ fontspec: bmfont.BitmapFontSpec,
 fontspec_numbers: bmfont.BitmapFontSpec,
 r_finger: FingerRenderer,
 frame_arena: std.heap.ArenaAllocator,
+ui_root: ui.Root,
 
 deb_render_tile_collision: bool = false,
 
@@ -82,8 +84,16 @@ pub fn create(game: *Game) !*PlayState {
         .r_quad = QuadBatch.create(),
         // Created/destroyed in update()
         .frame_arena = undefined,
+        .ui_root = ui.Root.init(game.allocator),
     };
     self.r_font = BitmapFont.init(&self.r_batch);
+
+    const t_panel = self.game.texman.getNamedTexture("ui_panel.png");
+    var ui_panel = try self.ui_root.createPanel();
+    ui_panel.rect = Rect.init(0, 0, @intCast(i32, t_panel.width), @intCast(i32, t_panel.height));
+    ui_panel.rect.alignRight(Game.INTERNAL_WIDTH);
+    ui_panel.texture = t_panel;
+    try self.ui_root.addChild(ui_panel.control());
 
     // TODO probably want a better way to manage this, direct IO shouldn't be here
     // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
@@ -108,6 +118,7 @@ pub fn destroy(self: *PlayState) void {
     self.game.allocator.free(self.foam_buf);
     self.r_batch.destroy();
     self.world.deinit();
+    self.ui_root.deinit();
     self.game.allocator.destroy(self);
 }
 
@@ -139,6 +150,11 @@ pub fn update(self: *PlayState) void {
 }
 
 pub fn render(self: *PlayState, alpha: f64) void {
+    const mouse_p = self.game.unproject(
+        self.game.input.mouse.client_x,
+        self.game.input.mouse.client_y,
+    );
+
     gl.clearColor(0x64.0 / 255.0, 0x95.0 / 255.0, 0xED.0 / 255.0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -153,7 +169,10 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.renderHealthBars(cam_interp, alpha);
     self.renderFloatingText(cam_interp, alpha);
     self.renderBlockedConstructionRects(cam_interp);
-    self.renderPlacementIndicator(cam_interp);
+    if (!self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
+        self.renderPlacementIndicator(cam_interp);
+    }
+    self.renderUI();
 
     if (self.deb_render_tile_collision) {
         self.debugRenderTileCollision(cam_interp);
@@ -175,6 +194,24 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
         if (self.world.canBuildAt(tile_coord)) {
             self.world.spawnTower(&wo.t_wall, tile_coord, self.game.frame_counter) catch unreachable;
         }
+    }
+}
+
+fn renderControl(self: *PlayState, control: ui.Control) void {
+    if (control.interactRect()) |rect| {
+        if (control.getTexture()) |t| {
+            self.r_batch.begin(.{
+                .texture = t,
+            });
+            self.r_batch.drawQuad(Rect.init(0, 0, @intCast(i32, t.width), @intCast(i32, t.height)), rect);
+            self.r_batch.end();
+        }
+    }
+}
+
+fn renderUI(self: *PlayState) void {
+    for (self.ui_root.children.items) |child| {
+        self.renderControl(child);
     }
 }
 

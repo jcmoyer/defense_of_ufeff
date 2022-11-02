@@ -88,6 +88,10 @@ pub fn intersect(self: Rect, other: Rect, subrect: ?*Rect) bool {
     }
 }
 
+pub fn contains(self: Rect, x: i32, y: i32) bool {
+    return x >= self.left() and x <= self.right() and y >= self.top() and y <= self.bottom();
+}
+
 pub fn toRectf(self: Rect) Rectf {
     return Rectf.init(
         @intToFloat(f32, self.x),
