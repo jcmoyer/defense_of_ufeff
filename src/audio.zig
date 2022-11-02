@@ -171,9 +171,10 @@ pub const AudioSystem = struct {
             self.decode_queue_m.unlock();
 
             // now we can load the requests and put them into the tracklist
-            for (local_queue.items) |req| {
+            while (local_queue.popOrNull()) |req| {
                 // empty filename kills the thread
                 if (req.filename.len == 0) {
+                    req.parameters.release();
                     return;
                 }
                 const t = Track{
@@ -188,7 +189,6 @@ pub const AudioSystem = struct {
                     std.process.exit(1);
                 };
             }
-            local_queue.clearRetainingCapacity();
         }
     }
 
@@ -312,11 +312,13 @@ pub const AudioSystem = struct {
         }
 
         // erase finished tracks
-        var i: usize = 0;
-        while (i < self.tracks.items.len) : (i += 1) {
+        var i: usize = self.tracks.items.len -% 1;
+        while (i < self.tracks.items.len) {
             if (self.tracks.items[i].done) {
                 var t = self.tracks.swapRemove(i);
                 t.deinit();
+            } else {
+                i -%= 1;
             }
         }
     }
