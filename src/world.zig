@@ -677,12 +677,14 @@ pub const World = struct {
     }
 
     fn invalidatePathCache(self: *World) void {
+        var timer = std.time.Timer.start() catch unreachable;
         self.path_cache.clear();
         for (self.monsters.slice()) |*m| {
             const coord = m.getTilePosition();
             m.path_index = 0;
             m.path = self.findPath(coord, self.goal.?).?;
         }
+        std.log.debug("invalidatePathCache took {d}us", .{timer.read() / std.time.ns_per_us});
     }
 
     fn spawnTowerWorld(self: *World, spec: *const TowerSpec, world_x: u32, world_y: u32, frame: u64) !void {
@@ -845,12 +847,10 @@ pub const World = struct {
         if (self.path_cache.get(start)) |existing_path| {
             return existing_path;
         }
-        var timer = std.time.Timer.start() catch unreachable;
         const has_path = self.pathfinder.findPath(start, end, &self.map, &self.path_cache) catch |err| {
             std.log.err("findPath failed: {!}", .{err});
             std.process.exit(1);
         };
-        std.log.debug("Pathfinding {any}->{any} took {d}us", .{ start, end, timer.read() / std.time.ns_per_us });
 
         if (has_path) {
             return self.path_cache.get(start).?;
