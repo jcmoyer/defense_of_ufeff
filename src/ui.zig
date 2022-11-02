@@ -105,6 +105,46 @@ pub const Button = struct {
     };
 };
 
+pub const Minimap = struct {
+    root: *Root,
+    rect: Rect,
+    texture: ?*const Texture = null,
+    userdata: ?*anyopaque = null,
+    callback: ?*const fn (?*anyopaque) void = null,
+
+    pub fn deinit(self: *Minimap) void {
+        self.root.allocator.destroy(self);
+    }
+
+    pub fn handleMouseClick(self: *const Minimap, x: i32, y: i32) void {
+        _ = self;
+        _ = x;
+        _ = y;
+    }
+
+    pub fn interactRect(self: *Minimap) ?Rect {
+        return self.rect;
+    }
+
+    pub fn control(self: *Minimap) Control {
+        return Control{
+            .instance = self,
+            .vtable = &vtable,
+        };
+    }
+
+    pub fn getTexture(self: *Minimap) ?*const Texture {
+        return self.texture;
+    }
+
+    const vtable = ControlVtbl{
+        .deinitFn = @ptrCast(*const fn (*anyopaque) void, &deinit),
+        .handleMouseClickFn = @ptrCast(*const fn (*anyopaque, x: i32, y: i32) void, &handleMouseClick),
+        .interactRectFn = @ptrCast(*const fn (self: *anyopaque) ?Rect, &interactRect),
+        .getTextureFn = @ptrCast(*const fn (self: *anyopaque) ?*const Texture, &getTexture),
+    };
+};
+
 pub const ControlVtbl = struct {
     deinitFn: *const fn (*anyopaque) void,
     handleMouseClickFn: ?*const fn (*anyopaque, x: i32, y: i32) void = null,
@@ -214,6 +254,16 @@ pub const Root = struct {
         ptr.* = Button{
             .root = self,
             .text = "button",
+            .rect = Rect.init(0, 0, 0, 0),
+        };
+        try self.controls.append(self.allocator, ptr.control());
+        return ptr;
+    }
+
+    pub fn createMinimap(self: *Root) !*Minimap {
+        var ptr = try self.allocator.create(Minimap);
+        ptr.* = Minimap{
+            .root = self,
             .rect = Rect.init(0, 0, 0, 0),
         };
         try self.controls.append(self.allocator, ptr.control());

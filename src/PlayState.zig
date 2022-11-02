@@ -19,6 +19,7 @@ const audio = @import("audio.zig");
 // eventually should probably eliminate this dependency
 const sdl = @import("sdl.zig");
 const ui = @import("ui.zig");
+const Texture = @import("texture.zig").Texture;
 
 const DEFAULT_CAMERA = Camera{
     .view = Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT),
@@ -60,6 +61,8 @@ r_finger: FingerRenderer,
 frame_arena: std.heap.ArenaAllocator,
 ui_root: ui.Root,
 ui_buttons: [8]*ui.Button,
+ui_minimap: *ui.Minimap,
+t_minimap: *Texture,
 
 deb_render_tile_collision: bool = false,
 
@@ -87,6 +90,8 @@ pub fn create(game: *Game) !*PlayState {
         .frame_arena = undefined,
         .ui_root = ui.Root.init(game.allocator),
         .ui_buttons = undefined,
+        .ui_minimap = undefined,
+        .t_minimap = game.texman.createInMemory(),
     };
     self.r_font = BitmapFont.init(&self.r_batch);
 
@@ -106,6 +111,10 @@ pub fn create(game: *Game) !*PlayState {
         b.*.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
         b.*.rect = Rect.init(x, y, 32, 32);
     }
+    self.ui_minimap = try self.ui_root.createMinimap();
+    self.ui_minimap.rect = Rect.init(16, 16, 64, 64);
+    self.ui_minimap.texture = self.t_minimap;
+    try ui_panel.addChild(self.ui_minimap.control());
 
     // TODO probably want a better way to manage this, direct IO shouldn't be here
     // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
@@ -701,6 +710,11 @@ fn loadWorld(self: *PlayState, mapid: []const u8) void {
         std.log.err("failed to load tilemap {!}", .{err});
         std.process.exit(1);
     };
+
+    self.createMinimap() catch |err| {
+        std.log.err("Failed to create minimap: {!}", .{err});
+        std.process.exit(1);
+    };
     // self.world.animan = &self.aman;
 
     // Init camera for this map
@@ -721,6 +735,49 @@ fn loadWorld(self: *PlayState, mapid: []const u8) void {
     // must be set before calling spawnMonster since it's used for audio parameters...
     // should probably clean this up eventually
     self.world.view = self.camera.view;
+}
+
+fn createMinimap(self: *PlayState) !void {
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, self.t_minimap.handle);
+
+    self.t_minimap.width = @intCast(u32, self.world.getWidth());
+    self.t_minimap.height = @intCast(u32, self.world.getHeight());
+
+    var pixels = try self.game.allocator.alloc(u32, self.t_minimap.width * self.t_minimap.height);
+    defer self.game.allocator.free(pixels);
+
+    var y: u32 = 0;
+    var x: u32 = 0;
+    while (y < self.t_minimap.height) : (y += 1) {
+        x = 0;
+        while (x < self.t_minimap.width) : (x += 1) {
+            // flip vertically for OpenGL
+            const dest_y = self.t_minimap.height - y - 1;
+            if (self.world.map.at2DPtr(.base, x, y).isWater()) {
+                pixels[dest_y * self.t_minimap.width + x] = 0xffff0000;
+            } else {
+                pixels[dest_y * self.t_minimap.width + x] = 0xff00ff00;
+            }
+        }
+    }
+
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        @intCast(gl.GLsizei, self.t_minimap.width),
+        @intCast(gl.GLsizei, self.t_minimap.height),
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        pixels.ptr,
+    );
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 }
 
 fn renderFoam(
