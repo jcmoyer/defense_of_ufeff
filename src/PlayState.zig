@@ -240,6 +240,33 @@ fn renderControl(self: *PlayState, control: ui.Control, renderstate: ControlRend
             self.r_batch.begin(.{
                 .texture = t,
             });
+
+            // touch inside of dest rect
+            // this is for the minimap, mostly
+            const aspect_ratio = @intToFloat(f32, t.width) / @intToFloat(f32, t.height);
+            const p = render_dest.centerPoint();
+
+            // A = aspect ratio, W = width, H = height
+            //
+            // A = W/H
+            // H = W/A
+            // W = AH
+            //
+            // A > 1 means rect is wider than tall
+            // A < 1 means rect is taller than wide
+            //
+            // we can maintain A at different sizes by setting W or H and then
+            // doing one of the above transforms for the other axis
+            if (aspect_ratio > 1) {
+                render_dest.w = rect.w;
+                render_dest.h = @floatToInt(i32, @intToFloat(f32, render_dest.w) / aspect_ratio);
+                render_dest.centerOn(p[0], p[1]);
+            } else {
+                render_dest.h = rect.h;
+                render_dest.w = @floatToInt(i32, @intToFloat(f32, render_dest.h) * aspect_ratio);
+                render_dest.centerOn(p[0], p[1]);
+            }
+
             self.r_batch.drawQuad(Rect.init(0, 0, @intCast(i32, t.width), @intCast(i32, t.height)), render_dest);
             self.r_batch.end();
         }
