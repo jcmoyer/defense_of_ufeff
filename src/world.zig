@@ -569,8 +569,16 @@ pub const World = struct {
         self.map.copyInto(&self.scratch_map);
         self.scratch_map.at2DPtr(.base, coord.x, coord.y).flags.contains_tower = true;
         self.scratch_cache.clear();
-        for (self.monsters.slice()) |*m| {
-            if (!self.findTheoreticalPath(m.getTilePosition(), self.goal.?)) {
+
+        // TODO: do we actually need to path from all monsters? it seems spawn points should be enough
+        // for (self.monsters.slice()) |*m| {
+        //     if (!self.findTheoreticalPath(m.getTilePosition(), self.goal.?)) {
+        //         return false;
+        //     }
+        // }
+
+        for (self.spawns.items) |*sp| {
+            if (!self.findTheoreticalPath(sp.coord, self.goal.?)) {
                 return false;
             }
         }
