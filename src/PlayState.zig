@@ -159,25 +159,6 @@ pub fn render(self: *PlayState, alpha: f64) void {
         self.debugRenderTileCollision(cam_interp);
     }
 
-    self.r_font.begin(.{
-        .texture = self.game.texman.getNamedTexture("text16.png"),
-        .spec = &self.fontspec,
-    });
-    self.r_font.drawText("HELLO WORLD", .{ .x = 0, .y = 0 });
-    self.r_font.end();
-    self.r_font.begin(.{
-        .texture = self.game.texman.getNamedTexture("text16.png"),
-        .spec = &self.fontspec_numbers,
-    });
-    self.r_font.drawText("0123456789", .{ .x = 0, .y = 50 });
-    self.r_font.end();
-
-    self.r_finger.beginTextured(.{
-        .texture = self.game.texman.getNamedTexture("finger.png"),
-    });
-    self.r_finger.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
-    self.r_finger.drawFinger(64, 64, @intToFloat(f32, self.game.frame_counter) / 8.0);
-
     self.r_quad.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
     for (self.world.spawns.items) |*s| {
         s.emitter.render(&self.r_quad, @floatCast(f32, alpha));
