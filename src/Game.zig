@@ -10,6 +10,7 @@ const texture = @import("texture.zig");
 const Texture = texture.Texture;
 const TextureManager = texture.TextureManager;
 const AudioSystem = @import("audio.zig").AudioSystem;
+const MenuState = @import("MenuState.zig");
 const PlayState = @import("PlayState.zig");
 const InputState = @import("input.zig").InputState;
 
@@ -35,6 +36,7 @@ scene_renderbuf: gl.GLuint = 0,
 scene_color: *Texture,
 
 current_state: ?StateId = null,
+st_menu: *MenuState,
 st_play: *PlayState,
 
 frame_counter: u64 = 0,
@@ -42,6 +44,7 @@ frame_counter: u64 = 0,
 input: InputState,
 
 pub const StateId = enum {
+    menu,
     play,
 };
 
@@ -58,6 +61,7 @@ pub fn create(allocator: Allocator) !*Game {
         .audio = undefined,
         .scene_color = undefined,
         .input = undefined,
+        .st_menu = undefined,
         .st_play = undefined,
     };
 
@@ -111,6 +115,11 @@ pub fn create(allocator: Allocator) !*Game {
 
     ptr.init();
 
+    ptr.st_menu = MenuState.create(ptr) catch |err| {
+        log.err("Could not create MenuState: {!}", .{err});
+        std.process.exit(1);
+    };
+
     ptr.st_play = PlayState.create(ptr) catch |err| {
         log.err("Could not create PlayState: {!}", .{err});
         std.process.exit(1);
@@ -123,6 +132,7 @@ pub fn create(allocator: Allocator) !*Game {
 
 pub fn destroy(self: *Game) void {
     self.st_play.destroy();
+    self.st_menu.destroy();
     self.texman.deinit();
     self.audio.destroy();
     sdl.SDL_GL_DeleteContext(self.context);
@@ -148,7 +158,7 @@ fn init(self: *Game) void {
 /// Initialize game and run main loop.
 pub fn run(self: *Game) void {
     self.running = true;
-    self.changeState(.play);
+    self.changeState(.menu);
 
     var last: f64 = @intToFloat(f64, sdl.SDL_GetTicks64());
     var acc: f64 = 0;
@@ -278,30 +288,35 @@ fn endRenderToScene(self: *Game) void {
 
 fn stateDispatchEvent(self: *Game, id: StateId, ev: sdl.SDL_Event) void {
     switch (id) {
+        .menu => self.st_menu.handleEvent(ev),
         .play => self.st_play.handleEvent(ev),
     }
 }
 
 fn stateDispatchUpdate(self: *Game, id: StateId) void {
     switch (id) {
+        .menu => self.st_menu.update(),
         .play => self.st_play.update(),
     }
 }
 
 fn stateDispatchRender(self: *Game, id: StateId, alpha: f64) void {
     switch (id) {
+        .menu => self.st_menu.render(alpha),
         .play => self.st_play.render(alpha),
     }
 }
 
 fn stateDispatchEnter(self: *Game, id: StateId, from: ?StateId) void {
     switch (id) {
+        .menu => self.st_menu.enter(from),
         .play => self.st_play.enter(from),
     }
 }
 
 fn stateDispatchLeave(self: *Game, id: StateId, to: ?StateId) void {
     switch (id) {
+        .menu => self.st_menu.leave(to),
         .play => self.st_play.leave(to),
     }
 }
