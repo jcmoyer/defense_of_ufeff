@@ -63,6 +63,9 @@ pub fn create(game: *Game) !*MenuState {
     self.ui_tip.rect = Rect.init(0, 0, 16, 16);
     self.ui_tip.callback = onButtonClick;
     self.ui_tip.userdata = self;
+    self.ui_tip.rect.alignRight(Game.INTERNAL_WIDTH);
+    self.ui_tip.rect.alignBottom(Game.INTERNAL_HEIGHT);
+    self.ui_tip.rect.translate(-8, -8);
     try self.ui_root.addChild(self.ui_tip.control());
 
     // TODO probably want a better way to manage this, direct IO shouldn't be here
