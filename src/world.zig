@@ -254,6 +254,8 @@ pub const TowerSpec = struct {
     anim_set: ?anim.AnimationSet = null,
     spawnFn: ?*const fn (*Tower, u64) void = null,
     updateFn: ?*const fn (*Tower, u64) void = null,
+    min_range: f32 = 0,
+    max_range: f32 = 0,
 };
 
 pub const t_wall = TowerSpec{};
@@ -262,6 +264,8 @@ pub const tspec_test = TowerSpec{
     .anim_set = anim.a_chara.animationSet(),
     .spawnFn = tspecTestSpawn,
     .updateFn = tspecTestUpdate,
+    .min_range = 50,
+    .max_range = 100,
 };
 
 fn tspecTestSpawn(self: *Tower, frame: u64) void {

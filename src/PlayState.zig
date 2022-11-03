@@ -755,6 +755,19 @@ fn renderPlacementIndicator(self: *PlayState, cam: Camera) void {
     );
     self.game.imm.beginUntextured();
     self.game.imm.drawQuadRGBA(dest, color);
+
+    self.game.imm.drawCircle(
+        32,
+        zm.f32x4(@intToFloat(f32, dest.x + 8), @intToFloat(f32, dest.y + 8), 0, 0),
+        self.interact_state.build.tower_spec.min_range,
+        zm.f32x4(1, 0, 0, 1),
+    );
+    self.game.imm.drawCircle(
+        32,
+        zm.f32x4(@intToFloat(f32, dest.x + 8), @intToFloat(f32, dest.y + 8), 0, 0),
+        self.interact_state.build.tower_spec.max_range,
+        zm.f32x4(0, 1, 0, 1),
+    );
 }
 
 fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
