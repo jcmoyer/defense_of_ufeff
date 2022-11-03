@@ -81,7 +81,10 @@ pub const BitmapFontSpec = struct {
     }
 
     pub fn mapGlyph(self: BitmapFontSpec, glyph: u8) Rect {
-        return self.map.get(glyph).?;
+        return self.map.get(glyph) orelse {
+            std.log.warn("Could not map glyph: `{c}`", .{glyph});
+            return Rect.init(0, 0, 0, 0);
+        };
     }
 
     pub fn kerning(self: BitmapFontSpec, first: u8, second: u8) i8 {
@@ -131,6 +134,11 @@ pub const BitmapFont = struct {
         var dy = opts.y;
         var last_ch: u8 = 0;
         for (text) |ch| {
+            if (ch == '\n') {
+                dy += self.mapGlyph(' ').h;
+                dx = opts.x;
+                continue;
+            }
             const src = self.mapGlyph(ch);
             dx += self.fontspec.kerning(last_ch, ch);
             const dest = Rect.init(
@@ -150,18 +158,26 @@ pub const BitmapFont = struct {
     }
 
     pub fn measureText(self: BitmapFont, text: []const u8) Rect {
+        var width_this_line: i32 = 0;
         var width: i32 = 0;
         var height: i32 = 0;
         var height_this_line: i32 = 0;
         var last_ch: u8 = 0;
         for (text) |ch| {
+            if (ch == '\n') {
+                width = std.math.max(width, width_this_line);
+                height += height_this_line;
+                width_this_line = 0;
+                height_this_line = 0;
+                continue;
+            }
             const glyph_rect = self.mapGlyph(ch);
-            width += glyph_rect.w + self.fontspec.space + self.fontspec.kerning(last_ch, ch);
+            width_this_line += glyph_rect.w + self.fontspec.space + self.fontspec.kerning(last_ch, ch);
             height_this_line = std.math.max(height_this_line, glyph_rect.h);
             last_ch = ch;
-            // TODO: handle \n
         }
-        width -= self.fontspec.space;
+        width_this_line -= self.fontspec.space;
+        width = std.math.max(width, width_this_line);
         height += height_this_line;
         return Rect.init(0, 0, width, height);
     }
