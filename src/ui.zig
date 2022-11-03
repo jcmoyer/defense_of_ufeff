@@ -69,8 +69,8 @@ pub const Panel = struct {
 pub const Button = struct {
     const ButtonState = enum {
         normal,
-        down,
         hover,
+        down,
         disabled,
     };
 
@@ -81,6 +81,16 @@ pub const Button = struct {
     userdata: ?*anyopaque = null,
     callback: ?*const fn (*Button, ?*anyopaque) void = null,
     state: ButtonState = .normal,
+    texture_rects: [4]Rect = .{
+        // .normal
+        Rect.init(0, 0, 32, 32),
+        // .hover
+        Rect.init(0, 32, 32, 32),
+        // .down
+        Rect.init(32, 0, 32, 32),
+        // .disabled
+        Rect.init(32, 32, 32, 32),
+    },
 
     pub fn deinit(self: *Button) void {
         self.root.allocator.destroy(self);
@@ -119,24 +129,10 @@ pub const Button = struct {
 
     pub fn getTexture(self: *Button) ?ControlTexture {
         if (self.texture) |t| {
-            switch (self.state) {
-                .normal => return ControlTexture{
-                    .texture = t,
-                    .texture_rect = Rect.init(0, 0, 32, 32),
-                },
-                .hover => return ControlTexture{
-                    .texture = t,
-                    .texture_rect = Rect.init(0, 32, 32, 32),
-                },
-                .down => return ControlTexture{
-                    .texture = t,
-                    .texture_rect = Rect.init(32, 0, 32, 32),
-                },
-                .disabled => return ControlTexture{
-                    .texture = t,
-                    .texture_rect = Rect.init(32, 32, 32, 32),
-                },
-            }
+            return ControlTexture{
+                .texture = t,
+                .texture_rect = self.texture_rects[@enumToInt(self.state)],
+            };
         } else {
             return null;
         }
