@@ -256,8 +256,14 @@ pub fn render(self: *PlayState, alpha: f64) void {
 }
 
 pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
-    if (ev.type == .SDL_KEYDOWN and ev.key.keysym.sym == sdl.SDLK_F1) {
-        self.deb_render_tile_collision = !self.deb_render_tile_collision;
+    if (ev.type == .SDL_KEYDOWN) {
+        switch (ev.key.keysym.sym) {
+            sdl.SDLK_F1 => self.deb_render_tile_collision = !self.deb_render_tile_collision,
+            sdl.SDLK_ESCAPE => if (self.interact_state == .build) {
+                self.interact_state = .none;
+            },
+            else => {},
+        }
     }
 
     if (ev.type == .SDL_MOUSEMOTION) {
@@ -268,22 +274,28 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
         self.ui_root.handleMouseMove(mouse_p[0], mouse_p[1]);
     }
 
-    if (ev.type == .SDL_MOUSEBUTTONDOWN and ev.button.button == sdl.SDL_BUTTON_LEFT) {
-        const mouse_p = self.game.unproject(
-            self.game.input.mouse.client_x,
-            self.game.input.mouse.client_y,
-        );
-        if (self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
-            self.ui_root.handleMouseClick(mouse_p[0], mouse_p[1]);
-        } else {
-            if (self.interact_state == .build) {
-                const tile_coord = self.mouseToTile();
-                if (self.world.canBuildAt(tile_coord)) {
-                    self.world.spawnTower(self.interact_state.build.tower_spec, tile_coord, self.game.frame_counter) catch unreachable;
-                    if (sdl.SDL_GetModState() & sdl.KMOD_SHIFT == 0) {
-                        self.interact_state = .none;
+    if (ev.type == .SDL_MOUSEBUTTONDOWN) {
+        if (ev.button.button == sdl.SDL_BUTTON_LEFT) {
+            const mouse_p = self.game.unproject(
+                self.game.input.mouse.client_x,
+                self.game.input.mouse.client_y,
+            );
+            if (self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
+                self.ui_root.handleMouseClick(mouse_p[0], mouse_p[1]);
+            } else {
+                if (self.interact_state == .build) {
+                    const tile_coord = self.mouseToTile();
+                    if (self.world.canBuildAt(tile_coord)) {
+                        self.world.spawnTower(self.interact_state.build.tower_spec, tile_coord, self.game.frame_counter) catch unreachable;
+                        if (sdl.SDL_GetModState() & sdl.KMOD_SHIFT == 0) {
+                            self.interact_state = .none;
+                        }
                     }
                 }
+            }
+        } else if (ev.button.button == sdl.SDL_BUTTON_RIGHT) {
+            if (self.interact_state == .build) {
+                self.interact_state = .none;
             }
         }
     }
