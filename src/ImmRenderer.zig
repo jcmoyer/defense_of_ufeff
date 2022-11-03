@@ -110,6 +110,17 @@ pub fn drawQuad(self: ImmRenderer, x: i32, y: i32, w: u32, h: u32, r: f32, g: f3
     gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 }
 
+pub fn drawLine(self: ImmRenderer, p0: zm.Vec, p1: zm.Vec, rgba: zm.Vec) void {
+    const vertices = [2]Vertex{
+        Vertex{ .xyuv = p0, .rgba = rgba },
+        Vertex{ .xyuv = p1, .rgba = rgba },
+    };
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, self.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, 2 * @sizeOf(Vertex), &vertices, gl.STREAM_DRAW);
+    gl.drawArrays(gl.LINES, 0, 2);
+}
+
 pub fn drawQuadRGBA(self: ImmRenderer, dest: Rect, rgba: zm.Vec) void {
     const left = @intToFloat(f32, dest.left());
     const right = @intToFloat(f32, dest.right());

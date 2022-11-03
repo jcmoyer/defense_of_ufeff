@@ -239,6 +239,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.renderHealthBars(cam_interp, alpha);
     self.renderFloatingText(cam_interp, alpha);
     self.renderBlockedConstructionRects(cam_interp);
+    self.renderGrid(cam_interp);
     if (!self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
         self.renderPlacementIndicator(cam_interp);
     }
@@ -599,6 +600,27 @@ fn renderTilemapLayer(
         ty += 1;
     }
     self.r_batch.end();
+}
+
+fn renderGrid(
+    self: *PlayState,
+    cam: Camera,
+) void {
+    if (self.interact_state != .build) {
+        return;
+    }
+
+    _ = cam;
+    self.game.imm.beginUntextured();
+    var y: f32 = 16;
+    var x: f32 = 16;
+    while (y < Game.INTERNAL_HEIGHT) : (y += 16) {
+        self.game.imm.drawLine(zm.f32x4(0, y, 0, 0), zm.f32x4(Game.INTERNAL_WIDTH, y, 0, 0), zm.f32x4(0, 0, 0, 0.2));
+    }
+
+    while (x < Game.INTERNAL_WIDTH) : (x += 16) {
+        self.game.imm.drawLine(zm.f32x4(x, 0, 0, 0), zm.f32x4(x, Game.INTERNAL_HEIGHT, 0, 0), zm.f32x4(0, 0, 0, 0.2));
+    }
 }
 
 fn renderBlockedConstructionRects(
