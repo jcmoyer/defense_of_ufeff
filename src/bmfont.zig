@@ -9,6 +9,7 @@ pub const BitmapFontSpec = struct {
     allocator: Allocator,
     space: i32,
     map: std.AutoArrayHashMapUnmanaged(u8, Rect),
+    kerning_map: std.AutoArrayHashMapUnmanaged(u16, i8),
 
     pub fn initJson(allocator: Allocator, json: []const u8) !BitmapFontSpec {
         const GlyphDef = struct {
@@ -18,6 +19,7 @@ pub const BitmapFontSpec = struct {
         const Document = struct {
             space: i32 = 0,
             glyphs: []GlyphDef,
+            kerning: ?[][]const u8 = null,
         };
         var ts = std.json.TokenStream.init(json);
         var parse_opts = std.json.ParseOptions{
@@ -30,22 +32,61 @@ pub const BitmapFontSpec = struct {
         var map = std.AutoArrayHashMapUnmanaged(u8, Rect){};
         errdefer map.deinit(allocator);
         for (doc.glyphs) |g| {
-            try map.putNoClobber(allocator, g.glyph[0], g.rect);
+            var gop = try map.getOrPut(allocator, g.glyph[0]);
+            if (gop.found_existing) {
+                std.log.warn("Duplicate glyph: `{c}`; ignoring", .{g.glyph[0]});
+            } else {
+                gop.value_ptr.* = g.rect;
+            }
+        }
+
+        var kerning_map = std.AutoArrayHashMapUnmanaged(u16, i8){};
+        errdefer kerning_map.deinit(allocator);
+        if (doc.kerning) |kern| {
+            for (kern) |row| {
+                var tok = std.mem.tokenize(u8, row, &[_]u8{' '});
+                const head = tok.next() orelse {
+                    std.log.warn("Kerning missing first element: `{s}`", .{row});
+                    continue;
+                };
+                const pair_with = tok.next() orelse {
+                    std.log.warn("Kerning missing second element: `{s}`", .{row});
+                    continue;
+                };
+                const offset = tok.next() orelse {
+                    std.log.warn("Kerning missing third element: `{s}`", .{row});
+                    continue;
+                };
+                const offset_int = try std.fmt.parseInt(i8, offset, 10);
+
+                const base: u16 = @as(u16, head[0]) << 8;
+                for (pair_with) |pair| {
+                    const id = base | pair;
+                    try kerning_map.put(allocator, id, offset_int);
+                }
+            }
         }
 
         return BitmapFontSpec{
             .allocator = allocator,
             .space = doc.space,
             .map = map,
+            .kerning_map = kerning_map,
         };
     }
 
     pub fn deinit(self: *BitmapFontSpec) void {
         self.map.deinit(self.allocator);
+        self.kerning_map.deinit(self.allocator);
     }
 
     pub fn mapGlyph(self: BitmapFontSpec, glyph: u8) Rect {
         return self.map.get(glyph).?;
+    }
+
+    pub fn kerning(self: BitmapFontSpec, first: u8, second: u8) i8 {
+        const key = (@as(u16, first) << 8) | second;
+        return self.kerning_map.get(key) orelse 0;
     }
 };
 
@@ -88,8 +129,10 @@ pub const BitmapFont = struct {
     pub fn drawText(self: BitmapFont, text: []const u8, opts: DrawTextOptions) void {
         var dx = opts.x;
         var dy = opts.y;
+        var last_ch: u8 = 0;
         for (text) |ch| {
             const src = self.mapGlyph(ch);
+            dx += self.fontspec.kerning(last_ch, ch);
             const dest = Rect.init(
                 dx,
                 dy,
@@ -102,6 +145,7 @@ pub const BitmapFont = struct {
                 .color = opts.color,
             });
             dx += src.w + self.fontspec.space;
+            last_ch = ch;
         }
     }
 
@@ -109,10 +153,12 @@ pub const BitmapFont = struct {
         var width: i32 = 0;
         var height: i32 = 0;
         var height_this_line: i32 = 0;
+        var last_ch: u8 = 0;
         for (text) |ch| {
             const glyph_rect = self.mapGlyph(ch);
-            width += glyph_rect.w + self.fontspec.space;
+            width += glyph_rect.w + self.fontspec.space + self.fontspec.kerning(last_ch, ch);
             height_this_line = std.math.max(height_this_line, glyph_rect.h);
+            last_ch = ch;
             // TODO: handle \n
         }
         width -= self.fontspec.space;

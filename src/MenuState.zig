@@ -52,7 +52,7 @@ pub fn create(game: *Game) !*MenuState {
 
     // TODO probably want a better way to manage this, direct IO shouldn't be here
     // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
-    self.fontspec = try loadFontSpec(self.game.allocator, "assets/tables/text16.json");
+    self.fontspec = try loadFontSpec(self.game.allocator, "assets/tables/CommonCase.json");
     return self;
 }
 
@@ -97,6 +97,14 @@ pub fn render(self: *MenuState, alpha: f64) void {
     gl.clearColor(0x64.0 / 255.0, 0x95.0 / 255.0, 0xED.0 / 255.0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
+    self.r_font.begin(.{
+        .texture = self.game.texman.getNamedTexture("CommonCase.png"),
+        .spec = &self.fontspec,
+    });
+    self.r_font.drawText("Hello world", .{ .x = 0, .y = 100 });
+    self.r_font.end();
+
+    self.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
     self.renderUI();
 }
 
