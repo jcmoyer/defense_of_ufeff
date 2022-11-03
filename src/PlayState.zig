@@ -211,6 +211,14 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
         self.deb_render_tile_collision = !self.deb_render_tile_collision;
     }
 
+    if (ev.type == .SDL_MOUSEMOTION) {
+        const mouse_p = self.game.unproject(
+            self.game.input.mouse.client_x,
+            self.game.input.mouse.client_y,
+        );
+        self.ui_root.handleMouseMove(mouse_p[0], mouse_p[1]);
+    }
+
     if (ev.type == .SDL_MOUSEBUTTONDOWN and ev.button.button == sdl.SDL_BUTTON_LEFT) {
         const mouse_p = self.game.unproject(
             self.game.input.mouse.client_x,

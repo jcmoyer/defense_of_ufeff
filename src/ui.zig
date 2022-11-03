@@ -67,15 +67,31 @@ pub const Panel = struct {
 };
 
 pub const Button = struct {
+    const ButtonState = enum {
+        normal,
+        down,
+        hover,
+        disabled,
+    };
+
     root: *Root,
     text: []const u8,
     rect: Rect,
     texture: ?*const Texture = null,
     userdata: ?*anyopaque = null,
     callback: ?*const fn (?*anyopaque) void = null,
+    state: ButtonState = .normal,
 
     pub fn deinit(self: *Button) void {
         self.root.allocator.destroy(self);
+    }
+
+    pub fn handleMouseEnter(self: *Button) void {
+        self.state = .hover;
+    }
+
+    pub fn handleMouseLeave(self: *Button) void {
+        self.state = .normal;
     }
 
     pub fn handleMouseClick(self: *const Button, x: i32, y: i32) void {
@@ -97,12 +113,31 @@ pub const Button = struct {
             .handleMouseClickFn = handleMouseClick,
             .interactRectFn = interactRect,
             .getTextureFn = getTexture,
+            .handleMouseEnterFn = handleMouseEnter,
+            .handleMouseLeaveFn = handleMouseLeave,
         });
     }
 
     pub fn getTexture(self: *Button) ?ControlTexture {
         if (self.texture) |t| {
-            return ControlTexture{ .texture = t };
+            switch (self.state) {
+                .normal => return ControlTexture{
+                    .texture = t,
+                    .texture_rect = Rect.init(0, 0, 32, 32),
+                },
+                .hover => return ControlTexture{
+                    .texture = t,
+                    .texture_rect = Rect.init(0, 32, 32, 32),
+                },
+                .down => return ControlTexture{
+                    .texture = t,
+                    .texture_rect = Rect.init(32, 0, 32, 32),
+                },
+                .disabled => return ControlTexture{
+                    .texture = t,
+                    .texture_rect = Rect.init(32, 32, 32, 32),
+                },
+            }
         } else {
             return null;
         }
@@ -151,10 +186,13 @@ pub const Minimap = struct {
 fn ControlImpl(comptime PointerT: type) type {
     return struct {
         deinitFn: *const fn (PointerT) void,
+
         handleMouseClickFn: ?*const fn (PointerT, i32, i32) void = null,
         interactRectFn: ?*const fn (self: PointerT) ?Rect = null,
         getTextureFn: ?*const fn (self: PointerT) ?ControlTexture = null,
         getChildrenFn: ?*const fn (self: PointerT) []Control = null,
+        handleMouseEnterFn: ?*const fn (self: PointerT) void = null,
+        handleMouseLeaveFn: ?*const fn (self: PointerT) void = null,
     };
 }
 
@@ -168,6 +206,8 @@ pub const Control = struct {
         interactRectFn: *const fn (self: *anyopaque) ?Rect,
         getTextureFn: *const fn (self: *anyopaque) ?ControlTexture,
         getChildrenFn: *const fn (self: *anyopaque) []Control,
+        handleMouseEnterFn: *const fn (*anyopaque) void,
+        handleMouseLeaveFn: *const fn (*anyopaque) void,
     };
 
     pub fn init(
@@ -220,12 +260,26 @@ pub const Control = struct {
                 return f(inst);
             }
 
+            fn handleMouseEnterImpl(ptr: *anyopaque) void {
+                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                const f = fns.handleMouseEnterFn orelse return;
+                return f(inst);
+            }
+
+            fn handleMouseLeaveImpl(ptr: *anyopaque) void {
+                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                const f = fns.handleMouseLeaveFn orelse return;
+                return f(inst);
+            }
+
             const vtable = VTable{
                 .deinitFn = deinitImpl,
                 .handleMouseClickFn = handleMouseClickImpl,
                 .interactRectFn = interactRectImpl,
                 .getTextureFn = getTextureImpl,
                 .getChildrenFn = getChildrenImpl,
+                .handleMouseEnterFn = handleMouseEnterImpl,
+                .handleMouseLeaveFn = handleMouseLeaveImpl,
             };
         };
 
@@ -254,6 +308,14 @@ pub const Control = struct {
     pub fn getChildren(self: Control) ?[]Control {
         return self.vtable.getChildrenFn(self.instance);
     }
+
+    pub fn handleMouseEnter(self: Control) void {
+        self.vtable.handleMouseEnterFn(self.instance);
+    }
+
+    pub fn handleMouseLeave(self: Control) void {
+        self.vtable.handleMouseLeaveFn(self.instance);
+    }
 };
 
 pub const Root = struct {
@@ -262,6 +324,7 @@ pub const Root = struct {
     children: std.ArrayListUnmanaged(Control),
     /// All controls owned by this Root
     controls: std.ArrayListUnmanaged(Control),
+    hover: ?Control = null,
 
     pub fn init(allocator: Allocator) Root {
         return .{
@@ -288,6 +351,44 @@ pub const Root = struct {
             }
         }
         return false;
+    }
+
+    fn findElementChild(self: *Root, at: Control, x: i32, y: i32) Control {
+        if (at.getChildren()) |children| {
+            for (children) |child| {
+                if (child.interactRect()) |rect| {
+                    if (rect.contains(x, y)) {
+                        return self.findElementChild(child, x, y);
+                    }
+                }
+            }
+        }
+        return at;
+    }
+
+    fn findElementAt(self: *Root, x: i32, y: i32) ?Control {
+        for (self.children.items) |child| {
+            if (child.interactRect()) |rect| {
+                if (rect.contains(x, y)) {
+                    const lowest = self.findElementChild(child, x - rect.x, y - rect.y);
+                    return lowest;
+                }
+            }
+        }
+        return null;
+    }
+
+    pub fn handleMouseMove(self: *Root, x: i32, y: i32) void {
+        if (self.findElementAt(x, y)) |e| {
+            if (self.hover) |h| {
+                if (e.instance == h.instance) {
+                    return;
+                }
+                h.handleMouseLeave();
+            }
+            self.hover = e;
+            e.handleMouseEnter();
+        }
     }
 
     pub fn handleMouseClick(self: *Root, x: i32, y: i32) void {
