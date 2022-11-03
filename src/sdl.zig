@@ -1165,6 +1165,9 @@ pub const SDLK_ENDCALL = SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_ENDCALL);
 
 // SDL_Keymod
 
+pub const SDL_Keymod = c_int;
+pub extern fn SDL_GetModState() SDL_Keymod;
+
 pub const KMOD_NONE = 0x0000;
 pub const KMOD_LSHIFT = 0x0001;
 pub const KMOD_RSHIFT = 0x0002;

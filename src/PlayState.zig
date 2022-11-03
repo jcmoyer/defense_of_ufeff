@@ -279,7 +279,9 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
                 const tile_coord = self.mouseToTile();
                 if (self.world.canBuildAt(tile_coord)) {
                     self.world.spawnTower(self.interact_state.build.tower_spec, tile_coord, self.game.frame_counter) catch unreachable;
-                    self.interact_state = .none;
+                    if (sdl.SDL_GetModState() & sdl.KMOD_SHIFT == 0) {
+                        self.interact_state = .none;
+                    }
                 }
             }
         }
