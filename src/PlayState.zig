@@ -111,6 +111,8 @@ pub fn create(game: *Game) !*PlayState {
 
         b.*.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
         b.*.rect = Rect.init(x, y, 28, 28);
+        b.*.callback = onButtonClick;
+        b.*.userdata = self;
     }
     self.ui_minimap = try self.ui_root.createMinimap();
     self.ui_minimap.rect = Rect.init(16, 16, 64, 64);
@@ -122,6 +124,13 @@ pub fn create(game: *Game) !*PlayState {
     self.fontspec = try loadFontSpec(self.game.allocator, "assets/tables/text16.json");
     self.fontspec_numbers = try loadFontSpec(self.game.allocator, "assets/tables/number3x5.json");
     return self;
+}
+
+fn onButtonClick(button: *ui.Button, userdata: ?*anyopaque) void {
+    _ = button;
+    var self = @ptrCast(*PlayState, @alignCast(@alignOf(PlayState), userdata));
+
+    self.game.audio.playSound("assets/sounds/click.ogg").release();
 }
 
 fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.BitmapFontSpec {

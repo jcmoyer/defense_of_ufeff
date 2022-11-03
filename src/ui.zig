@@ -79,7 +79,7 @@ pub const Button = struct {
     rect: Rect,
     texture: ?*const Texture = null,
     userdata: ?*anyopaque = null,
-    callback: ?*const fn (?*anyopaque) void = null,
+    callback: ?*const fn (*Button, ?*anyopaque) void = null,
     state: ButtonState = .normal,
 
     pub fn deinit(self: *Button) void {
@@ -94,12 +94,11 @@ pub const Button = struct {
         self.state = .normal;
     }
 
-    pub fn handleMouseClick(self: *const Button, x: i32, y: i32) void {
+    pub fn handleMouseClick(self: *Button, x: i32, y: i32) void {
         _ = x;
         _ = y;
-        std.log.debug("Button clicked", .{});
         if (self.callback) |cb| {
-            cb(self.userdata);
+            cb(self, self.userdata);
         }
     }
 
