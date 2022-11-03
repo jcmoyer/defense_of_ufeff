@@ -235,15 +235,16 @@ const ControlRenderState = struct {
 fn renderControl(self: *PlayState, control: ui.Control, renderstate: ControlRenderState) void {
     if (control.interactRect()) |rect| {
         if (control.getTexture()) |t| {
+            var render_src = t.texture_rect orelse Rect.init(0, 0, @intCast(i32, t.texture.width), @intCast(i32, t.texture.height));
             var render_dest = rect;
             render_dest.translate(renderstate.translate_x, renderstate.translate_y);
             self.r_batch.begin(.{
-                .texture = t,
+                .texture = t.texture,
             });
 
             // touch inside of dest rect
             // this is for the minimap, mostly
-            const aspect_ratio = @intToFloat(f32, t.width) / @intToFloat(f32, t.height);
+            const aspect_ratio = @intToFloat(f32, t.texture.width) / @intToFloat(f32, t.texture.height);
             const p = render_dest.centerPoint();
 
             // A = aspect ratio, W = width, H = height
@@ -267,7 +268,7 @@ fn renderControl(self: *PlayState, control: ui.Control, renderstate: ControlRend
                 render_dest.centerOn(p[0], p[1]);
             }
 
-            self.r_batch.drawQuad(Rect.init(0, 0, @intCast(i32, t.width), @intCast(i32, t.height)), render_dest);
+            self.r_batch.drawQuad(render_src, render_dest);
             self.r_batch.end();
         }
     }

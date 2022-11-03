@@ -4,6 +4,12 @@ const Allocator = std.mem.Allocator;
 const IntrusiveSlotMap = @import("slotmap.zig").IntrusiveSlotMap;
 const Texture = @import("texture.zig").Texture;
 
+pub const ControlTexture = struct {
+    texture: *const Texture,
+    /// `null` means use the whole texture
+    texture_rect: ?Rect = null,
+};
+
 pub const Panel = struct {
     root: *Root,
     children: std.ArrayListUnmanaged(Control),
@@ -47,8 +53,12 @@ pub const Panel = struct {
         });
     }
 
-    pub fn getTexture(self: *Panel) ?*const Texture {
-        return self.texture;
+    pub fn getTexture(self: *Panel) ?ControlTexture {
+        if (self.texture) |t| {
+            return ControlTexture{ .texture = t };
+        } else {
+            return null;
+        }
     }
 
     pub fn getChildren(self: *Panel) []Control {
@@ -90,8 +100,12 @@ pub const Button = struct {
         });
     }
 
-    pub fn getTexture(self: *Button) ?*const Texture {
-        return self.texture;
+    pub fn getTexture(self: *Button) ?ControlTexture {
+        if (self.texture) |t| {
+            return ControlTexture{ .texture = t };
+        } else {
+            return null;
+        }
     }
 };
 
@@ -125,8 +139,12 @@ pub const Minimap = struct {
         });
     }
 
-    pub fn getTexture(self: *Minimap) ?*const Texture {
-        return self.texture;
+    pub fn getTexture(self: *Minimap) ?ControlTexture {
+        if (self.texture) |t| {
+            return ControlTexture{ .texture = t };
+        } else {
+            return null;
+        }
     }
 };
 
@@ -135,7 +153,7 @@ fn ControlImpl(comptime PointerT: type) type {
         deinitFn: *const fn (PointerT) void,
         handleMouseClickFn: ?*const fn (PointerT, i32, i32) void = null,
         interactRectFn: ?*const fn (self: PointerT) ?Rect = null,
-        getTextureFn: ?*const fn (self: PointerT) ?*const Texture = null,
+        getTextureFn: ?*const fn (self: PointerT) ?ControlTexture = null,
         getChildrenFn: ?*const fn (self: PointerT) []Control = null,
     };
 }
@@ -148,7 +166,7 @@ pub const Control = struct {
         deinitFn: *const fn (*anyopaque) void,
         handleMouseClickFn: *const fn (*anyopaque, x: i32, y: i32) void,
         interactRectFn: *const fn (self: *anyopaque) ?Rect,
-        getTextureFn: *const fn (self: *anyopaque) ?*const Texture,
+        getTextureFn: *const fn (self: *anyopaque) ?ControlTexture,
         getChildrenFn: *const fn (self: *anyopaque) []Control,
     };
 
@@ -182,11 +200,11 @@ pub const Control = struct {
                 return f(inst);
             }
 
-            fn getTextureDefault(_: *anyopaque) ?*const Texture {
+            fn getTextureDefault(_: *anyopaque) ?ControlTexture {
                 return null;
             }
 
-            fn getTextureImpl(ptr: *anyopaque) ?*const Texture {
+            fn getTextureImpl(ptr: *anyopaque) ?ControlTexture {
                 var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
                 const f = fns.getTextureFn orelse getTextureDefault;
                 return f(inst);
@@ -229,7 +247,7 @@ pub const Control = struct {
         return self.vtable.interactRectFn(self.instance);
     }
 
-    pub fn getTexture(self: Control) ?*const Texture {
+    pub fn getTexture(self: Control) ?ControlTexture {
         return self.vtable.getTextureFn(self.instance);
     }
 
