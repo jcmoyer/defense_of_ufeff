@@ -97,10 +97,14 @@ pub const Button = struct {
     }
 
     pub fn handleMouseEnter(self: *Button) void {
+        if (self.state != .disabled) {
+            self.root.interaction_hint = .clickable;
+        }
         self.state = .hover;
     }
 
     pub fn handleMouseLeave(self: *Button) void {
+        self.root.interaction_hint = .none;
         self.state = .normal;
     }
 
@@ -313,6 +317,11 @@ pub const Control = struct {
     }
 };
 
+pub const InteractionHint = enum {
+    none,
+    clickable,
+};
+
 pub const Root = struct {
     allocator: Allocator,
     /// Top level controls
@@ -320,12 +329,15 @@ pub const Root = struct {
     /// All controls owned by this Root
     controls: std.ArrayListUnmanaged(Control),
     hover: ?Control = null,
+    interaction_hint: InteractionHint = .none,
+    backend: SDLBackend,
 
     pub fn init(allocator: Allocator) Root {
         return .{
             .allocator = allocator,
             .children = .{},
             .controls = .{},
+            .backend = SDLBackend.init(),
         };
     }
 
@@ -335,6 +347,7 @@ pub const Root = struct {
         }
         self.controls.deinit(self.allocator);
         self.children.deinit(self.allocator);
+        self.backend.deinit();
     }
 
     pub fn isMouseOnElement(self: *Root, x: i32, y: i32) bool {
@@ -383,7 +396,13 @@ pub const Root = struct {
             }
             self.hover = e;
             e.handleMouseEnter();
+        } else {
+            if (self.hover) |h| {
+                h.handleMouseLeave();
+                self.hover = null;
+            }
         }
+        self.backend.setCursorForHint(self.interaction_hint);
     }
 
     pub fn handleMouseClick(self: *Root, x: i32, y: i32) void {
@@ -431,5 +450,35 @@ pub const Root = struct {
         };
         try self.controls.append(self.allocator, ptr.control());
         return ptr;
+    }
+};
+
+// Try to contain all the SDL-specific calls here
+const sdl = @import("sdl.zig");
+const SDLBackend = struct {
+    c_arrow: ?*sdl.SDL_Cursor = null,
+    c_hand: ?*sdl.SDL_Cursor = null,
+
+    fn init() SDLBackend {
+        return SDLBackend{
+            .c_arrow = sdl.SDL_CreateSystemCursor(.SDL_SYSTEM_CURSOR_ARROW),
+            .c_hand = sdl.SDL_CreateSystemCursor(.SDL_SYSTEM_CURSOR_HAND),
+        };
+    }
+
+    fn deinit(self: *SDLBackend) void {
+        if (self.c_hand) |hand| {
+            sdl.SDL_FreeCursor(hand);
+        }
+        if (self.c_arrow) |arrow| {
+            sdl.SDL_FreeCursor(arrow);
+        }
+    }
+
+    fn setCursorForHint(self: SDLBackend, hint: InteractionHint) void {
+        switch (hint) {
+            .none => sdl.SDL_SetCursor(self.c_arrow),
+            .clickable => sdl.SDL_SetCursor(self.c_hand),
+        }
     }
 };

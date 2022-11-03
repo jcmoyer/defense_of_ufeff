@@ -1297,3 +1297,23 @@ pub const SDL_BUTTON_X2 = 5;
 // #define SDL_BUTTON_RMASK    SDL_BUTTON(SDL_BUTTON_RIGHT)
 // #define SDL_BUTTON_X1MASK   SDL_BUTTON(SDL_BUTTON_X1)
 // #define SDL_BUTTON_X2MASK   SDL_BUTTON(SDL_BUTTON_X2)
+
+pub const SDL_Cursor = opaque {};
+pub const SDL_SystemCursor = enum(c_int) {
+    SDL_SYSTEM_CURSOR_ARROW,
+    SDL_SYSTEM_CURSOR_IBEAM,
+    SDL_SYSTEM_CURSOR_WAIT,
+    SDL_SYSTEM_CURSOR_CROSSHAIR,
+    SDL_SYSTEM_CURSOR_WAITARROW,
+    SDL_SYSTEM_CURSOR_SIZENWSE,
+    SDL_SYSTEM_CURSOR_SIZENESW,
+    SDL_SYSTEM_CURSOR_SIZEWE,
+    SDL_SYSTEM_CURSOR_SIZENS,
+    SDL_SYSTEM_CURSOR_SIZEALL,
+    SDL_SYSTEM_CURSOR_NO,
+    SDL_SYSTEM_CURSOR_HAND,
+    SDL_NUM_SYSTEM_CURSORS,
+};
+pub extern fn SDL_CreateSystemCursor(id: SDL_SystemCursor) ?*SDL_Cursor;
+pub extern fn SDL_FreeCursor(cursor: *SDL_Cursor) void;
+pub extern fn SDL_SetCursor(cursor: ?*SDL_Cursor) void;
