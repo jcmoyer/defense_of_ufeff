@@ -39,6 +39,33 @@ const FoamDraw = struct {
     top: bool,
     bottom: bool,
 };
+
+const ButtonData = struct {
+    state: *PlayState,
+    spec: *const wo.TowerSpec,
+};
+
+const button_specs = [8]*const wo.TowerSpec{
+    &wo.t_wall,
+    &wo.tspec_test,
+    &wo.t_wall,
+    &wo.t_wall,
+    &wo.t_wall,
+    &wo.t_wall,
+    &wo.t_wall,
+    &wo.t_wall,
+};
+
+const InteractStateBuild = struct {
+    /// What the player will build when he clicks
+    tower_spec: *const wo.TowerSpec,
+};
+
+const InteractState = union(enum) {
+    none: void,
+    build: InteractStateBuild,
+};
+
 const FingerRenderer = @import("FingerRenderer.zig");
 
 game: *Game,
@@ -64,6 +91,7 @@ ui_root: ui.Root,
 ui_buttons: [8]*ui.Button,
 ui_minimap: *ui.Minimap,
 t_minimap: *Texture,
+interact_state: InteractState = .none,
 
 deb_render_tile_collision: bool = false,
 
@@ -112,7 +140,12 @@ pub fn create(game: *Game) !*PlayState {
         b.*.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
         b.*.rect = Rect.init(x, y, 28, 28);
         b.*.callback = onButtonClick;
-        b.*.userdata = self;
+
+        var userdata_ptr = try self.game.allocator.create(ButtonData);
+        userdata_ptr.state = self;
+        userdata_ptr.spec = button_specs[i];
+
+        b.*.userdata = userdata_ptr;
     }
     self.ui_minimap = try self.ui_root.createMinimap();
     self.ui_minimap.rect = Rect.init(16, 16, 64, 64);
@@ -128,9 +161,11 @@ pub fn create(game: *Game) !*PlayState {
 
 fn onButtonClick(button: *ui.Button, userdata: ?*anyopaque) void {
     _ = button;
-    var self = @ptrCast(*PlayState, @alignCast(@alignOf(PlayState), userdata));
-
-    self.game.audio.playSound("assets/sounds/click.ogg").release();
+    var data = @ptrCast(*ButtonData, @alignCast(@alignOf(ButtonData), userdata));
+    data.state.game.audio.playSound("assets/sounds/click.ogg").release();
+    data.state.interact_state = .{ .build = InteractStateBuild{
+        .tower_spec = data.spec,
+    } };
 }
 
 fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.BitmapFontSpec {
@@ -142,6 +177,10 @@ fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.Bitm
 }
 
 pub fn destroy(self: *PlayState) void {
+    for (self.ui_buttons) |b| {
+        var data = @ptrCast(*ButtonData, @alignCast(@alignOf(ButtonData), b.userdata));
+        self.game.allocator.destroy(data);
+    }
     self.fontspec.deinit();
     self.fontspec_numbers.deinit();
     self.r_quad.destroy();
@@ -236,9 +275,12 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
         if (self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
             self.ui_root.handleMouseClick(mouse_p[0], mouse_p[1]);
         } else {
-            const tile_coord = self.mouseToTile();
-            if (self.world.canBuildAt(tile_coord)) {
-                self.world.spawnTower(&wo.t_wall, tile_coord, self.game.frame_counter) catch unreachable;
+            if (self.interact_state == .build) {
+                const tile_coord = self.mouseToTile();
+                if (self.world.canBuildAt(tile_coord)) {
+                    self.world.spawnTower(self.interact_state.build.tower_spec, tile_coord, self.game.frame_counter) catch unreachable;
+                    self.interact_state = .none;
+                }
             }
         }
     }
@@ -557,6 +599,10 @@ fn renderBlockedConstructionRects(
     self: *PlayState,
     cam: Camera,
 ) void {
+    if (self.interact_state != .build) {
+        return;
+    }
+
     const min_tile_x = @intCast(usize, cam.view.left()) / 16;
     const min_tile_y = @intCast(usize, cam.view.top()) / 16;
     const max_tile_x = std.math.min(
@@ -655,6 +701,10 @@ fn mouseToTile(self: *PlayState) tilemap.TileCoord {
 }
 
 fn renderPlacementIndicator(self: *PlayState, cam: Camera) void {
+    if (self.interact_state != .build) {
+        return;
+    }
+
     const tc = self.mouseToTile();
     const color = if (self.world.canBuildAt(tc)) [4]f32{ 0, 1, 0, 0.5 } else [4]f32{ 1, 0, 0, 0.5 };
     const dest = Rect.init(
