@@ -123,20 +123,40 @@ pub const BitmapFont = struct {
         self.r_batch.end();
     }
 
+    pub const TextAlignment = enum {
+        left,
+        /// For multiline strings, all lines will be centered based on the longest line.
+        center,
+    };
+
     pub const DrawTextOptions = struct {
         x: i32,
         y: i32,
         color: @Vector(4, u8) = @splat(4, @as(u8, 255)),
+        alignment: TextAlignment = .left,
     };
 
     pub fn drawText(self: BitmapFont, text: []const u8, opts: DrawTextOptions) void {
+        var dims = self.measureText(text);
         var dx = opts.x;
         var dy = opts.y;
+        if (std.mem.indexOfScalar(u8, text[0..], '\n')) |linebreak| {
+            const line_dims = self.measureText(text[0..linebreak]);
+            if (opts.alignment == .center) {
+                dx = opts.x + @divFloor(dims.w, 2) - @divFloor(line_dims.w, 2);
+            }
+        }
         var last_ch: u8 = 0;
-        for (text) |ch| {
+        for (text) |ch, i| {
             if (ch == '\n') {
                 dy += self.mapGlyph(' ').h;
                 dx = opts.x;
+                if (std.mem.indexOfScalar(u8, text[i + 1 ..], '\n')) |linebreak| {
+                    const line_dims = self.measureText(text[i + 1 .. linebreak]);
+                    if (opts.alignment == .center) {
+                        dx = opts.x + @divFloor(dims.w, 2) - @divFloor(line_dims.w, 2);
+                    }
+                }
                 continue;
             }
             const src = self.mapGlyph(ch);
