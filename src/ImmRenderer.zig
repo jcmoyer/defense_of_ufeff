@@ -121,6 +121,24 @@ pub fn drawLine(self: ImmRenderer, p0: zm.Vec, p1: zm.Vec, rgba: zm.Vec) void {
     gl.drawArrays(gl.LINES, 0, 2);
 }
 
+pub fn drawCircle(self: ImmRenderer, comptime segs: comptime_int, p0: zm.Vec, r: f32, rgba: zm.Vec) void {
+    var vertices: [segs]Vertex = undefined;
+    inline for (vertices) |*v, i| {
+        const f = @intToFloat(f32, i) + 1.0;
+        const d = f / @intToFloat(f32, segs);
+        const offset = p0 + zm.f32x4(
+            @cos(std.math.tau * d) * r,
+            @sin(std.math.tau * d) * r,
+            0,
+            0,
+        );
+        v.* = .{ .xyuv = offset, .rgba = rgba };
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, self.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices.len * @sizeOf(Vertex), &vertices, gl.STREAM_DRAW);
+    gl.drawArrays(gl.LINE_LOOP, 0, vertices.len);
+}
+
 pub fn drawQuadRGBA(self: ImmRenderer, dest: Rect, rgba: zm.Vec) void {
     const left = @intToFloat(f32, dest.left());
     const right = @intToFloat(f32, dest.right());
