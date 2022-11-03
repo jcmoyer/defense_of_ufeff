@@ -106,11 +106,11 @@ pub fn create(game: *Game) !*PlayState {
         b.* = try self.ui_root.createButton();
         try ui_panel.addChild(b.*.control());
 
-        const x: i32 = if (i % 2 == 0) 16 else 48;
-        const y: i32 = 112 + @intCast(i32, i / 2) * 32;
+        const x: i32 = if (i % 2 == 0) 18 else 50;
+        const y: i32 = 114 + @intCast(i32, i / 2) * 32;
 
         b.*.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
-        b.*.rect = Rect.init(x, y, 32, 32);
+        b.*.rect = Rect.init(x, y, 28, 28);
     }
     self.ui_minimap = try self.ui_root.createMinimap();
     self.ui_minimap.rect = Rect.init(16, 16, 64, 64);
