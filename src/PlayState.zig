@@ -286,7 +286,7 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
                 if (self.interact_state == .build) {
                     const tile_coord = self.mouseToTile();
                     if (self.world.canBuildAt(tile_coord)) {
-                        self.world.spawnTower(self.interact_state.build.tower_spec, tile_coord, self.game.frame_counter) catch unreachable;
+                        _ = self.world.spawnTower(self.interact_state.build.tower_spec, tile_coord, self.game.frame_counter) catch unreachable;
                         if (sdl.SDL_GetModState() & sdl.KMOD_SHIFT == 0) {
                             self.interact_state = .none;
                         }
@@ -466,7 +466,7 @@ fn renderTowers(
     self.r_batch.begin(.{
         .texture = t_special,
     });
-    for (self.world.towers.items) |t| {
+    for (self.world.towers.slice()) |*t| {
         self.r_batch.drawQuad(
             Rect.init(0, 7 * 16, 16, 16),
             Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - cam.view.top(), 16, 16),
@@ -478,7 +478,7 @@ fn renderTowers(
     self.r_batch.begin(.{
         .texture = t_characters,
     });
-    for (self.world.towers.items) |t| {
+    for (self.world.towers.slice()) |*t| {
         if (t.animator) |animator| {
             // shift up on Y so the character is standing in the center of the tile
             self.r_batch.drawQuad(

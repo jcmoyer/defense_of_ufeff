@@ -277,6 +277,7 @@ fn tspecTestUpdate(self: *Tower, frame: u64) void {
 }
 
 pub const Tower = struct {
+    id: u32 = undefined,
     world: *World,
     spec: *const TowerSpec,
     animator: ?anim.Animator = null,
@@ -491,7 +492,9 @@ pub const World = struct {
     scratch_map: Tilemap = .{},
     scratch_cache: PathfindingCache,
     monsters: IntrusiveSlotMap(Monster) = .{},
-    towers: std.ArrayListUnmanaged(Tower) = .{},
+    towers: IntrusiveSlotMap(Tower) = .{},
+    /// Tile coordinates for tower -> slot map handle
+    tower_map: std.AutoHashMapUnmanaged(TileCoord, u32) = .{},
     spawns: std.ArrayListUnmanaged(Spawn) = .{},
     projectiles: IntrusiveSlotMap(Projectile) = .{},
     pending_projectiles: std.ArrayListUnmanaged(Projectile) = .{},
@@ -528,6 +531,7 @@ pub const World = struct {
         self.floating_text.deinit(self.allocator);
         self.pending_projectiles.deinit(self.allocator);
         self.sprite_effects.deinit(self.allocator);
+        self.tower_map.deinit(self.allocator);
     }
 
     pub fn getWidth(self: World) usize {
@@ -561,7 +565,15 @@ pub const World = struct {
             return false;
         }
         const tile_flags = self.map.at2DPtr(.base, coord.x, coord.y).flags;
-        if (tile_flags.construction_blocked or tile_flags.contains_tower) {
+        if (tile_flags.construction_blocked) {
+            return false;
+        }
+        if (tile_flags.contains_tower) {
+            if (self.tower_map.get(coord)) |id| {
+                if (self.towers.get(id).spec == &t_wall) {
+                    return true;
+                }
+            }
             return false;
         }
         for (self.monsters.slice()) |m| {
@@ -618,15 +630,17 @@ pub const World = struct {
         return self.spawnFloatingText(s.getWritten(), world_x, world_y);
     }
 
-    pub fn spawnTower(self: *World, spec: *const TowerSpec, coord: TileCoord, frame: u64) !void {
+    pub fn spawnTower(self: *World, spec: *const TowerSpec, coord: TileCoord, frame: u64) !u32 {
         self.map.at2DPtr(.base, coord.x, coord.y).flags.contains_tower = true;
-        try self.spawnTowerWorld(
+        var id = try self.spawnTowerWorld(
             spec,
             @intCast(u32, coord.x * 16),
             @intCast(u32, coord.y * 16),
             frame,
         );
+        try self.tower_map.put(self.allocator, coord, id);
         self.invalidatePathCache();
+        return id;
     }
 
     pub fn spawnSpriteEffect(self: *World, spec: *const SpriteEffectSpec, world_x: i32, world_y: i32, frame: u64) !u32 {
@@ -687,16 +701,16 @@ pub const World = struct {
         std.log.debug("invalidatePathCache took {d}us", .{timer.read() / std.time.ns_per_us});
     }
 
-    fn spawnTowerWorld(self: *World, spec: *const TowerSpec, world_x: u32, world_y: u32, frame: u64) !void {
-        var ptr = try self.towers.addOne(self.allocator);
-        ptr.* = Tower{
+    fn spawnTowerWorld(self: *World, spec: *const TowerSpec, world_x: u32, world_y: u32, frame: u64) !u32 {
+        var id = try self.towers.put(self.allocator, Tower{
             .world = self,
             .spec = spec,
             .world_x = world_x,
             .world_y = world_y,
             .cooldown = timing.FrameTimer.initSeconds(frame, 1),
-        };
-        ptr.spawn(frame);
+        });
+        self.towers.getPtr(id).spawn(frame);
+        return id;
     }
 
     fn spawnMonsterWorld(self: *World, world_x: u32, world_y: u32) !void {
@@ -746,7 +760,7 @@ pub const World = struct {
             }
             s.emitter.update();
         }
-        for (self.towers.items) |*t| {
+        for (self.towers.slice()) |*t| {
             t.update(frame);
         }
         for (self.monsters.slice()) |*m| {
