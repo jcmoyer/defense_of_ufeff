@@ -38,10 +38,13 @@ pub const Panel = struct {
     }
 
     pub fn control(self: *Panel) Control {
-        return Control{
-            .instance = self,
-            .vtable = &vtable,
-        };
+        return Control.init(self, .{
+            .deinitFn = deinit,
+            .handleMouseClickFn = handleMouseClick,
+            .interactRectFn = interactRect,
+            .getTextureFn = getTexture,
+            .getChildrenFn = getChildren,
+        });
     }
 
     pub fn getTexture(self: *Panel) ?*const Texture {
@@ -51,14 +54,6 @@ pub const Panel = struct {
     pub fn getChildren(self: *Panel) []Control {
         return self.children.items;
     }
-
-    const vtable = ControlVtbl{
-        .deinitFn = @ptrCast(*const fn (*anyopaque) void, &deinit),
-        .handleMouseClickFn = @ptrCast(*const fn (*anyopaque, x: i32, y: i32) void, &handleMouseClick),
-        .interactRectFn = @ptrCast(*const fn (self: *anyopaque) ?Rect, &interactRect),
-        .getTextureFn = @ptrCast(*const fn (self: *anyopaque) ?*const Texture, &getTexture),
-        .getChildrenFn = @ptrCast(?*const fn (self: *anyopaque) []Control, &getChildren),
-    };
 };
 
 pub const Button = struct {
@@ -87,22 +82,17 @@ pub const Button = struct {
     }
 
     pub fn control(self: *Button) Control {
-        return Control{
-            .instance = self,
-            .vtable = &vtable,
-        };
+        return Control.init(self, .{
+            .deinitFn = deinit,
+            .handleMouseClickFn = handleMouseClick,
+            .interactRectFn = interactRect,
+            .getTextureFn = getTexture,
+        });
     }
 
     pub fn getTexture(self: *Button) ?*const Texture {
         return self.texture;
     }
-
-    const vtable = ControlVtbl{
-        .deinitFn = @ptrCast(*const fn (*anyopaque) void, &deinit),
-        .handleMouseClickFn = @ptrCast(*const fn (*anyopaque, x: i32, y: i32) void, &handleMouseClick),
-        .interactRectFn = @ptrCast(*const fn (self: *anyopaque) ?Rect, &interactRect),
-        .getTextureFn = @ptrCast(*const fn (self: *anyopaque) ?*const Texture, &getTexture),
-    };
 };
 
 pub const Minimap = struct {
@@ -127,65 +117,124 @@ pub const Minimap = struct {
     }
 
     pub fn control(self: *Minimap) Control {
-        return Control{
-            .instance = self,
-            .vtable = &vtable,
-        };
+        return Control.init(self, .{
+            .deinitFn = deinit,
+            .handleMouseClickFn = handleMouseClick,
+            .interactRectFn = interactRect,
+            .getTextureFn = getTexture,
+        });
     }
 
     pub fn getTexture(self: *Minimap) ?*const Texture {
         return self.texture;
     }
+};
 
-    const vtable = ControlVtbl{
-        .deinitFn = @ptrCast(*const fn (*anyopaque) void, &deinit),
-        .handleMouseClickFn = @ptrCast(*const fn (*anyopaque, x: i32, y: i32) void, &handleMouseClick),
-        .interactRectFn = @ptrCast(*const fn (self: *anyopaque) ?Rect, &interactRect),
-        .getTextureFn = @ptrCast(*const fn (self: *anyopaque) ?*const Texture, &getTexture),
+fn ControlImpl(comptime PointerT: type) type {
+    return struct {
+        deinitFn: *const fn (PointerT) void,
+        handleMouseClickFn: ?*const fn (PointerT, i32, i32) void = null,
+        interactRectFn: ?*const fn (self: PointerT) ?Rect = null,
+        getTextureFn: ?*const fn (self: PointerT) ?*const Texture = null,
+        getChildrenFn: ?*const fn (self: PointerT) []Control = null,
     };
-};
-
-pub const ControlVtbl = struct {
-    deinitFn: *const fn (*anyopaque) void,
-    handleMouseClickFn: ?*const fn (*anyopaque, x: i32, y: i32) void = null,
-    interactRectFn: ?*const fn (self: *anyopaque) ?Rect = null,
-    getTextureFn: ?*const fn (self: *anyopaque) ?*const Texture = null,
-    getChildrenFn: ?*const fn (self: *anyopaque) []Control = null,
-};
+}
 
 pub const Control = struct {
     instance: *anyopaque,
-    vtable: *const ControlVtbl,
+    vtable: *const VTable,
+
+    pub const VTable = struct {
+        deinitFn: *const fn (*anyopaque) void,
+        handleMouseClickFn: *const fn (*anyopaque, x: i32, y: i32) void,
+        interactRectFn: *const fn (self: *anyopaque) ?Rect,
+        getTextureFn: *const fn (self: *anyopaque) ?*const Texture,
+        getChildrenFn: *const fn (self: *anyopaque) []Control,
+    };
+
+    pub fn init(
+        pointer: anytype,
+        comptime fns: ControlImpl(@TypeOf(pointer)),
+    ) Control {
+        const Ptr = @TypeOf(pointer);
+        const alignment = @typeInfo(Ptr).Pointer.alignment;
+
+        const Impl = struct {
+            fn deinitImpl(ptr: *anyopaque) void {
+                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                fns.deinitFn(inst);
+            }
+
+            fn handleMouseClickImpl(ptr: *anyopaque, x: i32, y: i32) void {
+                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                if (fns.handleMouseClickFn) |f| {
+                    f(inst, x, y);
+                }
+            }
+
+            fn interactRectDefault(_: *anyopaque) ?Rect {
+                return null;
+            }
+
+            fn interactRectImpl(ptr: *anyopaque) ?Rect {
+                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                const f = fns.interactRectFn orelse interactRectDefault;
+                return f(inst);
+            }
+
+            fn getTextureDefault(_: *anyopaque) ?*const Texture {
+                return null;
+            }
+
+            fn getTextureImpl(ptr: *anyopaque) ?*const Texture {
+                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                const f = fns.getTextureFn orelse getTextureDefault;
+                return f(inst);
+            }
+
+            fn getChildrenDefault(_: *anyopaque) []Control {
+                return &[_]Control{};
+            }
+
+            fn getChildrenImpl(ptr: *anyopaque) []Control {
+                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                const f = fns.getChildrenFn orelse getChildrenDefault;
+                return f(inst);
+            }
+
+            const vtable = VTable{
+                .deinitFn = deinitImpl,
+                .handleMouseClickFn = handleMouseClickImpl,
+                .interactRectFn = interactRectImpl,
+                .getTextureFn = getTextureImpl,
+                .getChildrenFn = getChildrenImpl,
+            };
+        };
+
+        return Control{
+            .instance = pointer,
+            .vtable = &Impl.vtable,
+        };
+    }
 
     pub fn deinit(self: Control) void {
         self.vtable.deinitFn(self.instance);
     }
 
     pub fn handleMouseClick(self: Control, x: i32, y: i32) void {
-        if (self.vtable.handleMouseClickFn) |f| {
-            f(self.instance, x, y);
-        }
+        self.vtable.handleMouseClickFn(self.instance, x, y);
     }
 
     pub fn interactRect(self: Control) ?Rect {
-        if (self.vtable.interactRectFn) |f| {
-            return f(self.instance);
-        }
-        return null;
+        return self.vtable.interactRectFn(self.instance);
     }
 
     pub fn getTexture(self: Control) ?*const Texture {
-        if (self.vtable.getTextureFn) |f| {
-            return f(self.instance);
-        }
-        return null;
+        return self.vtable.getTextureFn(self.instance);
     }
 
     pub fn getChildren(self: Control) ?[]Control {
-        if (self.vtable.getChildrenFn) |f| {
-            return f(self.instance);
-        }
-        return null;
+        return self.vtable.getChildrenFn(self.instance);
     }
 };
 
