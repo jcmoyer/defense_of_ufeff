@@ -504,6 +504,10 @@ fn renderHealthBars(
 ) void {
     self.r_quad.begin(.{});
     for (self.world.monsters.slice()) |m| {
+        // no health bar for healthy enemies
+        if (m.hp == m.spec.max_hp) {
+            continue;
+        }
         const w = m.getInterpWorldPosition(a);
         var dest_red = Rect.init(w[0] - cam.view.left(), w[1] - 4 - cam.view.top(), 16, 1);
         var dest_border = dest_red;
