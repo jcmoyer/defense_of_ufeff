@@ -29,6 +29,11 @@ fontspec: bmfont.BitmapFontSpec,
 ui_root: ui.Root,
 ui_tip: *ui.Button,
 rng: std.rand.DefaultPrng,
+tip_index: usize = 0,
+
+const tips = [_][]const u8{
+    "You can build over top of walls!\nThis lets you maze first, then build towers.",
+};
 
 pub fn create(game: *Game) !*MenuState {
     var self = try game.allocator.create(MenuState);
@@ -44,7 +49,17 @@ pub fn create(game: *Game) !*MenuState {
     self.r_font = BitmapFont.init(&self.r_batch);
 
     self.ui_tip = try self.ui_root.createButton();
-    self.ui_tip.texture = self.game.texman.getNamedTexture("ui_panel.png");
+    self.ui_tip.texture = self.game.texman.getNamedTexture("special.png");
+    self.ui_tip.texture_rects = [4]Rect{
+        // .normal
+        Rect.init(208, 48, 16, 16),
+        // .hover
+        Rect.init(208, 48, 16, 16),
+        // .down
+        Rect.init(208, 48, 16, 16),
+        // .disabled
+        Rect.init(208, 48, 16, 16),
+    };
     self.ui_tip.rect = Rect.init(0, 0, 16, 16);
     self.ui_tip.callback = onButtonClick;
     self.ui_tip.userdata = self;
@@ -56,10 +71,15 @@ pub fn create(game: *Game) !*MenuState {
     return self;
 }
 
+fn showRandomTip(self: *MenuState) void {
+    self.tip_index = self.rng.random().intRangeLessThan(usize, 0, tips.len);
+}
+
 fn onButtonClick(button: *ui.Button, userdata: ?*anyopaque) void {
     _ = button;
     var data = @ptrCast(*MenuState, @alignCast(@alignOf(MenuState), userdata));
     data.game.audio.playSound("assets/sounds/click.ogg").release();
+    data.showRandomTip();
 }
 
 fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.BitmapFontSpec {
@@ -101,7 +121,11 @@ pub fn render(self: *MenuState, alpha: f64) void {
         .texture = self.game.texman.getNamedTexture("CommonCase.png"),
         .spec = &self.fontspec,
     });
-    self.r_font.drawText("Hello world", .{ .x = 0, .y = 100 });
+
+    var measured = self.r_font.measureText(tips[self.tip_index]);
+    measured.centerOn(Game.INTERNAL_WIDTH / 2, @floatToInt(i32, 0.8 * Game.INTERNAL_HEIGHT));
+
+    self.r_font.drawText(tips[self.tip_index], .{ .x = measured.x, .y = measured.y });
     self.r_font.end();
 
     self.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
