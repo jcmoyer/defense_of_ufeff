@@ -116,7 +116,13 @@ pub const mon_human = MonsterSpec{
 };
 
 pub const Monster = struct {
+    const PathingState = enum {
+        to_goal,
+        to_spawn,
+    };
+
     id: u32 = undefined,
+    spawn_id: usize,
     world: *World,
     spec: *const MonsterSpec,
     p_world_x: u32 = 0,
@@ -129,12 +135,12 @@ pub const Monster = struct {
     mstate: MoveState = .idle,
     face: Direction = .down,
     animator: ?anim.Animator = null,
-    path: []TileCoord,
+    path: []TileCoord = &[_]TileCoord{},
     path_index: usize = 0,
-    path_forward: bool = true,
     flash_frames: u32 = 0,
     hp: u32 = 0,
     dead: bool = false,
+    pathing_state: PathingState = .to_goal,
 
     pub fn setTilePosition(self: *Monster, coord: TileCoord) void {
         self.setWorldPosition(@intCast(u32, coord.x * 16), @intCast(u32, coord.y * 16));
@@ -150,6 +156,14 @@ pub const Monster = struct {
 
     pub fn getTilePosition(self: Monster) TileCoord {
         return self.tile_pos;
+    }
+
+    fn computePath(self: *Monster) void {
+        self.path = switch (self.pathing_state) {
+            .to_goal => self.world.findPath(self.getTilePosition(), self.world.goal.getTilePosition()).?,
+            .to_spawn => self.world.findPath(self.getTilePosition(), self.world.spawns.items[self.spawn_id].coord).?,
+        };
+        self.path_index = 0;
     }
 
     fn spawn(self: *Monster, frame: u64) void {
@@ -173,6 +187,14 @@ pub const Monster = struct {
                 std.debug.assert(std.meta.eql(self.path[self.path_index], self.getTilePosition()));
                 self.beginMove(self.path[self.path_index].directionToAdjacent(self.path[self.path_index + 1]));
                 self.path_index += 1;
+            } else if (steps_remaining == 0) {
+                if (self.pathing_state == .to_goal) {
+                    self.pathing_state = .to_spawn;
+                    self.computePath();
+                } else {
+                    // TODO: deduct real lives
+                    self.dead = true;
+                }
             }
         }
 
@@ -723,9 +745,7 @@ pub const World = struct {
         var timer = std.time.Timer.start() catch unreachable;
         self.path_cache.clear();
         for (self.monsters.slice()) |*m| {
-            const coord = m.getTilePosition();
-            m.path_index = 0;
-            m.path = self.findPath(coord, self.goal.getTilePosition()).?;
+            m.computePath();
         }
         std.log.debug("invalidatePathCache took {d}us", .{timer.read() / std.time.ns_per_us});
     }
@@ -742,24 +762,17 @@ pub const World = struct {
         return id;
     }
 
-    fn spawnMonsterWorld(self: *World, world_x: u32, world_y: u32) !void {
-        try self.monsters.append(self.allocator, Monster{
-            .world_x = world_x,
-            .world_y = world_y,
-            .animator = anim.a_chara.createAnimator("down"),
-        });
-    }
-
     pub fn spawnMonster(self: *World, spec: *const MonsterSpec, spawn_id: usize, frame: u64) !u32 {
         const pos = self.getSpawnPosition(spawn_id);
         self.getSpawn(spawn_id).emit();
         var mon = Monster{
             .world = self,
             .spec = spec,
-            .path = self.findPath(pos, self.goal.getTilePosition()).?,
             .animator = anim.a_chara.animationSet().createAnimator("down"),
+            .spawn_id = spawn_id,
         };
         mon.setTilePosition(pos);
+        mon.computePath();
         const id = try self.monsters.put(self.allocator, mon);
         self.monsters.getPtr(id).spawn(frame);
 
@@ -781,7 +794,6 @@ pub const World = struct {
         var mon_pending_removal = std.ArrayListUnmanaged(u32){};
         var effect_pending_removal = std.ArrayListUnmanaged(u32){};
         var text_pending_removal = std.ArrayListUnmanaged(u32){};
-
         self.goal.update(frame);
 
         for (self.spawns.items) |*s, id| {
@@ -796,6 +808,9 @@ pub const World = struct {
         }
         for (self.monsters.slice()) |*m| {
             m.update(frame);
+            if (m.dead) {
+                mon_pending_removal.append(frame_arena, m.id) catch unreachable;
+            }
         }
         for (self.sprite_effects.slice()) |*e| {
             e.update(frame);
@@ -889,26 +904,28 @@ pub const World = struct {
     }
 
     pub fn findPath(self: *World, start: TileCoord, end: TileCoord) ?[]TileCoord {
-        if (self.path_cache.get(start)) |existing_path| {
+        const pc = PathingCoords.init(start, end);
+        if (self.path_cache.get(pc)) |existing_path| {
             return existing_path;
         }
-        const has_path = self.pathfinder.findPath(start, end, &self.map, &self.path_cache) catch |err| {
+        const has_path = self.pathfinder.findPath(pc, &self.map, &self.path_cache) catch |err| {
             std.log.err("findPath failed: {!}", .{err});
             std.process.exit(1);
         };
 
         if (has_path) {
-            return self.path_cache.get(start).?;
+            return self.path_cache.get(pc).?;
         } else {
             return null;
         }
     }
 
     pub fn findTheoreticalPath(self: *World, start: TileCoord, end: TileCoord) bool {
-        if (self.scratch_cache.hasPathFrom(start)) {
+        const pc = PathingCoords.init(start, end);
+        if (self.scratch_cache.hasPathFrom(pc)) {
             return true;
         }
-        const has_path = self.pathfinder.findPath(start, end, &self.scratch_map, &self.scratch_cache) catch |err| {
+        const has_path = self.pathfinder.findPath(pc, &self.scratch_map, &self.scratch_cache) catch |err| {
             std.log.err("findTheoreticalPath failed: {!}", .{err});
             std.process.exit(1);
         };
@@ -924,14 +941,26 @@ pub const World = struct {
     }
 };
 
+const PathingCoords = struct {
+    start: TileCoord,
+    end: TileCoord,
+
+    fn init(start: TileCoord, end: TileCoord) PathingCoords {
+        return .{
+            .start = start,
+            .end = end,
+        };
+    }
+};
+
 const PathfindingCache = struct {
     allocator: Allocator,
-    entries: std.AutoArrayHashMap(TileCoord, []TileCoord),
+    entries: std.AutoArrayHashMap(PathingCoords, []TileCoord),
 
     fn init(allocator: Allocator) PathfindingCache {
         return .{
             .allocator = allocator,
-            .entries = std.AutoArrayHashMap(TileCoord, []TileCoord).init(allocator),
+            .entries = std.AutoArrayHashMap(PathingCoords, []TileCoord).init(allocator),
         };
     }
 
@@ -953,16 +982,16 @@ const PathfindingCache = struct {
         self.entries.clearRetainingCapacity();
     }
 
-    fn set(self: *PathfindingCache, from: TileCoord, path: []TileCoord) void {
-        self.entries.putAssumeCapacityNoClobber(from, path);
+    fn set(self: *PathfindingCache, coords: PathingCoords, path: []TileCoord) void {
+        self.entries.putAssumeCapacityNoClobber(coords, path);
     }
 
-    fn get(self: *PathfindingCache, from: TileCoord) ?[]TileCoord {
-        return self.entries.get(from);
+    fn get(self: *PathfindingCache, coords: PathingCoords) ?[]TileCoord {
+        return self.entries.get(coords);
     }
 
-    fn hasPathFrom(self: *PathfindingCache, from: TileCoord) bool {
-        return self.entries.contains(from);
+    fn hasPathFrom(self: *PathfindingCache, coords: PathingCoords) bool {
+        return self.entries.contains(coords);
     }
 };
 
@@ -1028,7 +1057,7 @@ const PathfindingState = struct {
         );
     }
 
-    fn findPath(self: *PathfindingState, start: TileCoord, end: TileCoord, map: *const Tilemap, cache: ?*PathfindingCache) !bool {
+    fn findPath(self: *PathfindingState, coords: PathingCoords, map: *const Tilemap, cache: ?*PathfindingCache) !bool {
         const width = map.width;
 
         // sus, upstream interface needs some love
@@ -1040,29 +1069,29 @@ const PathfindingState = struct {
 
         self.frontier_set.clearRetainingCapacity();
 
-        try self.frontier.add(start);
-        try self.frontier_set.put(self.allocator, start, {});
+        try self.frontier.add(coords.start);
+        try self.frontier_set.put(self.allocator, coords.start, {});
         std.mem.set(Score, self.score_map, Score.infinity);
 
-        self.score_map[start.toScalarCoord(map.width)] = .{
+        self.score_map[coords.start.toScalarCoord(map.width)] = .{
             .fscore = 0,
             .gscore = 0,
             .from = undefined,
         };
 
         while (self.frontier.removeOrNull()) |current| {
-            if (std.meta.eql(current, end)) {
+            if (std.meta.eql(current, coords.end)) {
                 if (cache != null) {
                     self.result.clearRetainingCapacity();
-                    var coord = end;
-                    while (!std.meta.eql(coord, start)) {
+                    var coord = coords.end;
+                    while (!std.meta.eql(coord, coords.start)) {
                         try self.result.append(self.allocator, coord);
                         coord = self.score_map[coord.toScalarCoord(width)].from;
                     }
                     try self.result.append(self.allocator, coord);
                     std.mem.reverse(TileCoord, self.result.items);
                     // return self.result.items;
-                    cache.?.set(start, self.result.toOwnedSlice(self.allocator));
+                    cache.?.set(coords, self.result.toOwnedSlice(self.allocator));
                 }
 
                 return true;
@@ -1081,7 +1110,7 @@ const PathfindingState = struct {
                         self.score_map[neighbor.toScalarCoord(width)] = .{
                             .from = current,
                             .gscore = tentative_score,
-                            .fscore = tentative_score + self.heuristic(neighbor, end),
+                            .fscore = tentative_score + self.heuristic(neighbor, coords.end),
                         };
                         if (!self.frontier_set.contains(neighbor)) {
                             try self.frontier_set.put(self.allocator, neighbor, {});
@@ -1092,9 +1121,9 @@ const PathfindingState = struct {
             }
         }
 
-        std.log.debug("no path {any} to {any}", .{ start, end });
+        std.log.debug("no path: {any}", .{coords});
         if (cache) |c| {
-            c.set(start, &[_]TileCoord{});
+            c.set(coords, &[_]TileCoord{});
         }
 
         return false;
