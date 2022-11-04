@@ -280,9 +280,7 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
                 self.game.input.mouse.client_x,
                 self.game.input.mouse.client_y,
             );
-            if (self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
-                self.ui_root.handleMouseClick(mouse_p[0], mouse_p[1]);
-            } else {
+            if (!self.ui_root.handleMouseDown(mouse_p[0], mouse_p[1])) {
                 if (self.interact_state == .build) {
                     const tile_coord = self.mouseToTile();
                     if (self.world.canBuildAt(tile_coord)) {
@@ -298,6 +296,14 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
                 self.interact_state = .none;
             }
         }
+    }
+
+    if (ev.type == .SDL_MOUSEBUTTONUP) {
+        const mouse_p = self.game.unproject(
+            self.game.input.mouse.client_x,
+            self.game.input.mouse.client_y,
+        );
+        _ = self.ui_root.handleMouseUp(mouse_p[0], mouse_p[1]);
     }
 }
 

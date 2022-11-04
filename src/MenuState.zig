@@ -157,7 +157,15 @@ pub fn handleEvent(self: *MenuState, ev: sdl.SDL_Event) void {
             self.game.input.mouse.client_x,
             self.game.input.mouse.client_y,
         );
-        self.ui_root.handleMouseClick(mouse_p[0], mouse_p[1]);
+        _ = self.ui_root.handleMouseDown(mouse_p[0], mouse_p[1]);
+    }
+
+    if (ev.type == .SDL_MOUSEBUTTONUP) {
+        const mouse_p = self.game.unproject(
+            self.game.input.mouse.client_x,
+            self.game.input.mouse.client_y,
+        );
+        _ = self.ui_root.handleMouseUp(mouse_p[0], mouse_p[1]);
     }
 }
 

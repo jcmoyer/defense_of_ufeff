@@ -100,12 +100,26 @@ pub const Button = struct {
         if (self.state != .disabled) {
             self.root.interaction_hint = .clickable;
         }
-        self.state = .hover;
+        if (self.state == .normal) {
+            self.state = .hover;
+        }
     }
 
     pub fn handleMouseLeave(self: *Button) void {
         self.root.interaction_hint = .none;
         self.state = .normal;
+    }
+
+    pub fn handleMouseDown(self: *Button, x: i32, y: i32) void {
+        _ = x;
+        _ = y;
+        self.state = .down;
+    }
+
+    pub fn handleMouseUp(self: *Button, x: i32, y: i32) void {
+        _ = x;
+        _ = y;
+        self.state = .hover;
     }
 
     pub fn handleMouseClick(self: *Button, x: i32, y: i32) void {
@@ -128,6 +142,8 @@ pub const Button = struct {
             .getTextureFn = getTexture,
             .handleMouseEnterFn = handleMouseEnter,
             .handleMouseLeaveFn = handleMouseLeave,
+            .handleMouseDownFn = handleMouseDown,
+            .handleMouseUpFn = handleMouseUp,
         });
     }
 
@@ -192,6 +208,8 @@ fn ControlImpl(comptime PointerT: type) type {
         getChildrenFn: ?*const fn (self: PointerT) []Control = null,
         handleMouseEnterFn: ?*const fn (self: PointerT) void = null,
         handleMouseLeaveFn: ?*const fn (self: PointerT) void = null,
+        handleMouseDownFn: ?*const fn (PointerT, i32, i32) void = null,
+        handleMouseUpFn: ?*const fn (PointerT, i32, i32) void = null,
     };
 }
 
@@ -207,6 +225,8 @@ pub const Control = struct {
         getChildrenFn: *const fn (self: *anyopaque) []Control,
         handleMouseEnterFn: *const fn (*anyopaque) void,
         handleMouseLeaveFn: *const fn (*anyopaque) void,
+        handleMouseDownFn: *const fn (*anyopaque, i32, i32) void,
+        handleMouseUpFn: *const fn (*anyopaque, i32, i32) void,
     };
 
     pub fn init(
@@ -271,6 +291,20 @@ pub const Control = struct {
                 return f(inst);
             }
 
+            fn handleMouseDownImpl(ptr: *anyopaque, x: i32, y: i32) void {
+                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                if (fns.handleMouseDownFn) |f| {
+                    f(inst, x, y);
+                }
+            }
+
+            fn handleMouseUpImpl(ptr: *anyopaque, x: i32, y: i32) void {
+                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                if (fns.handleMouseUpFn) |f| {
+                    f(inst, x, y);
+                }
+            }
+
             const vtable = VTable{
                 .deinitFn = deinitImpl,
                 .handleMouseClickFn = handleMouseClickImpl,
@@ -279,6 +313,8 @@ pub const Control = struct {
                 .getChildrenFn = getChildrenImpl,
                 .handleMouseEnterFn = handleMouseEnterImpl,
                 .handleMouseLeaveFn = handleMouseLeaveImpl,
+                .handleMouseDownFn = handleMouseDownImpl,
+                .handleMouseUpFn = handleMouseUpImpl,
             };
         };
 
@@ -315,6 +351,14 @@ pub const Control = struct {
     pub fn handleMouseLeave(self: Control) void {
         self.vtable.handleMouseLeaveFn(self.instance);
     }
+
+    pub fn handleMouseDown(self: Control, x: i32, y: i32) void {
+        self.vtable.handleMouseDownFn(self.instance, x, y);
+    }
+
+    pub fn handleMouseUp(self: Control, x: i32, y: i32) void {
+        self.vtable.handleMouseUpFn(self.instance, x, y);
+    }
 };
 
 pub const InteractionHint = enum {
@@ -329,6 +373,7 @@ pub const Root = struct {
     /// All controls owned by this Root
     controls: std.ArrayListUnmanaged(Control),
     hover: ?Control = null,
+    mouse_down_control: ?Control = null,
     interaction_hint: InteractionHint = .none,
     backend: SDLBackend,
 
@@ -361,7 +406,13 @@ pub const Root = struct {
         return false;
     }
 
-    fn findElementChild(self: *Root, at: Control, x: i32, y: i32) Control {
+    const FindElementResult = struct {
+        control: Control,
+        local_x: i32,
+        local_y: i32,
+    };
+
+    fn findElementChild(self: *Root, at: Control, x: i32, y: i32) FindElementResult {
         if (at.getChildren()) |children| {
             for (children) |child| {
                 if (child.interactRect()) |rect| {
@@ -371,10 +422,14 @@ pub const Root = struct {
                 }
             }
         }
-        return at;
+        return FindElementResult{
+            .control = at,
+            .local_x = x,
+            .local_y = y,
+        };
     }
 
-    fn findElementAt(self: *Root, x: i32, y: i32) ?Control {
+    fn findElementAt(self: *Root, x: i32, y: i32) ?FindElementResult {
         for (self.children.items) |child| {
             if (child.interactRect()) |rect| {
                 if (rect.contains(x, y)) {
@@ -387,15 +442,15 @@ pub const Root = struct {
     }
 
     pub fn handleMouseMove(self: *Root, x: i32, y: i32) void {
-        if (self.findElementAt(x, y)) |e| {
+        if (self.findElementAt(x, y)) |result| {
             if (self.hover) |h| {
-                if (e.instance == h.instance) {
+                if (result.control.instance == h.instance) {
                     return;
                 }
                 h.handleMouseLeave();
             }
-            self.hover = e;
-            e.handleMouseEnter();
+            self.hover = result.control;
+            result.control.handleMouseEnter();
         } else {
             if (self.hover) |h| {
                 h.handleMouseLeave();
@@ -405,15 +460,30 @@ pub const Root = struct {
         self.backend.setCursorForHint(self.interaction_hint);
     }
 
-    pub fn handleMouseClick(self: *Root, x: i32, y: i32) void {
-        for (self.children.items) |child| {
-            if (child.interactRect()) |rect| {
-                if (rect.contains(x, y)) {
-                    child.handleMouseClick(x, y);
-                    return;
+    /// Returns true if a UI element handled the event.
+    pub fn handleMouseUp(self: *Root, x: i32, y: i32) bool {
+        var handled: bool = false;
+        if (self.findElementAt(x, y)) |result| {
+            if (self.mouse_down_control) |down_control| {
+                if (result.control.instance == down_control.instance) {
+                    result.control.handleMouseUp(result.local_x, result.local_y);
+                    result.control.handleMouseClick(result.local_x, result.local_y);
+                    handled = true;
                 }
             }
         }
+        self.mouse_down_control = null;
+        return handled;
+    }
+
+    /// Returns true if a UI element handled the event.
+    pub fn handleMouseDown(self: *Root, x: i32, y: i32) bool {
+        if (self.findElementAt(x, y)) |result| {
+            self.mouse_down_control = result.control;
+            result.control.handleMouseDown(result.local_x, result.local_y);
+            return true;
+        }
+        return false;
     }
 
     pub fn addChild(self: *Root, c: Control) !void {
