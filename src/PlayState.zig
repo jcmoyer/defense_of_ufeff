@@ -261,7 +261,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     if (!self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
         self.renderPlacementIndicator(cam_interp);
     }
-    self.renderUI();
+    ui.renderUI(&self.r_batch, self.ui_root);
 
     if (self.deb_render_tile_collision) {
         self.debugRenderTileCollision(cam_interp);
@@ -330,67 +330,6 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
             self.game.input.mouse.client_y,
         );
         _ = self.ui_root.handleMouseUp(mouse_p[0], mouse_p[1]);
-    }
-}
-
-const ControlRenderState = struct {
-    translate_x: i32 = 0,
-    translate_y: i32 = 0,
-};
-
-fn renderControl(self: *PlayState, control: ui.Control, renderstate: ControlRenderState) void {
-    if (control.interactRect()) |rect| {
-        if (control.getTexture()) |t| {
-            var render_src = t.texture_rect orelse Rect.init(0, 0, @intCast(i32, t.texture.width), @intCast(i32, t.texture.height));
-            var render_dest = rect;
-            render_dest.translate(renderstate.translate_x, renderstate.translate_y);
-            self.r_batch.begin(.{
-                .texture = t.texture,
-            });
-
-            // touch inside of dest rect
-            // this is for the minimap, mostly
-            const aspect_ratio = @intToFloat(f32, t.texture.width) / @intToFloat(f32, t.texture.height);
-            const p = render_dest.centerPoint();
-
-            // A = aspect ratio, W = width, H = height
-            //
-            // A = W/H
-            // H = W/A
-            // W = AH
-            //
-            // A > 1 means rect is wider than tall
-            // A < 1 means rect is taller than wide
-            //
-            // we can maintain A at different sizes by setting W or H and then
-            // doing one of the above transforms for the other axis
-            if (aspect_ratio > 1) {
-                render_dest.w = rect.w;
-                render_dest.h = @floatToInt(i32, @intToFloat(f32, render_dest.w) / aspect_ratio);
-                render_dest.centerOn(p[0], p[1]);
-            } else {
-                render_dest.h = rect.h;
-                render_dest.w = @floatToInt(i32, @intToFloat(f32, render_dest.h) * aspect_ratio);
-                render_dest.centerOn(p[0], p[1]);
-            }
-
-            self.r_batch.drawQuad(render_src, render_dest);
-            self.r_batch.end();
-        }
-    }
-    if (control.getChildren()) |children| {
-        for (children) |child| {
-            self.renderControl(child, .{
-                .translate_x = renderstate.translate_x + control.interactRect().?.x,
-                .translate_y = renderstate.translate_y + control.interactRect().?.y,
-            });
-        }
-    }
-}
-
-fn renderUI(self: *PlayState) void {
-    for (self.ui_root.children.items) |child| {
-        self.renderControl(child, .{});
     }
 }
 

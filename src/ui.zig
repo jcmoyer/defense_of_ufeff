@@ -565,3 +565,67 @@ const SDLBackend = struct {
         }
     }
 };
+
+// Try to contain the UI rendering stuff here
+const SpriteBatch = @import("SpriteBatch.zig");
+
+const ControlRenderState = struct {
+    translate_x: i32 = 0,
+    translate_y: i32 = 0,
+};
+
+fn renderControl(r_batch: *SpriteBatch, control: Control, renderstate: ControlRenderState) void {
+    if (control.interactRect()) |rect| {
+        if (control.getTexture()) |t| {
+            var render_src = t.texture_rect orelse Rect.init(0, 0, @intCast(i32, t.texture.width), @intCast(i32, t.texture.height));
+            var render_dest = rect;
+            render_dest.translate(renderstate.translate_x, renderstate.translate_y);
+            r_batch.begin(.{
+                .texture = t.texture,
+            });
+
+            // touch inside of dest rect
+            // this is for the minimap, mostly
+            const aspect_ratio = @intToFloat(f32, t.texture.width) / @intToFloat(f32, t.texture.height);
+            const p = render_dest.centerPoint();
+
+            // A = aspect ratio, W = width, H = height
+            //
+            // A = W/H
+            // H = W/A
+            // W = AH
+            //
+            // A > 1 means rect is wider than tall
+            // A < 1 means rect is taller than wide
+            //
+            // we can maintain A at different sizes by setting W or H and then
+            // doing one of the above transforms for the other axis
+            if (aspect_ratio > 1) {
+                render_dest.w = rect.w;
+                render_dest.h = @floatToInt(i32, @intToFloat(f32, render_dest.w) / aspect_ratio);
+                render_dest.centerOn(p[0], p[1]);
+            } else {
+                render_dest.h = rect.h;
+                render_dest.w = @floatToInt(i32, @intToFloat(f32, render_dest.h) * aspect_ratio);
+                render_dest.centerOn(p[0], p[1]);
+            }
+
+            r_batch.drawQuad(render_src, render_dest);
+            r_batch.end();
+        }
+    }
+    if (control.getChildren()) |children| {
+        for (children) |child| {
+            renderControl(r_batch, child, .{
+                .translate_x = renderstate.translate_x + control.interactRect().?.x,
+                .translate_y = renderstate.translate_y + control.interactRect().?.y,
+            });
+        }
+    }
+}
+
+pub fn renderUI(r_batch: *SpriteBatch, ui_root: Root) void {
+    for (ui_root.children.items) |child| {
+        renderControl(r_batch, child, .{});
+    }
+}
