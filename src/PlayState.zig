@@ -21,6 +21,7 @@ const audio = @import("audio.zig");
 const sdl = @import("sdl.zig");
 const ui = @import("ui.zig");
 const Texture = @import("texture.zig").Texture;
+const FrameTimer = @import("timing.zig").FrameTimer;
 
 const DEFAULT_CAMERA = Camera{
     .view = Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT),
@@ -66,6 +67,11 @@ const InteractState = union(enum) {
     build: InteractStateBuild,
 };
 
+const Substate = enum {
+    none,
+    gameover_fadeout,
+};
+
 const FingerRenderer = @import("FingerRenderer.zig");
 
 game: *Game,
@@ -93,6 +99,8 @@ ui_buttons: [8]*ui.Button,
 ui_minimap: *ui.Minimap,
 t_minimap: *Texture,
 interact_state: InteractState = .none,
+sub: Substate = .none,
+fade_timer: FrameTimer = .{},
 
 deb_render_tile_collision: bool = false,
 
@@ -192,6 +200,7 @@ pub fn destroy(self: *PlayState) void {
 
 pub fn enter(self: *PlayState, from: ?Game.StateId) void {
     _ = from;
+    self.sub = .none;
     self.loadWorld("map01");
 }
 
@@ -219,6 +228,10 @@ pub fn update(self: *PlayState) void {
 
     if (self.world.recoverable_lives == 0) {
         self.beginTransitionGameOver();
+    }
+
+    if (self.sub == .gameover_fadeout and self.fade_timer.expired(self.game.frame_counter)) {
+        self.game.changeState(.menu);
     }
 }
 
@@ -258,12 +271,20 @@ pub fn render(self: *PlayState, alpha: f64) void {
     for (self.world.spawns.items) |*s| {
         s.emitter.render(&self.r_quad, @floatCast(f32, alpha));
     }
+
+    self.renderFade();
 }
 
 pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
+    // stop accepting input
+    if (self.sub == .gameover_fadeout) {
+        return;
+    }
+
     if (ev.type == .SDL_KEYDOWN) {
         switch (ev.key.keysym.sym) {
             sdl.SDLK_F1 => self.deb_render_tile_collision = !self.deb_render_tile_collision,
+            sdl.SDLK_F6 => self.beginTransitionGameOver(),
             sdl.SDLK_ESCAPE => if (self.interact_state == .build) {
                 self.interact_state = .none;
             },
@@ -898,6 +919,8 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
 }
 
 fn loadWorld(self: *PlayState, mapid: []const u8) void {
+    self.world.deinit();
+
     const filename = std.fmt.allocPrint(self.game.allocator, "assets/maps/{s}.tmj", .{mapid}) catch |err| {
         std.log.err("Failed to allocate world path: {!}", .{err});
         std.process.exit(1);
@@ -1032,5 +1055,17 @@ fn renderFoam(
 }
 
 fn beginTransitionGameOver(self: *PlayState) void {
-    _ = self;
+    self.sub = .gameover_fadeout;
+    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
+}
+
+fn renderFade(self: *PlayState) void {
+    if (self.sub != .gameover_fadeout) {
+        return;
+    }
+
+    const a = self.fade_timer.progressClamped(self.game.frame_counter);
+
+    self.game.imm.beginUntextured();
+    self.game.imm.drawQuadRGBA(Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT), zm.f32x4(0, 0, 0, a));
 }

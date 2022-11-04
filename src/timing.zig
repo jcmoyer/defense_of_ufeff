@@ -12,14 +12,30 @@ pub const FrameTimer = struct {
         };
     }
 
+    pub fn durationFrames(self: FrameTimer) u64 {
+        return self.frame_end - self.frame_start;
+    }
+
     pub fn expired(self: FrameTimer, current_frame: u64) bool {
         return current_frame >= self.frame_end;
     }
 
     pub fn restart(self: *FrameTimer, current_frame: u64) void {
-        const d = self.frame_end - self.frame_start;
+        const d = self.durationFrames();
         self.frame_start = current_frame;
         self.frame_end = current_frame + d;
+    }
+
+    pub fn progress(self: FrameTimer, current_frame: u64) f32 {
+        return @intToFloat(f32, current_frame - self.frame_start) / @intToFloat(f32, self.durationFrames());
+    }
+
+    pub fn progressClamped(self: FrameTimer, current_frame: u64) f32 {
+        return std.math.clamp(self.progress(current_frame), 0.0, 1.0);
+    }
+
+    pub fn invProgressClamped(self: FrameTimer, current_frame: u64) f32 {
+        return 1 - self.progressClamped(current_frame);
     }
 };
 
