@@ -119,6 +119,7 @@ pub const Monster = struct {
     const PathingState = enum {
         to_goal,
         to_spawn,
+        waiting_for_heart,
     };
 
     id: u32 = undefined,
@@ -141,6 +142,7 @@ pub const Monster = struct {
     hp: u32 = 0,
     dead: bool = false,
     pathing_state: PathingState = .to_goal,
+    carrying_life: bool = false,
 
     pub fn setTilePosition(self: *Monster, coord: TileCoord) void {
         self.setWorldPosition(@intCast(u32, coord.x * 16), @intCast(u32, coord.y * 16));
@@ -162,8 +164,49 @@ pub const Monster = struct {
         self.path = switch (self.pathing_state) {
             .to_goal => self.world.findPath(self.getTilePosition(), self.world.goal.getTilePosition()).?,
             .to_spawn => self.world.findPath(self.getTilePosition(), self.world.spawns.items[self.spawn_id].coord).?,
+            .waiting_for_heart => &[_]TileCoord{},
         };
         self.path_index = 0;
+    }
+
+    fn atEndOfPath(self: *Monster) bool {
+        const steps_remaining = self.path.len - (self.path_index + 1);
+        return steps_remaining == 0;
+    }
+
+    /// Calls beginMove() with the direction needed to continue along the current path
+    fn beginPathingMove(self: *Monster) void {
+        std.debug.assert(std.meta.eql(self.path[self.path_index], self.getTilePosition()));
+        self.beginMove(self.path[self.path_index].directionToAdjacent(self.path[self.path_index + 1]));
+        self.path_index += 1;
+    }
+
+    fn updatePathingState(self: *Monster) void {
+        switch (self.pathing_state) {
+            .to_goal => {
+                if (self.atEndOfPath()) {
+                    self.pathing_state = .waiting_for_heart;
+                } else {
+                    self.beginPathingMove();
+                }
+            },
+            .to_spawn => {
+                if (self.atEndOfPath()) {
+                    self.world.recoverable_lives -= 1;
+                    self.dead = true;
+                } else {
+                    self.beginPathingMove();
+                }
+            },
+            .waiting_for_heart => {
+                if (self.world.lives_at_goal > 0) {
+                    self.carrying_life = true;
+                    self.world.lives_at_goal -= 1;
+                    self.pathing_state = .to_spawn;
+                    self.computePath();
+                }
+            },
+        }
     }
 
     fn spawn(self: *Monster, frame: u64) void {
@@ -176,28 +219,7 @@ pub const Monster = struct {
         }
     }
 
-    pub fn update(self: *Monster, frame: u64) void {
-        self.flash_frames -|= 1;
-        self.p_world_x = self.world_x;
-        self.p_world_y = self.world_y;
-
-        if (self.mstate == .idle) {
-            const steps_remaining = self.path.len - (self.path_index + 1);
-            if (steps_remaining > 0) {
-                std.debug.assert(std.meta.eql(self.path[self.path_index], self.getTilePosition()));
-                self.beginMove(self.path[self.path_index].directionToAdjacent(self.path[self.path_index + 1]));
-                self.path_index += 1;
-            } else if (steps_remaining == 0) {
-                if (self.pathing_state == .to_goal) {
-                    self.pathing_state = .to_spawn;
-                    self.computePath();
-                } else {
-                    // TODO: deduct real lives
-                    self.dead = true;
-                }
-            }
-        }
-
+    fn doMovement(self: *Monster) void {
         switch (self.mstate) {
             .idle => {},
             .left => self.world_x -= self.mspeed,
@@ -219,6 +241,19 @@ pub const Monster = struct {
                 }
             },
         }
+    }
+
+    pub fn update(self: *Monster, frame: u64) void {
+        self.flash_frames -|= 1;
+        self.p_world_x = self.world_x;
+        self.p_world_y = self.world_y;
+
+        // only do pathing related stuff while not moving
+        if (self.mstate == .idle) {
+            self.updatePathingState();
+        }
+
+        self.doMovement();
 
         if (self.spec.updateFn) |updateFn| {
             updateFn(self, frame);
@@ -516,7 +551,6 @@ pub const Goal = struct {
     world_x: u32,
     world_y: u32,
     animator: anim.Animator = anim.a_goal.animationSet().createAnimator("default"),
-    lives: u32 = 30,
 
     fn init(world_x: u32, world_y: u32) Goal {
         var self = Goal{
@@ -555,6 +589,8 @@ pub const World = struct {
     goal: Goal,
     view: Rect = .{},
     play_area: ?Rect = null,
+    lives_at_goal: u32 = 30,
+    recoverable_lives: u32 = 30,
 
     pub fn init(allocator: Allocator) World {
         return .{

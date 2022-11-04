@@ -82,6 +82,7 @@ foam_anim_l: anim.Animator,
 foam_anim_r: anim.Animator,
 foam_anim_u: anim.Animator,
 foam_anim_d: anim.Animator,
+heart_anim: anim.Animator = anim.a_goal_heart.animationSet().createAnimator("default"),
 world: wo.World,
 fontspec: bmfont.BitmapFontSpec,
 fontspec_numbers: bmfont.BitmapFontSpec,
@@ -211,9 +212,14 @@ pub fn update(self: *PlayState) void {
     self.foam_anim_r.update();
     self.foam_anim_u.update();
     self.foam_anim_d.update();
+    self.heart_anim.update();
 
     self.world.view = self.camera.view;
     self.world.update(self.game.frame_counter, arena);
+
+    if (self.world.recoverable_lives == 0) {
+        self.beginTransitionGameOver();
+    }
 }
 
 pub fn render(self: *PlayState, alpha: f64) void {
@@ -230,6 +236,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
 
     self.renderTilemap(cam_interp);
     self.renderMonsters(cam_interp, alpha);
+    self.renderStolenHearts(cam_interp, alpha);
     self.renderGoal(cam_interp, alpha);
     self.renderTowers(cam_interp);
     self.renderSpriteEffects(cam_interp, alpha);
@@ -553,6 +560,25 @@ fn renderHealthBars(
         self.r_quad.drawQuadRGBA(dest_red, 255, 0, 0, 255);
     }
     self.r_quad.end();
+}
+
+fn renderStolenHearts(
+    self: *PlayState,
+    cam: Camera,
+    a: f64,
+) void {
+    self.r_batch.begin(.{
+        .texture = self.game.texman.getNamedTexture("special.png"),
+    });
+    for (self.world.monsters.slice()) |m| {
+        const w = m.getInterpWorldPosition(a);
+        if (m.carrying_life) {
+            var src = self.heart_anim.getCurrentRect();
+            var dest = Rect.init(w[0] - cam.view.left(), w[1] - cam.view.top(), 16, 16);
+            self.r_batch.drawQuad(src, dest);
+        }
+    }
+    self.r_batch.end();
 }
 
 fn renderTilemapLayer(
@@ -1003,4 +1029,8 @@ fn renderFoam(
         }
     }
     self.r_batch.end();
+}
+
+fn beginTransitionGameOver(self: *PlayState) void {
+    _ = self;
 }
