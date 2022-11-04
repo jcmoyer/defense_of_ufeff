@@ -139,13 +139,11 @@ pub fn create(game: *Game) !*PlayState {
 
         b.*.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
         b.*.rect = Rect.init(x, y, 28, 28);
-        b.*.callback = onButtonClick;
 
         var userdata_ptr = try self.game.allocator.create(ButtonData);
         userdata_ptr.state = self;
         userdata_ptr.spec = button_specs[i];
-
-        b.*.userdata = userdata_ptr;
+        b.*.setCallback(userdata_ptr, onButtonClick);
     }
     self.ui_minimap = try self.ui_root.createMinimap();
     self.ui_minimap.rect = Rect.init(16, 16, 64, 64);
@@ -159,9 +157,8 @@ pub fn create(game: *Game) !*PlayState {
     return self;
 }
 
-fn onButtonClick(button: *ui.Button, userdata: ?*anyopaque) void {
+fn onButtonClick(button: *ui.Button, data: *ButtonData) void {
     _ = button;
-    var data = @ptrCast(*ButtonData, @alignCast(@alignOf(ButtonData), userdata));
     data.state.game.audio.playSound("assets/sounds/click.ogg").release();
     data.state.interact_state = .{ .build = InteractStateBuild{
         .tower_spec = data.spec,

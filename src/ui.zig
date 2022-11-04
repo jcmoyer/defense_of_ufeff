@@ -96,6 +96,19 @@ pub const Button = struct {
         self.root.allocator.destroy(self);
     }
 
+    pub fn setCallback(self: *Button, userdata_ptr: anytype, comptime cb: *const fn (*Button, @TypeOf(userdata_ptr)) void) void {
+        const Ptr = @TypeOf(userdata_ptr);
+        const alignment = @typeInfo(Ptr).Pointer.alignment;
+        const Impl = struct {
+            fn callbackImpl(button: *Button, userdata: ?*anyopaque) void {
+                var userdata_ptr_ = @ptrCast(Ptr, @alignCast(alignment, userdata));
+                cb(button, userdata_ptr_);
+            }
+        };
+        self.userdata = userdata_ptr;
+        self.callback = Impl.callbackImpl;
+    }
+
     pub fn handleMouseEnter(self: *Button) void {
         if (self.state != .disabled) {
             self.root.interaction_hint = .clickable;
