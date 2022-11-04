@@ -299,3 +299,59 @@ pub const a_hurt_generic = StaticAnimationSet(&[1]StaticAnimationDef{.{
         },
     },
 }}){};
+
+pub const a_goal = StaticAnimationSet(&[1]StaticAnimationDef{.{
+    .name = "default",
+    .animation = Animation{
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(48, 160, 16, 16),
+                .time = 60,
+            },
+            .{
+                .rect = Rect.init(32, 160, 16, 16),
+                .time = 2,
+            },
+            .{
+                .rect = Rect.init(16, 160, 16, 16),
+                .time = 2,
+            },
+            .{
+                .rect = Rect.init(32, 160, 16, 16),
+                .time = 2,
+            },
+            .{
+                .rect = Rect.init(0, 160, 16, 16),
+                .time = 20,
+            },
+            .{
+                .rect = Rect.init(32, 160, 16, 16),
+                .time = 2,
+            },
+            .{
+                .rect = Rect.init(16, 160, 16, 16),
+                .time = 2,
+            },
+            .{
+                .rect = Rect.init(32, 160, 16, 16),
+                .time = 2,
+            },
+        },
+    },
+}}){};
+
+pub const a_goal_heart = StaticAnimationSet(&[1]StaticAnimationDef{.{
+    .name = "default",
+    .animation = Animation{
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(80, 160, 16, 16),
+                .time = 4,
+            },
+            .{
+                .rect = Rect.init(96, 160, 16, 16),
+                .time = 4,
+            },
+        },
+    },
+}}){};

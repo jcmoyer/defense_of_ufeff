@@ -230,6 +230,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
 
     self.renderTilemap(cam_interp);
     self.renderMonsters(cam_interp, alpha);
+    self.renderGoal(cam_interp, alpha);
     self.renderTowers(cam_interp);
     self.renderSpriteEffects(cam_interp, alpha);
     self.renderProjectiles(cam_interp, alpha);
@@ -510,6 +511,25 @@ fn renderMonsters(
             m.flash_frames > 0,
         );
     }
+    self.r_batch.end();
+}
+
+fn renderGoal(
+    self: *PlayState,
+    cam: Camera,
+    a: f64,
+) void {
+    _ = a;
+    self.r_batch.begin(.{
+        .texture = self.game.texman.getNamedTexture("special.png"),
+    });
+    const dest = Rect.init(
+        @intCast(i32, self.world.goal.world_x) - cam.view.left(),
+        @intCast(i32, self.world.goal.world_y) - cam.view.top(),
+        16,
+        16,
+    );
+    self.r_batch.drawQuad(self.world.goal.animator.getCurrentRect(), dest);
     self.r_batch.end();
 }
 

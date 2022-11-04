@@ -490,6 +490,30 @@ pub const FloatingText = struct {
     }
 };
 
+pub const Goal = struct {
+    world_x: u32,
+    world_y: u32,
+    animator: anim.Animator = anim.a_goal.animationSet().createAnimator("default"),
+    lives: u32 = 30,
+
+    fn init(world_x: u32, world_y: u32) Goal {
+        var self = Goal{
+            .world_x = world_x,
+            .world_y = world_y,
+        };
+        return self;
+    }
+
+    fn getTilePosition(self: Goal) TileCoord {
+        return TileCoord.initWorld(self.world_x, self.world_y);
+    }
+
+    fn update(self: *Goal, frame: u64) void {
+        _ = frame;
+        self.animator.update();
+    }
+};
+
 pub const World = struct {
     allocator: Allocator,
     map: Tilemap = .{},
@@ -506,7 +530,7 @@ pub const World = struct {
     floating_text: IntrusiveSlotMap(FloatingText) = .{},
     pathfinder: PathfindingState,
     path_cache: PathfindingCache,
-    goal: ?TileCoord = null,
+    goal: Goal,
     view: Rect = .{},
     play_area: ?Rect = null,
 
@@ -516,6 +540,7 @@ pub const World = struct {
             .pathfinder = PathfindingState.init(allocator),
             .path_cache = PathfindingCache.init(allocator),
             .scratch_cache = PathfindingCache.init(allocator),
+            .goal = undefined,
         };
     }
 
@@ -547,7 +572,7 @@ pub const World = struct {
     }
 
     fn setGoal(self: *World, coord: TileCoord) void {
-        self.goal = coord;
+        self.goal = Goal.init(coord.worldX(), coord.worldY());
     }
 
     fn createSpawn(self: *World, coord: TileCoord) !void {
@@ -598,7 +623,7 @@ pub const World = struct {
         // }
 
         for (self.spawns.items) |*sp| {
-            if (!self.findTheoreticalPath(sp.coord, self.goal.?)) {
+            if (!self.findTheoreticalPath(sp.coord, self.goal.getTilePosition())) {
                 return false;
             }
         }
@@ -700,7 +725,7 @@ pub const World = struct {
         for (self.monsters.slice()) |*m| {
             const coord = m.getTilePosition();
             m.path_index = 0;
-            m.path = self.findPath(coord, self.goal.?).?;
+            m.path = self.findPath(coord, self.goal.getTilePosition()).?;
         }
         std.log.debug("invalidatePathCache took {d}us", .{timer.read() / std.time.ns_per_us});
     }
@@ -731,7 +756,7 @@ pub const World = struct {
         var mon = Monster{
             .world = self,
             .spec = spec,
-            .path = self.findPath(pos, self.goal.?).?,
+            .path = self.findPath(pos, self.goal.getTilePosition()).?,
             .animator = anim.a_chara.animationSet().createAnimator("down"),
         };
         mon.setTilePosition(pos);
@@ -756,6 +781,8 @@ pub const World = struct {
         var mon_pending_removal = std.ArrayListUnmanaged(u32){};
         var effect_pending_removal = std.ArrayListUnmanaged(u32){};
         var text_pending_removal = std.ArrayListUnmanaged(u32){};
+
+        self.goal.update(frame);
 
         for (self.spawns.items) |*s, id| {
             if (s.timer.expired(frame)) {
