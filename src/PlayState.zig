@@ -657,16 +657,26 @@ fn renderGrid(
         return;
     }
 
-    _ = cam;
+    var offset_x = @mod(cam.view.x, 16);
+    var offset_y = @mod(cam.view.y, 16);
+    var viewf = cam.view.toRectf();
+
+    const m = zm.translation(@intToFloat(f32, -offset_x), @intToFloat(f32, -offset_y), 0);
+    const grid_color = zm.f32x4(0, 0, 0, 0.2);
+
     self.game.imm.beginUntextured();
     var y: f32 = 16;
     var x: f32 = 16;
-    while (y < Game.INTERNAL_HEIGHT) : (y += 16) {
-        self.game.imm.drawLine(zm.f32x4(0, y, 0, 0), zm.f32x4(Game.INTERNAL_WIDTH, y, 0, 0), zm.f32x4(0, 0, 0, 0.2));
+    while (y < viewf.h + 16) : (y += 16) {
+        const p0 = zm.mul(zm.f32x4(0, y, 0, 1), m);
+        const p1 = zm.mul(zm.f32x4(Game.INTERNAL_WIDTH, y, 0, 1), m);
+        self.game.imm.drawLine(p0, p1, grid_color);
     }
 
-    while (x < Game.INTERNAL_WIDTH) : (x += 16) {
-        self.game.imm.drawLine(zm.f32x4(x, 0, 0, 0), zm.f32x4(x, Game.INTERNAL_HEIGHT, 0, 0), zm.f32x4(0, 0, 0, 0.2));
+    while (x < viewf.w + 16) : (x += 16) {
+        const p0 = zm.mul(zm.f32x4(x, 0, 0, 1), m);
+        const p1 = zm.mul(zm.f32x4(x, Game.INTERNAL_HEIGHT, 0, 1), m);
+        self.game.imm.drawLine(p0, p1, grid_color);
     }
 }
 
