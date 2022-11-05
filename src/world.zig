@@ -119,7 +119,6 @@ pub const Monster = struct {
     const PathingState = enum {
         to_goal,
         to_spawn,
-        waiting_for_heart,
     };
 
     id: u32 = undefined,
@@ -164,7 +163,6 @@ pub const Monster = struct {
         self.path = switch (self.pathing_state) {
             .to_goal => self.world.findPath(self.getTilePosition(), self.world.goal.getTilePosition()).?,
             .to_spawn => self.world.findPath(self.getTilePosition(), self.world.spawns.items[self.spawn_id].coord).?,
-            .waiting_for_heart => &[_]TileCoord{},
         };
         self.path_index = 0;
     }
@@ -181,11 +179,24 @@ pub const Monster = struct {
         self.path_index += 1;
     }
 
+    fn warpToSpawn(self: *Monster) void {
+        self.setTilePosition(self.world.getSpawnPosition(self.spawn_id));
+        self.computePath();
+        self.path_index = 0;
+    }
+
     fn updatePathingState(self: *Monster) void {
         switch (self.pathing_state) {
             .to_goal => {
                 if (self.atEndOfPath()) {
-                    self.pathing_state = .waiting_for_heart;
+                    if (self.world.lives_at_goal > 0) {
+                        self.carrying_life = true;
+                        self.world.lives_at_goal -= 1;
+                        self.pathing_state = .to_spawn;
+                        self.computePath();
+                    } else {
+                        self.warpToSpawn();
+                    }
                 } else {
                     self.beginPathingMove();
                 }
@@ -196,14 +207,6 @@ pub const Monster = struct {
                     self.dead = true;
                 } else {
                     self.beginPathingMove();
-                }
-            },
-            .waiting_for_heart => {
-                if (self.world.lives_at_goal > 0) {
-                    self.carrying_life = true;
-                    self.world.lives_at_goal -= 1;
-                    self.pathing_state = .to_spawn;
-                    self.computePath();
                 }
             },
         }
