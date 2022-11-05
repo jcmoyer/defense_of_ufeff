@@ -300,9 +300,13 @@ pub const Monster = struct {
     }
 
     pub fn hurt(self: *Monster, amt: u32) void {
+        std.debug.assert(self.dead == false);
         self.hp -|= amt;
         if (self.hp == 0) {
             self.dead = true;
+            if (self.carrying_life) {
+                self.world.lives_at_goal += 1;
+            }
         }
     }
 };

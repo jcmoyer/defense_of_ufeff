@@ -226,7 +226,7 @@ pub fn update(self: *PlayState) void {
     self.world.view = self.camera.view;
     self.world.update(self.game.frame_counter, arena);
 
-    if (self.world.recoverable_lives == 0) {
+    if (self.sub == .none and self.world.recoverable_lives == 0) {
         self.beginTransitionGameOver();
     }
 
