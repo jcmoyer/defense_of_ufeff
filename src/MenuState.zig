@@ -56,6 +56,7 @@ pub fn create(game: *Game) !*MenuState {
     self.btn_newgame.rect = Rect.init(0, 0, 128, 32);
     self.btn_newgame.rect.centerOn(Game.INTERNAL_WIDTH / 2, 100);
     self.btn_newgame.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
+    self.btn_newgame.setCallback(self, onNewGameClick);
     try self.ui_root.addChild(self.btn_newgame.control());
 
     self.ui_tip = try self.ui_root.createButton();
@@ -86,6 +87,12 @@ pub fn create(game: *Game) !*MenuState {
 
 fn showRandomTip(self: *MenuState) void {
     self.tip_index = self.rng.random().intRangeLessThan(usize, 0, tips.len);
+}
+
+fn onNewGameClick(button: *ui.Button, self: *MenuState) void {
+    _ = button;
+    self.game.audio.playSound("assets/sounds/click.ogg").release();
+    self.game.changeState(.play);
 }
 
 fn onButtonClick(button: *ui.Button, userdata: ?*anyopaque) void {
@@ -154,7 +161,6 @@ pub fn handleEvent(self: *MenuState, ev: sdl.SDL_Event) void {
     if (ev.type == .SDL_KEYDOWN) {
         switch (ev.key.keysym.sym) {
             sdl.SDLK_ESCAPE => std.process.exit(0),
-            sdl.SDLK_RETURN => self.game.changeState(.play),
             else => {},
         }
     }
