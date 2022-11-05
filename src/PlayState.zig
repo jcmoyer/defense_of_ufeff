@@ -178,7 +178,6 @@ fn onButtonClick(button: *ui.Button, data: *ButtonData) void {
 }
 
 fn onMinimapPan(_: *ui.Minimap, self: *PlayState, x: f32, y: f32) void {
-    self.game.audio.playSound("assets/sounds/click.ogg").release();
     self.camera.view.centerOn(
         @floatToInt(i32, x * @intToFloat(f32, self.camera.bounds.w)),
         @floatToInt(i32, y * @intToFloat(f32, self.camera.bounds.h)),
@@ -332,7 +331,12 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
             self.game.input.mouse.client_x,
             self.game.input.mouse.client_y,
         );
-        self.ui_root.handleMouseMove(mouse_p[0], mouse_p[1]);
+        const ui_args = ui.MouseEventArgs{
+            .x = mouse_p[0],
+            .y = mouse_p[1],
+            .buttons = ui.SDLBackend.mouseEventToButtons(ev),
+        };
+        self.ui_root.handleMouseMove(ui_args);
     }
 
     if (ev.type == .SDL_MOUSEBUTTONDOWN) {
@@ -341,7 +345,12 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
                 self.game.input.mouse.client_x,
                 self.game.input.mouse.client_y,
             );
-            if (!self.ui_root.handleMouseDown(mouse_p[0], mouse_p[1])) {
+            const ui_args = ui.MouseEventArgs{
+                .x = mouse_p[0],
+                .y = mouse_p[1],
+                .buttons = ui.SDLBackend.mouseEventToButtons(ev),
+            };
+            if (!self.ui_root.handleMouseDown(ui_args)) {
                 if (self.interact_state == .build) {
                     const tile_coord = self.mouseToTile();
                     if (self.world.canBuildAt(tile_coord)) {
@@ -364,7 +373,12 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
             self.game.input.mouse.client_x,
             self.game.input.mouse.client_y,
         );
-        _ = self.ui_root.handleMouseUp(mouse_p[0], mouse_p[1]);
+        const ui_args = ui.MouseEventArgs{
+            .x = mouse_p[0],
+            .y = mouse_p[1],
+            .buttons = ui.SDLBackend.mouseEventToButtons(ev),
+        };
+        _ = self.ui_root.handleMouseUp(ui_args);
     }
 }
 

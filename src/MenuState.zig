@@ -171,7 +171,12 @@ pub fn handleEvent(self: *MenuState, ev: sdl.SDL_Event) void {
             self.game.input.mouse.client_x,
             self.game.input.mouse.client_y,
         );
-        self.ui_root.handleMouseMove(mouse_p[0], mouse_p[1]);
+        const ui_args = ui.MouseEventArgs{
+            .x = mouse_p[0],
+            .y = mouse_p[1],
+            .buttons = ui.SDLBackend.mouseEventToButtons(ev),
+        };
+        self.ui_root.handleMouseMove(ui_args);
     }
 
     if (ev.type == .SDL_MOUSEBUTTONDOWN) {
@@ -179,7 +184,12 @@ pub fn handleEvent(self: *MenuState, ev: sdl.SDL_Event) void {
             self.game.input.mouse.client_x,
             self.game.input.mouse.client_y,
         );
-        _ = self.ui_root.handleMouseDown(mouse_p[0], mouse_p[1]);
+        const ui_args = ui.MouseEventArgs{
+            .x = mouse_p[0],
+            .y = mouse_p[1],
+            .buttons = ui.SDLBackend.mouseEventToButtons(ev),
+        };
+        _ = self.ui_root.handleMouseDown(ui_args);
     }
 
     if (ev.type == .SDL_MOUSEBUTTONUP) {
@@ -187,6 +197,11 @@ pub fn handleEvent(self: *MenuState, ev: sdl.SDL_Event) void {
             self.game.input.mouse.client_x,
             self.game.input.mouse.client_y,
         );
-        _ = self.ui_root.handleMouseUp(mouse_p[0], mouse_p[1]);
+        const ui_args = ui.MouseEventArgs{
+            .x = mouse_p[0],
+            .y = mouse_p[1],
+            .buttons = ui.SDLBackend.mouseEventToButtons(ev),
+        };
+        _ = self.ui_root.handleMouseUp(ui_args);
     }
 }

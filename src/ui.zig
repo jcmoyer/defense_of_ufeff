@@ -10,6 +10,20 @@ pub const ControlTexture = struct {
     texture_rect: ?Rect = null,
 };
 
+pub const MouseButtons = struct {
+    left: bool = false,
+    middle: bool = false,
+    right: bool = false,
+    x1: bool = false,
+    x2: bool = false,
+};
+
+pub const MouseEventArgs = struct {
+    x: i32,
+    y: i32,
+    buttons: MouseButtons,
+};
+
 pub const Panel = struct {
     root: *Root,
     children: std.ArrayListUnmanaged(Control),
@@ -21,14 +35,17 @@ pub const Panel = struct {
         self.root.allocator.destroy(self);
     }
 
-    pub fn handleMouseClick(self: *const Panel, x: i32, y: i32) void {
-        const local_x = x - self.rect.left();
-        const local_y = y - self.rect.top();
+    pub fn handleMouseClick(self: *const Panel, args: MouseEventArgs) void {
+        const local_args = MouseEventArgs{
+            .x = args.x - self.rect.left(),
+            .y = args.y - self.rect.top(),
+            .buttons = args.buttons,
+        };
 
         for (self.children.items) |child| {
             if (child.interactRect()) |rect| {
-                if (rect.contains(local_x, local_y)) {
-                    child.handleMouseClick(local_x, local_y);
+                if (rect.contains(local_args.x, local_args.y)) {
+                    child.handleMouseClick(local_args);
                     return;
                 }
             }
@@ -123,21 +140,18 @@ pub const Button = struct {
         self.state = .normal;
     }
 
-    pub fn handleMouseDown(self: *Button, x: i32, y: i32) void {
-        _ = x;
-        _ = y;
+    pub fn handleMouseDown(self: *Button, args: MouseEventArgs) void {
+        _ = args;
         self.state = .down;
     }
 
-    pub fn handleMouseUp(self: *Button, x: i32, y: i32) void {
-        _ = x;
-        _ = y;
+    pub fn handleMouseUp(self: *Button, args: MouseEventArgs) void {
+        _ = args;
         self.state = .hover;
     }
 
-    pub fn handleMouseClick(self: *Button, x: i32, y: i32) void {
-        _ = x;
-        _ = y;
+    pub fn handleMouseClick(self: *Button, args: MouseEventArgs) void {
+        _ = args;
         if (self.callback) |cb| {
             cb(self, self.userdata);
         }
@@ -190,12 +204,21 @@ pub const Minimap = struct {
         self.root.allocator.destroy(self);
     }
 
-    pub fn handleMouseClick(self: *Minimap, x: i32, y: i32) void {
+    pub fn handleMouseDown(self: *Minimap, args: MouseEventArgs) void {
+        self.handleMouseEvent(args);
+    }
+
+    pub fn handleMouseMove(self: *Minimap, args: MouseEventArgs) void {
+        self.handleMouseEvent(args);
+    }
+
+    fn handleMouseEvent(self: *Minimap, args: MouseEventArgs) void {
         const cr = self.computeClickableRect();
-        if (cr.contains(x, y)) {
+        if (args.buttons.left and cr.contains(args.x, args.y)) {
             const crf = cr.toRectf();
-            const xf = @intToFloat(f32, x);
-            const yf = @intToFloat(f32, y);
+            const xf = @intToFloat(f32, args.x);
+            const yf = @intToFloat(f32, args.y);
+            std.debug.print("{d}\n", .{xf - crf.left()});
             const percent_x = (xf - crf.left()) / crf.w;
             const percent_y = (yf - crf.top()) / crf.h;
             if (self.pan_callback) |cb| {
@@ -224,7 +247,8 @@ pub const Minimap = struct {
     pub fn control(self: *Minimap) Control {
         return Control.init(self, .{
             .deinitFn = deinit,
-            .handleMouseClickFn = handleMouseClick,
+            .handleMouseMoveFn = handleMouseMove,
+            .handleMouseDownFn = handleMouseDown,
             .interactRectFn = interactRect,
             .getTextureFn = getTexture,
             .customRenderFn = customRender,
@@ -301,14 +325,15 @@ fn ControlImpl(comptime PointerT: type) type {
     return struct {
         deinitFn: *const fn (PointerT) void,
 
-        handleMouseClickFn: ?*const fn (PointerT, i32, i32) void = null,
+        handleMouseClickFn: ?*const fn (PointerT, MouseEventArgs) void = null,
         interactRectFn: ?*const fn (self: PointerT) ?Rect = null,
         getTextureFn: ?*const fn (self: PointerT) ?ControlTexture = null,
         getChildrenFn: ?*const fn (self: PointerT) []Control = null,
         handleMouseEnterFn: ?*const fn (self: PointerT) void = null,
         handleMouseLeaveFn: ?*const fn (self: PointerT) void = null,
-        handleMouseDownFn: ?*const fn (PointerT, i32, i32) void = null,
-        handleMouseUpFn: ?*const fn (PointerT, i32, i32) void = null,
+        handleMouseDownFn: ?*const fn (PointerT, MouseEventArgs) void = null,
+        handleMouseUpFn: ?*const fn (PointerT, MouseEventArgs) void = null,
+        handleMouseMoveFn: ?*const fn (PointerT, MouseEventArgs) void = null,
         getTextFn: ?*const fn (PointerT) ?[]const u8 = null,
         customRenderFn: ?*const fn (PointerT, CustomRenderContext) void = null,
     };
@@ -320,15 +345,16 @@ pub const Control = struct {
 
     pub const VTable = struct {
         deinitFn: *const fn (*anyopaque) void,
-        handleMouseClickFn: *const fn (*anyopaque, x: i32, y: i32) void,
+        handleMouseClickFn: *const fn (*anyopaque, MouseEventArgs) void,
         interactRectFn: *const fn (self: *anyopaque) ?Rect,
         getTextureFn: *const fn (self: *anyopaque) ?ControlTexture,
         getTextFn: *const fn (self: *anyopaque) ?[]const u8,
         getChildrenFn: *const fn (self: *anyopaque) []Control,
         handleMouseEnterFn: *const fn (*anyopaque) void,
         handleMouseLeaveFn: *const fn (*anyopaque) void,
-        handleMouseDownFn: *const fn (*anyopaque, i32, i32) void,
-        handleMouseUpFn: *const fn (*anyopaque, i32, i32) void,
+        handleMouseDownFn: *const fn (*anyopaque, MouseEventArgs) void,
+        handleMouseUpFn: *const fn (*anyopaque, MouseEventArgs) void,
+        handleMouseMoveFn: *const fn (*anyopaque, MouseEventArgs) void,
         customRenderFn: ?*const fn (*anyopaque, CustomRenderContext) void = null,
     };
 
@@ -345,10 +371,10 @@ pub const Control = struct {
                 fns.deinitFn(inst);
             }
 
-            fn handleMouseClickImpl(ptr: *anyopaque, x: i32, y: i32) void {
+            fn handleMouseClickImpl(ptr: *anyopaque, args: MouseEventArgs) void {
                 var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
                 if (fns.handleMouseClickFn) |f| {
-                    f(inst, x, y);
+                    f(inst, args);
                 }
             }
 
@@ -400,17 +426,24 @@ pub const Control = struct {
                 return f(inst);
             }
 
-            fn handleMouseDownImpl(ptr: *anyopaque, x: i32, y: i32) void {
+            fn handleMouseDownImpl(ptr: *anyopaque, args: MouseEventArgs) void {
                 var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
                 if (fns.handleMouseDownFn) |f| {
-                    f(inst, x, y);
+                    f(inst, args);
                 }
             }
 
-            fn handleMouseUpImpl(ptr: *anyopaque, x: i32, y: i32) void {
+            fn handleMouseUpImpl(ptr: *anyopaque, args: MouseEventArgs) void {
                 var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
                 if (fns.handleMouseUpFn) |f| {
-                    f(inst, x, y);
+                    f(inst, args);
+                }
+            }
+
+            fn handleMouseMoveImpl(ptr: *anyopaque, args: MouseEventArgs) void {
+                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                if (fns.handleMouseMoveFn) |f| {
+                    f(inst, args);
                 }
             }
 
@@ -432,6 +465,7 @@ pub const Control = struct {
                 .handleMouseLeaveFn = handleMouseLeaveImpl,
                 .handleMouseDownFn = handleMouseDownImpl,
                 .handleMouseUpFn = handleMouseUpImpl,
+                .handleMouseMoveFn = handleMouseMoveImpl,
                 .customRenderFn = if (fns.customRenderFn != null) customRenderImpl else null,
             };
         };
@@ -446,8 +480,12 @@ pub const Control = struct {
         self.vtable.deinitFn(self.instance);
     }
 
-    pub fn handleMouseClick(self: Control, x: i32, y: i32) void {
-        self.vtable.handleMouseClickFn(self.instance, x, y);
+    pub fn handleMouseClick(self: Control, args: MouseEventArgs) void {
+        self.vtable.handleMouseClickFn(self.instance, args);
+    }
+
+    pub fn handleMouseMove(self: Control, args: MouseEventArgs) void {
+        self.vtable.handleMouseMoveFn(self.instance, args);
     }
 
     pub fn interactRect(self: Control) ?Rect {
@@ -470,12 +508,12 @@ pub const Control = struct {
         self.vtable.handleMouseLeaveFn(self.instance);
     }
 
-    pub fn handleMouseDown(self: Control, x: i32, y: i32) void {
-        self.vtable.handleMouseDownFn(self.instance, x, y);
+    pub fn handleMouseDown(self: Control, args: MouseEventArgs) void {
+        self.vtable.handleMouseDownFn(self.instance, args);
     }
 
-    pub fn handleMouseUp(self: Control, x: i32, y: i32) void {
-        self.vtable.handleMouseUpFn(self.instance, x, y);
+    pub fn handleMouseUp(self: Control, args: MouseEventArgs) void {
+        self.vtable.handleMouseUpFn(self.instance, args);
     }
 
     pub fn getText(self: Control) ?[]const u8 {
@@ -571,16 +609,21 @@ pub const Root = struct {
         return null;
     }
 
-    pub fn handleMouseMove(self: *Root, x: i32, y: i32) void {
-        if (self.findElementAt(x, y)) |result| {
+    pub fn handleMouseMove(self: *Root, args: MouseEventArgs) void {
+        if (self.findElementAt(args.x, args.y)) |result| {
             if (self.hover) |h| {
-                if (result.control.instance == h.instance) {
-                    return;
+                if (result.control.instance != h.instance) {
+                    h.handleMouseLeave();
                 }
-                h.handleMouseLeave();
             }
             self.hover = result.control;
             result.control.handleMouseEnter();
+            const local_args = MouseEventArgs{
+                .x = result.local_x,
+                .y = result.local_y,
+                .buttons = args.buttons,
+            };
+            result.control.handleMouseMove(local_args);
         } else {
             if (self.hover) |h| {
                 h.handleMouseLeave();
@@ -591,13 +634,18 @@ pub const Root = struct {
     }
 
     /// Returns true if a UI element handled the event.
-    pub fn handleMouseUp(self: *Root, x: i32, y: i32) bool {
+    pub fn handleMouseUp(self: *Root, args: MouseEventArgs) bool {
         var handled: bool = false;
-        if (self.findElementAt(x, y)) |result| {
+        if (self.findElementAt(args.x, args.y)) |result| {
             if (self.mouse_down_control) |down_control| {
                 if (result.control.instance == down_control.instance) {
-                    result.control.handleMouseUp(result.local_x, result.local_y);
-                    result.control.handleMouseClick(result.local_x, result.local_y);
+                    const local_args = MouseEventArgs{
+                        .x = result.local_x,
+                        .y = result.local_y,
+                        .buttons = args.buttons,
+                    };
+                    result.control.handleMouseUp(local_args);
+                    result.control.handleMouseClick(local_args);
                     handled = true;
                 }
             }
@@ -607,10 +655,16 @@ pub const Root = struct {
     }
 
     /// Returns true if a UI element handled the event.
-    pub fn handleMouseDown(self: *Root, x: i32, y: i32) bool {
-        if (self.findElementAt(x, y)) |result| {
+    pub fn handleMouseDown(self: *Root, args: MouseEventArgs) bool {
+        if (self.findElementAt(args.x, args.y)) |result| {
             self.mouse_down_control = result.control;
-            result.control.handleMouseDown(result.local_x, result.local_y);
+            const local_args = MouseEventArgs{
+                .x = result.local_x,
+                .y = result.local_y,
+                .buttons = args.buttons,
+            };
+
+            result.control.handleMouseDown(local_args);
             return true;
         }
         return false;
@@ -657,7 +711,7 @@ pub const Root = struct {
 
 // Try to contain all the SDL-specific calls here
 const sdl = @import("sdl.zig");
-const SDLBackend = struct {
+pub const SDLBackend = struct {
     c_arrow: ?*sdl.SDL_Cursor = null,
     c_hand: ?*sdl.SDL_Cursor = null,
 
@@ -681,6 +735,36 @@ const SDLBackend = struct {
         switch (hint) {
             .none => sdl.SDL_SetCursor(self.c_arrow),
             .clickable => sdl.SDL_SetCursor(self.c_hand),
+        }
+    }
+
+    pub fn mouseEventToButtons(ev: sdl.SDL_Event) MouseButtons {
+        switch (ev.type) {
+            .SDL_MOUSEMOTION => {
+                return MouseButtons{
+                    .left = ev.motion.state & sdl.SDL_BUTTON_LMASK > 0,
+                    .middle = ev.motion.state & sdl.SDL_BUTTON_MMASK > 0,
+                    .right = ev.motion.state & sdl.SDL_BUTTON_RMASK > 0,
+                    .x1 = ev.motion.state & sdl.SDL_BUTTON_X1MASK > 0,
+                    .x2 = ev.motion.state & sdl.SDL_BUTTON_X2MASK > 0,
+                };
+            },
+            .SDL_MOUSEBUTTONDOWN,
+            .SDL_MOUSEBUTTONUP,
+            => {
+                switch (ev.button.button) {
+                    sdl.SDL_BUTTON_LEFT => return MouseButtons{ .left = true },
+                    sdl.SDL_BUTTON_MIDDLE => return MouseButtons{ .middle = true },
+                    sdl.SDL_BUTTON_RIGHT => return MouseButtons{ .right = true },
+                    sdl.SDL_BUTTON_X1 => return MouseButtons{ .x1 = true },
+                    sdl.SDL_BUTTON_X2 => return MouseButtons{ .x2 = true },
+                    else => unreachable,
+                }
+            },
+            else => {
+                std.log.err("mouseEventToButtons got unrecognized event: {}", .{ev.type});
+                @panic("mouseEventToButtons got unrecognized event");
+            },
         }
     }
 };
