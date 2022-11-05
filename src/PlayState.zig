@@ -1008,7 +1008,6 @@ fn renderMinimapLayer(
     var y: usize = range.min.y;
     var x: usize = 0;
     while (y <= range.max.y) : (y += 1) {
-        std.debug.print("{d}\n", .{y});
         x = range.min.x;
         while (x <= range.max.x) : (x += 1) {
             const t = map.at2DPtr(layer, x, y);

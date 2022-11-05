@@ -218,7 +218,6 @@ pub const Minimap = struct {
             const crf = cr.toRectf();
             const xf = @intToFloat(f32, args.x);
             const yf = @intToFloat(f32, args.y);
-            std.debug.print("{d}\n", .{xf - crf.left()});
             const percent_x = (xf - crf.left()) / crf.w;
             const percent_y = (yf - crf.top()) / crf.h;
             if (self.pan_callback) |cb| {
