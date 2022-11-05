@@ -24,9 +24,11 @@ const Texture = @import("texture.zig").Texture;
 const FrameTimer = @import("timing.zig").FrameTimer;
 
 const DEFAULT_CAMERA = Camera{
-    .view = Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT),
+    .view = Rect.init(0, 0, Game.INTERNAL_WIDTH - gui_panel_width, Game.INTERNAL_HEIGHT),
 };
 const max_onscreen_tiles = 33 * 17;
+const camera_move_speed = 8;
+const gui_panel_width = 16 * 6;
 
 const WaterDraw = struct {
     dest: Rect,
@@ -215,6 +217,21 @@ pub fn update(self: *PlayState) void {
     var arena = self.frame_arena.allocator();
 
     self.prev_camera = self.camera;
+
+    if (self.game.input.isKeyDown(sdl.SDL_SCANCODE_A)) {
+        self.camera.view.x -= camera_move_speed;
+    }
+    if (self.game.input.isKeyDown(sdl.SDL_SCANCODE_D)) {
+        self.camera.view.x += camera_move_speed;
+    }
+
+    if (self.game.input.isKeyDown(sdl.SDL_SCANCODE_W)) {
+        self.camera.view.y -= camera_move_speed;
+    }
+    if (self.game.input.isKeyDown(sdl.SDL_SCANCODE_S)) {
+        self.camera.view.y += camera_move_speed;
+    }
+
     self.camera.clampToBounds();
 
     self.foam_anim_l.update();
@@ -704,7 +721,8 @@ fn renderTilemap(self: *PlayState, cam: Camera) void {
     const min_tile_y = @intCast(usize, cam.view.top()) / 16;
     const max_tile_x = std.math.min(
         self.world.getWidth(),
-        1 + @intCast(usize, cam.view.right()) / 16,
+        // +1 to account for partially transparent UI panel
+        1 + 1 + @intCast(usize, cam.view.right()) / 16,
     );
     const max_tile_y = std.math.min(
         self.world.getHeight(),
