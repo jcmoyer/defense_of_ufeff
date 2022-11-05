@@ -75,7 +75,7 @@ pub const Button = struct {
     };
 
     root: *Root,
-    text: []const u8,
+    text: ?[]const u8,
     rect: Rect,
     texture: ?*const Texture = null,
     userdata: ?*anyopaque = null,
@@ -536,7 +536,7 @@ pub const Root = struct {
         var ptr = try self.allocator.create(Button);
         ptr.* = Button{
             .root = self,
-            .text = "button",
+            .text = null,
             .rect = Rect.init(0, 0, 0, 0),
         };
         try self.controls.append(self.allocator, ptr.control());
@@ -645,8 +645,9 @@ fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRe
                     .spec = opts.font_spec,
                 });
                 opts.r_font.drawText(text, .{
-                    .x = render_dest.x,
-                    .y = render_dest.y,
+                    .dest = rect,
+                    .h_alignment = .center,
+                    .v_alignment = .middle,
                 });
                 opts.r_font.end();
             }

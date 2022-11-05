@@ -123,39 +123,66 @@ pub const BitmapFont = struct {
         self.r_batch.end();
     }
 
-    pub const TextAlignment = enum {
+    pub const HTextAlignment = enum {
         left,
         /// For multiline strings, all lines will be centered based on the longest line.
         center,
+        right,
+    };
+
+    pub const VTextAlignment = enum {
+        top,
+        middle,
+        bottom,
     };
 
     pub const DrawTextOptions = struct {
-        x: i32,
-        y: i32,
+        dest: Rect,
         color: @Vector(4, u8) = @splat(4, @as(u8, 255)),
-        alignment: TextAlignment = .left,
+        h_alignment: HTextAlignment = .left,
+        v_alignment: VTextAlignment = .middle,
     };
+
+    fn getXStart(alignment: HTextAlignment, dest: Rect, text_measure: Rect, line_measure: Rect) i32 {
+        // TODO: work this out on paper and make sure it's correct
+        _ = text_measure;
+        switch (alignment) {
+            .left => return dest.left(),
+            .center => return dest.left() + @divFloor(dest.w, 2) - @divFloor(line_measure.w, 2),
+            .right => return dest.right() - line_measure.w,
+        }
+    }
+
+    fn getYStart(alignment: VTextAlignment, dest: Rect, measure: Rect) i32 {
+        switch (alignment) {
+            .top => return dest.top(),
+            .middle => return dest.top() + @divFloor(dest.h, 2) - @divFloor(measure.h, 2),
+            .bottom => return dest.bottom() - measure.h,
+        }
+    }
 
     pub fn drawText(self: BitmapFont, text: []const u8, opts: DrawTextOptions) void {
         var dims = self.measureText(text);
-        var dx = opts.x;
-        var dy = opts.y;
-        if (std.mem.indexOfScalar(u8, text[0..], '\n')) |linebreak| {
+        var dx: i32 = 0;
+        var dy = getYStart(opts.v_alignment, opts.dest, dims);
+        if (std.mem.indexOfScalar(u8, text, '\n')) |linebreak| {
             const line_dims = self.measureText(text[0..linebreak]);
-            if (opts.alignment == .center) {
-                dx = opts.x + @divFloor(dims.w, 2) - @divFloor(line_dims.w, 2);
-            }
+            dx = getXStart(opts.h_alignment, opts.dest, dims, line_dims);
+        } else {
+            const line_dims = self.measureText(text);
+            dx = getXStart(opts.h_alignment, opts.dest, dims, line_dims);
         }
         var last_ch: u8 = 0;
         for (text) |ch, i| {
             if (ch == '\n') {
                 dy += self.mapGlyph(' ').h;
-                dx = opts.x;
+                dx = opts.dest.x;
                 if (std.mem.indexOfScalar(u8, text[i + 1 ..], '\n')) |linebreak| {
                     const line_dims = self.measureText(text[i + 1 .. linebreak]);
-                    if (opts.alignment == .center) {
-                        dx = opts.x + @divFloor(dims.w, 2) - @divFloor(line_dims.w, 2);
-                    }
+                    dx = getXStart(opts.h_alignment, opts.dest, dims, line_dims);
+                } else {
+                    const line_dims = self.measureText(text[i + 1 ..]);
+                    dx = getXStart(opts.h_alignment, opts.dest, dims, line_dims);
                 }
                 continue;
             }

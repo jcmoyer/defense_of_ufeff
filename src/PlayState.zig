@@ -409,16 +409,18 @@ fn renderFloatingText(
         .spec = &self.fontspec_numbers,
     });
     for (self.world.floating_text.slice()) |*t| {
-        const dims = self.r_font.measureText(t.textSlice());
-        const text_center = dims.centerPoint();
-        const dest = t.getInterpWorldPosition(alpha);
+        // const dims = self.r_font.measureText(t.textSlice());
+        // const text_center = dims.centerPoint();
+        const dest_pos = t.getInterpWorldPosition(alpha);
+        var dest = Rect.init(dest_pos[0], dest_pos[1], 0, 0);
+        dest.inflate(16, 16);
+        dest.translate(-cam.view.left(), -cam.view.top());
         // a nice curve that fades rapidly around 70%
         const a_coef = 1 - std.math.pow(f32, t.invLifePercent(), 5);
         self.r_font.drawText(
             t.textSlice(),
             .{
-                .x = dest[0] - cam.view.left() - text_center[0],
-                .y = dest[1] - cam.view.top() - text_center[1],
+                .dest = dest,
                 .color = @Vector(4, u8){
                     255,
                     255,
