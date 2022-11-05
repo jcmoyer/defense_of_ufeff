@@ -7,15 +7,15 @@
  <tileset firstgid="1025" source="special.tsx"/>
  <layer id="1" name="base" width="36" height="20" locked="1">
   <data encoding="base64" compression="zlib">
-   eJyTZmBgkMaCJQcIY3PLYHSPPuPgcQ/ILYPJPYMtfAabe4iJL1qleZjdIExK2qGHe0hxy0CWCbjidjC4gVK3dAJxNxZMit3UdM9KMv1PC7cQ4x5i4oua8e9JZfMoxS+B+BUePNDuIwbzATE/EBcMErcUAnHAIHDLKMbEABqbU78=
+   eJyTZmBgkEbDkgOI0d0y0G7C5R59xsHjHpBbBpN7Blv4DDb3EBNftErzyG4gJe3Qwz2kuIXW7iEnbgfCPdQuLzuBuBsHRncPLrup6Z6VJMYBLd1CjHuIiU9qpg9PKptHKX4JxK/w4IF2HzGYD4j5gbhgkLhlExAbDAK3gLAeEBeOugeOAT4iVRA=
   </data>
  </layer>
  <layer id="2" name="detail" width="36" height="20">
   <data encoding="base64" compression="zlib">
-   eJzNltEKgkAQRUX2NcsP8Bc06j8sil7suR6CPkD6+XZhB6fh7u6ISl64KLo2xzuzUpZhvfP/OKS18dxN+F5KnRmOzrWt8zRxh3hegONhfo8xyTWOp7V1mgRTKp85JTNybCfvWz6eZ0w+nIGrZQznfFhD12M8U2ZHq57V6BbulyZHmd8cPIV9fmu9U/4O7bce8Gr3fUy13zd75fOuDjGR5+IpPEvD5lMjyUOeyoOy0e4/xDNFmmzondF1xESS+XzMYL4GsaTmphrBhHg4i2SitbUyG35e+ZobxVykGKToe6rtE72/y7X03wdkykXDkWKUqkQ/qMcl8MH6CHhiLNrsuKhnfN4Qz8X6GshH1kO9XPr/2Np4vsGyfk0=
+   eJy9lF9qwkAQxndDLtAD5AwFvYl9a5/tg+ABJGfwJZD0HC0NeI0qiudQIj66S3bIdDqbncStH3xsyJ/ZX76ZRClee63Ue/o4H3Rrnxpz7RLJW8G7hXjeUv+1kF7TbrWWZO3jWTAc8/T32id6j+VpejICjlA+MUUz2pFeDuUZkg9mwMLzeNXdPQ3h4nTP7Ei1QntAfv/VL0mONL8YPKV5/sP4W1gHvrcVwxuDpzbPPydKHYV1lknHBI7FY7P50u23ch5Qh/KAYa7HCrLZoBrS78/HRGdKKkk2trbtD3e+jyl3BuXMOaj7afauHAvNhlM2ggnvjVkok9WP+29ZllA2+Dhze60F8xFioDq5uZP2Cd67cNlW7h/hWyUcIUaqjPSjcD1+Sv56YjxFlrBIs8OCnhVo3jiemfELct9+XC/LQN50pbnQ/e/lqbW/dui8hOcGpxutag==
   </data>
  </layer>
- <objectgroup id="3" name="info" locked="1">
+ <objectgroup id="3" name="info" visible="0" locked="1">
   <object id="1" class="spawn_point" x="560" y="192">
    <point/>
   </object>
