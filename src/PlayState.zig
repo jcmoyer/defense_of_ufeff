@@ -159,6 +159,7 @@ pub fn create(game: *Game) !*PlayState {
     self.ui_minimap = try self.ui_root.createMinimap();
     self.ui_minimap.rect = Rect.init(16, 16, 64, 64);
     self.ui_minimap.texture = self.t_minimap;
+    self.ui_minimap.setPanCallback(self, onMinimapPan);
     try ui_panel.addChild(self.ui_minimap.control());
 
     // TODO probably want a better way to manage this, direct IO shouldn't be here
@@ -174,6 +175,15 @@ fn onButtonClick(button: *ui.Button, data: *ButtonData) void {
     data.state.interact_state = .{ .build = InteractStateBuild{
         .tower_spec = data.spec,
     } };
+}
+
+fn onMinimapPan(_: *ui.Minimap, self: *PlayState, x: f32, y: f32) void {
+    self.game.audio.playSound("assets/sounds/click.ogg").release();
+    self.camera.view.centerOn(
+        @floatToInt(i32, x * @intToFloat(f32, self.camera.bounds.w)),
+        @floatToInt(i32, y * @intToFloat(f32, self.camera.bounds.h)),
+    );
+    self.camera.clampToBounds();
 }
 
 fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.BitmapFontSpec {

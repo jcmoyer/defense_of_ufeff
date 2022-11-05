@@ -181,8 +181,8 @@ pub const Minimap = struct {
     root: *Root,
     rect: Rect,
     texture: ?*const Texture = null,
-    userdata: ?*anyopaque = null,
-    callback: ?*const fn (?*anyopaque) void = null,
+    pan_userdata: ?*anyopaque = null,
+    pan_callback: ?*const fn (*Minimap, ?*anyopaque, f32, f32) void = null,
     view: Rect,
     bounds: Rect,
 
@@ -190,14 +190,35 @@ pub const Minimap = struct {
         self.root.allocator.destroy(self);
     }
 
-    pub fn handleMouseClick(self: *const Minimap, x: i32, y: i32) void {
-        _ = self;
-        _ = x;
-        _ = y;
+    pub fn handleMouseClick(self: *Minimap, x: i32, y: i32) void {
+        const cr = self.computeClickableRect();
+        if (cr.contains(x, y)) {
+            const crf = cr.toRectf();
+            const xf = @intToFloat(f32, x);
+            const yf = @intToFloat(f32, y);
+            const percent_x = (xf - crf.left()) / crf.w;
+            const percent_y = (yf - crf.top()) / crf.h;
+            if (self.pan_callback) |cb| {
+                cb(self, self.pan_userdata, percent_x, percent_y);
+            }
+        }
     }
 
     pub fn interactRect(self: *Minimap) ?Rect {
         return self.rect;
+    }
+
+    pub fn setPanCallback(self: *Minimap, userdata_ptr: anytype, comptime cb: *const fn (*Minimap, @TypeOf(userdata_ptr), f32, f32) void) void {
+        const Ptr = @TypeOf(userdata_ptr);
+        const alignment = @typeInfo(Ptr).Pointer.alignment;
+        const Impl = struct {
+            fn callbackImpl(button: *Minimap, userdata: ?*anyopaque, x: f32, y: f32) void {
+                var userdata_ptr_ = @ptrCast(Ptr, @alignCast(alignment, userdata));
+                cb(button, userdata_ptr_, x, y);
+            }
+        };
+        self.pan_userdata = userdata_ptr;
+        self.pan_callback = Impl.callbackImpl;
     }
 
     pub fn control(self: *Minimap) Control {
