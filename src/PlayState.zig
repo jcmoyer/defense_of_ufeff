@@ -261,7 +261,12 @@ pub fn render(self: *PlayState, alpha: f64) void {
     if (!self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
         self.renderPlacementIndicator(cam_interp);
     }
-    ui.renderUI(&self.r_batch, self.ui_root);
+    ui.renderUI(.{
+        .r_batch = &self.r_batch,
+        .r_font = &self.r_font,
+        .font_texture = self.game.texman.getNamedTexture("CommonCase.png"),
+        .font_spec = &self.fontspec,
+    }, self.ui_root);
 
     if (self.deb_render_tile_collision) {
         self.debugRenderTileCollision(cam_interp);

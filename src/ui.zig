@@ -147,12 +147,17 @@ pub const Button = struct {
         return self.rect;
     }
 
+    pub fn getText(self: *Button) ?[]const u8 {
+        return self.text;
+    }
+
     pub fn control(self: *Button) Control {
         return Control.init(self, .{
             .deinitFn = deinit,
             .handleMouseClickFn = handleMouseClick,
             .interactRectFn = interactRect,
             .getTextureFn = getTexture,
+            .getTextFn = getText,
             .handleMouseEnterFn = handleMouseEnter,
             .handleMouseLeaveFn = handleMouseLeave,
             .handleMouseDownFn = handleMouseDown,
@@ -223,6 +228,7 @@ fn ControlImpl(comptime PointerT: type) type {
         handleMouseLeaveFn: ?*const fn (self: PointerT) void = null,
         handleMouseDownFn: ?*const fn (PointerT, i32, i32) void = null,
         handleMouseUpFn: ?*const fn (PointerT, i32, i32) void = null,
+        getTextFn: ?*const fn (PointerT) ?[]const u8 = null,
     };
 }
 
@@ -235,6 +241,7 @@ pub const Control = struct {
         handleMouseClickFn: *const fn (*anyopaque, x: i32, y: i32) void,
         interactRectFn: *const fn (self: *anyopaque) ?Rect,
         getTextureFn: *const fn (self: *anyopaque) ?ControlTexture,
+        getTextFn: *const fn (self: *anyopaque) ?[]const u8,
         getChildrenFn: *const fn (self: *anyopaque) []Control,
         handleMouseEnterFn: *const fn (*anyopaque) void,
         handleMouseLeaveFn: *const fn (*anyopaque) void,
@@ -282,6 +289,12 @@ pub const Control = struct {
                 return f(inst);
             }
 
+            fn getTextImpl(ptr: *anyopaque) ?[]const u8 {
+                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                const f = fns.getTextFn orelse return null;
+                return f(inst);
+            }
+
             fn getChildrenDefault(_: *anyopaque) []Control {
                 return &[_]Control{};
             }
@@ -323,6 +336,7 @@ pub const Control = struct {
                 .handleMouseClickFn = handleMouseClickImpl,
                 .interactRectFn = interactRectImpl,
                 .getTextureFn = getTextureImpl,
+                .getTextFn = getTextImpl,
                 .getChildrenFn = getChildrenImpl,
                 .handleMouseEnterFn = handleMouseEnterImpl,
                 .handleMouseLeaveFn = handleMouseLeaveImpl,
@@ -371,6 +385,10 @@ pub const Control = struct {
 
     pub fn handleMouseUp(self: Control, x: i32, y: i32) void {
         self.vtable.handleMouseUpFn(self.instance, x, y);
+    }
+
+    pub fn getText(self: Control) ?[]const u8 {
+        return self.vtable.getTextFn(self.instance);
     }
 };
 
@@ -568,19 +586,27 @@ const SDLBackend = struct {
 
 // Try to contain the UI rendering stuff here
 const SpriteBatch = @import("SpriteBatch.zig");
+const font = @import("bmfont.zig");
 
 const ControlRenderState = struct {
     translate_x: i32 = 0,
     translate_y: i32 = 0,
 };
 
-fn renderControl(r_batch: *SpriteBatch, control: Control, renderstate: ControlRenderState) void {
+const UIRenderOptions = struct {
+    r_batch: *SpriteBatch,
+    r_font: *font.BitmapFont,
+    font_texture: *const Texture,
+    font_spec: *const font.BitmapFontSpec,
+};
+
+fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRenderState) void {
     if (control.interactRect()) |rect| {
         if (control.getTexture()) |t| {
             var render_src = t.texture_rect orelse Rect.init(0, 0, @intCast(i32, t.texture.width), @intCast(i32, t.texture.height));
             var render_dest = rect;
             render_dest.translate(renderstate.translate_x, renderstate.translate_y);
-            r_batch.begin(.{
+            opts.r_batch.begin(.{
                 .texture = t.texture,
             });
 
@@ -610,13 +636,25 @@ fn renderControl(r_batch: *SpriteBatch, control: Control, renderstate: ControlRe
                 render_dest.centerOn(p[0], p[1]);
             }
 
-            r_batch.drawQuad(render_src, render_dest);
-            r_batch.end();
+            opts.r_batch.drawQuad(render_src, render_dest);
+            opts.r_batch.end();
+
+            if (control.getText()) |text| {
+                opts.r_font.begin(.{
+                    .texture = opts.font_texture,
+                    .spec = opts.font_spec,
+                });
+                opts.r_font.drawText(text, .{
+                    .x = render_dest.x,
+                    .y = render_dest.y,
+                });
+                opts.r_font.end();
+            }
         }
     }
     if (control.getChildren()) |children| {
         for (children) |child| {
-            renderControl(r_batch, child, .{
+            renderControl(opts, child, .{
                 .translate_x = renderstate.translate_x + control.interactRect().?.x,
                 .translate_y = renderstate.translate_y + control.interactRect().?.y,
             });
@@ -624,8 +662,8 @@ fn renderControl(r_batch: *SpriteBatch, control: Control, renderstate: ControlRe
     }
 }
 
-pub fn renderUI(r_batch: *SpriteBatch, ui_root: Root) void {
+pub fn renderUI(opts: UIRenderOptions, ui_root: Root) void {
     for (ui_root.children.items) |child| {
-        renderControl(r_batch, child, .{});
+        renderControl(opts, child, .{});
     }
 }

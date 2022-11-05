@@ -28,6 +28,7 @@ r_font: BitmapFont,
 fontspec: bmfont.BitmapFontSpec,
 ui_root: ui.Root,
 ui_tip: *ui.Button,
+btn_newgame: *ui.Button,
 rng: std.rand.DefaultPrng,
 tip_index: usize = 0,
 
@@ -43,10 +44,18 @@ pub fn create(game: *Game) !*MenuState {
         .r_font = undefined,
         .fontspec = undefined,
         .ui_root = ui.Root.init(game.allocator),
-        .ui_tip = undefined,
         .rng = std.rand.DefaultPrng.init(@intCast(u64, std.time.milliTimestamp())),
+        // Initialized below
+        .ui_tip = undefined,
+        .btn_newgame = undefined,
     };
     self.r_font = BitmapFont.init(&self.r_batch);
+
+    self.btn_newgame = try self.ui_root.createButton();
+    self.btn_newgame.text = "New Game";
+    self.btn_newgame.rect = Rect.init(0, 0, 128, 32);
+    self.btn_newgame.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
+    try self.ui_root.addChild(self.btn_newgame.control());
 
     self.ui_tip = try self.ui_root.createButton();
     self.ui_tip.texture = self.game.texman.getNamedTexture("special.png");
@@ -132,7 +141,12 @@ pub fn render(self: *MenuState, alpha: f64) void {
     self.r_font.end();
 
     self.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
-    ui.renderUI(&self.r_batch, self.ui_root);
+    ui.renderUI(.{
+        .r_batch = &self.r_batch,
+        .r_font = &self.r_font,
+        .font_texture = self.game.texman.getNamedTexture("CommonCase.png"),
+        .font_spec = &self.fontspec,
+    }, self.ui_root);
 }
 
 pub fn handleEvent(self: *MenuState, ev: sdl.SDL_Event) void {
