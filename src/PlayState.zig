@@ -427,6 +427,8 @@ fn renderFloatingText(
                     255,
                     @floatToInt(u8, 255 * a_coef),
                 },
+                .v_alignment = .middle,
+                .h_alignment = .center,
             },
         );
     }
