@@ -152,6 +152,7 @@ pub fn render(self: *MenuState, alpha: f64) void {
     ui.renderUI(.{
         .r_batch = &self.r_batch,
         .r_font = &self.r_font,
+        .r_imm = &self.game.imm,
         .font_texture = self.game.texman.getNamedTexture("CommonCase.png"),
         .font_spec = &self.fontspec,
     }, self.ui_root);

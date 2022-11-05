@@ -233,6 +233,8 @@ pub fn update(self: *PlayState) void {
     }
 
     self.camera.clampToBounds();
+    self.ui_minimap.view = self.camera.view;
+    self.ui_minimap.bounds = self.camera.bounds;
 
     self.foam_anim_l.update();
     self.foam_anim_r.update();
@@ -281,6 +283,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     ui.renderUI(.{
         .r_batch = &self.r_batch,
         .r_font = &self.r_font,
+        .r_imm = &self.game.imm,
         .font_texture = self.game.texman.getNamedTexture("CommonCase.png"),
         .font_spec = &self.fontspec,
     }, self.ui_root);
@@ -935,8 +938,9 @@ fn loadWorld(self: *PlayState, mapid: []const u8) void {
 }
 
 fn createMinimap(self: *PlayState) !void {
-    self.t_minimap.width = @intCast(u32, self.world.getWidth());
-    self.t_minimap.height = @intCast(u32, self.world.getHeight());
+    const range = self.world.getPlayableRange();
+    self.t_minimap.width = @intCast(u32, range.getWidth());
+    self.t_minimap.height = @intCast(u32, range.getHeight());
 
     var fbo: gl.GLuint = 0;
     gl.genFramebuffers(1, &fbo);
@@ -955,16 +959,17 @@ fn createMinimap(self: *PlayState) !void {
     }
     gl.viewport(0, 0, @intCast(c_int, self.t_minimap.width), @intCast(c_int, self.t_minimap.height));
     self.r_batch.setOutputDimensions(self.t_minimap.width, self.t_minimap.height);
-    self.renderMinimapLayer(.base, .terrain);
-    self.renderMinimapLayer(.base, .special);
-    self.renderMinimapLayer(.detail, .terrain);
-    self.renderMinimapLayer(.detail, .special);
+    self.renderMinimapLayer(.base, .terrain, range);
+    self.renderMinimapLayer(.base, .special, range);
+    self.renderMinimapLayer(.detail, .terrain, range);
+    self.renderMinimapLayer(.detail, .special, range);
 }
 
 fn renderMinimapLayer(
     self: *PlayState,
     layer: tilemap.TileLayer,
     bank: tilemap.TileBank,
+    range: wo.TileRange,
 ) void {
     const map = self.world.map;
     const source_texture = switch (bank) {
@@ -976,11 +981,12 @@ fn renderMinimapLayer(
     self.r_batch.begin(SpriteBatch.SpriteBatchParams{
         .texture = source_texture,
     });
-    var y: usize = 0;
+    var y: usize = range.min.y;
     var x: usize = 0;
-    while (y < self.world.getHeight()) : (y += 1) {
-        x = 0;
-        while (x < self.world.getWidth()) : (x += 1) {
+    while (y <= range.max.y) : (y += 1) {
+        std.debug.print("{d}\n", .{y});
+        x = range.min.x;
+        while (x <= range.max.x) : (x += 1) {
             const t = map.at2DPtr(layer, x, y);
             if (t.bank != bank) {
                 continue;
@@ -992,8 +998,8 @@ fn renderMinimapLayer(
                 .h = 16,
             };
             const dest = Rectf.init(
-                @intToFloat(f32, x),
-                @intToFloat(f32, y),
+                @intToFloat(f32, x - range.min.x),
+                @intToFloat(f32, y - range.min.y),
                 1.0,
                 1.0,
             );

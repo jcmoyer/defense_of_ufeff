@@ -183,6 +183,8 @@ pub const Minimap = struct {
     texture: ?*const Texture = null,
     userdata: ?*anyopaque = null,
     callback: ?*const fn (?*anyopaque) void = null,
+    view: Rect,
+    bounds: Rect,
 
     pub fn deinit(self: *Minimap) void {
         self.root.allocator.destroy(self);
@@ -204,6 +206,7 @@ pub const Minimap = struct {
             .handleMouseClickFn = handleMouseClick,
             .interactRectFn = interactRect,
             .getTextureFn = getTexture,
+            .customRenderFn = customRender,
         });
     }
 
@@ -213,6 +216,63 @@ pub const Minimap = struct {
         } else {
             return null;
         }
+    }
+
+    fn computeClickableRect(self: *Minimap) Rect {
+        const rect = self.rect;
+        const t = self.getTexture() orelse return .{};
+
+        var render_dest = rect;
+
+        // touch inside of dest rect
+        // this is for the minimap, mostly
+        const aspect_ratio = @intToFloat(f32, t.texture.width) / @intToFloat(f32, t.texture.height);
+        const p = render_dest.centerPoint();
+
+        // A = aspect ratio, W = width, H = height
+        //
+        // A = W/H
+        // H = W/A
+        // W = AH
+        //
+        // A > 1 means rect is wider than tall
+        // A < 1 means rect is taller than wide
+        //
+        // we can maintain A at different sizes by setting W or H and then
+        // doing one of the above transforms for the other axis
+        if (aspect_ratio > 1) {
+            render_dest.w = rect.w;
+            render_dest.h = @floatToInt(i32, @intToFloat(f32, render_dest.w) / aspect_ratio);
+            render_dest.centerOn(p[0], p[1]);
+        } else {
+            render_dest.h = rect.h;
+            render_dest.w = @floatToInt(i32, @intToFloat(f32, render_dest.h) * aspect_ratio);
+            render_dest.centerOn(p[0], p[1]);
+        }
+
+        return render_dest;
+    }
+
+    pub fn customRender(self: *Minimap, ctx: CustomRenderContext) void {
+        const t = self.getTexture() orelse return;
+        const cr = self.computeClickableRect();
+        ctx.drawTexture(t.texture, cr);
+
+        // we draw lines onto this
+        const crf = cr.toRectf();
+
+        const vf = self.view.toRectf();
+        const bf = self.bounds.toRectf();
+
+        const left_f = ((vf.left() - bf.left()) / bf.w) * crf.w + crf.x;
+        const top_f = ((vf.top() - bf.top()) / bf.h) * crf.h + crf.y;
+        const bottom_f = ((vf.bottom() - bf.top()) / bf.h) * crf.h + crf.y;
+        const right_f = ((vf.right() - bf.left()) / bf.w) * crf.w + crf.x;
+
+        ctx.drawLine(left_f, top_f, left_f, bottom_f);
+        ctx.drawLine(right_f, top_f, right_f, bottom_f);
+        ctx.drawLine(left_f, top_f, right_f, top_f);
+        ctx.drawLine(left_f, bottom_f, right_f, bottom_f);
     }
 };
 
@@ -229,6 +289,7 @@ fn ControlImpl(comptime PointerT: type) type {
         handleMouseDownFn: ?*const fn (PointerT, i32, i32) void = null,
         handleMouseUpFn: ?*const fn (PointerT, i32, i32) void = null,
         getTextFn: ?*const fn (PointerT) ?[]const u8 = null,
+        customRenderFn: ?*const fn (PointerT, CustomRenderContext) void = null,
     };
 }
 
@@ -247,6 +308,7 @@ pub const Control = struct {
         handleMouseLeaveFn: *const fn (*anyopaque) void,
         handleMouseDownFn: *const fn (*anyopaque, i32, i32) void,
         handleMouseUpFn: *const fn (*anyopaque, i32, i32) void,
+        customRenderFn: ?*const fn (*anyopaque, CustomRenderContext) void = null,
     };
 
     pub fn init(
@@ -331,6 +393,13 @@ pub const Control = struct {
                 }
             }
 
+            fn customRenderImpl(ptr: *anyopaque, ctx: CustomRenderContext) void {
+                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                if (fns.customRenderFn) |f| {
+                    f(inst, ctx);
+                }
+            }
+
             const vtable = VTable{
                 .deinitFn = deinitImpl,
                 .handleMouseClickFn = handleMouseClickImpl,
@@ -342,6 +411,7 @@ pub const Control = struct {
                 .handleMouseLeaveFn = handleMouseLeaveImpl,
                 .handleMouseDownFn = handleMouseDownImpl,
                 .handleMouseUpFn = handleMouseUpImpl,
+                .customRenderFn = if (fns.customRenderFn != null) customRenderImpl else null,
             };
         };
 
@@ -389,6 +459,14 @@ pub const Control = struct {
 
     pub fn getText(self: Control) ?[]const u8 {
         return self.vtable.getTextFn(self.instance);
+    }
+
+    pub fn supportsCustomRender(self: Control) bool {
+        return self.vtable.customRenderFn != null;
+    }
+
+    pub fn customRender(self: Control, ctx: CustomRenderContext) void {
+        self.vtable.customRenderFn.?(self.instance, ctx);
     }
 };
 
@@ -548,6 +626,8 @@ pub const Root = struct {
         ptr.* = Minimap{
             .root = self,
             .rect = Rect.init(0, 0, 0, 0),
+            .view = .{},
+            .bounds = .{},
         };
         try self.controls.append(self.allocator, ptr.control());
         return ptr;
@@ -587,75 +667,111 @@ const SDLBackend = struct {
 // Try to contain the UI rendering stuff here
 const SpriteBatch = @import("SpriteBatch.zig");
 const font = @import("bmfont.zig");
+const ImmRenderer = @import("ImmRenderer.zig");
+
+const CustomRenderContext = struct {
+    instance: *anyopaque,
+    vtable: *const VTable,
+
+    const VTable = struct {
+        drawLineFn: *const fn (*anyopaque, x0: f32, y0: f32, x1: f32, y1: f32) void,
+        drawTextureFn: *const fn (ptr: *anyopaque, texture: *const Texture, dest: Rect) void,
+    };
+
+    fn drawLine(self: CustomRenderContext, x0: f32, y0: f32, x1: f32, y1: f32) void {
+        self.vtable.drawLineFn(self.instance, x0, y0, x1, y1);
+    }
+
+    fn drawTexture(self: CustomRenderContext, texture: *const Texture, dest: Rect) void {
+        self.vtable.drawTextureFn(self.instance, texture, dest);
+    }
+};
 
 const ControlRenderState = struct {
     translate_x: i32 = 0,
     translate_y: i32 = 0,
+    opts: *const UIRenderOptions,
+
+    fn createRenderContext(self: *ControlRenderState) CustomRenderContext {
+        return CustomRenderContext{
+            .instance = self,
+            .vtable = &CRVTable,
+        };
+    }
 };
 
 const UIRenderOptions = struct {
     r_batch: *SpriteBatch,
     r_font: *font.BitmapFont,
+    r_imm: *ImmRenderer,
     font_texture: *const Texture,
     font_spec: *const font.BitmapFontSpec,
 };
 
 fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRenderState) void {
-    if (control.interactRect()) |rect| {
-        if (control.getTexture()) |t| {
-            var render_src = t.texture_rect orelse Rect.init(0, 0, @intCast(i32, t.texture.width), @intCast(i32, t.texture.height));
-            var render_dest = rect;
-            render_dest.translate(renderstate.translate_x, renderstate.translate_y);
-            opts.r_batch.begin(.{
-                .texture = t.texture,
-            });
-
-            // touch inside of dest rect
-            // this is for the minimap, mostly
-            const aspect_ratio = @intToFloat(f32, t.texture.width) / @intToFloat(f32, t.texture.height);
-            const p = render_dest.centerPoint();
-
-            // A = aspect ratio, W = width, H = height
-            //
-            // A = W/H
-            // H = W/A
-            // W = AH
-            //
-            // A > 1 means rect is wider than tall
-            // A < 1 means rect is taller than wide
-            //
-            // we can maintain A at different sizes by setting W or H and then
-            // doing one of the above transforms for the other axis
-            if (aspect_ratio > 1) {
-                render_dest.w = rect.w;
-                render_dest.h = @floatToInt(i32, @intToFloat(f32, render_dest.w) / aspect_ratio);
-                render_dest.centerOn(p[0], p[1]);
-            } else {
-                render_dest.h = rect.h;
-                render_dest.w = @floatToInt(i32, @intToFloat(f32, render_dest.h) * aspect_ratio);
-                render_dest.centerOn(p[0], p[1]);
-            }
-
-            opts.r_batch.drawQuad(render_src, render_dest);
-            opts.r_batch.end();
-
-            if (control.getText()) |text| {
-                opts.r_font.begin(.{
-                    .texture = opts.font_texture,
-                    .spec = opts.font_spec,
+    if (control.supportsCustomRender()) {
+        // nasty temporary but we die of const poisoning otherwise
+        var rs = renderstate;
+        control.customRender(rs.createRenderContext());
+    } else {
+        if (control.interactRect()) |rect| {
+            if (control.getTexture()) |t| {
+                var render_src = t.texture_rect orelse Rect.init(0, 0, @intCast(i32, t.texture.width), @intCast(i32, t.texture.height));
+                var render_dest = rect;
+                render_dest.translate(renderstate.translate_x, renderstate.translate_y);
+                opts.r_batch.begin(.{
+                    .texture = t.texture,
                 });
-                opts.r_font.drawText(text, .{
-                    .dest = rect,
-                    .h_alignment = .center,
-                    .v_alignment = .middle,
-                });
-                opts.r_font.end();
+
+                // touch inside of dest rect
+                // this is for the minimap, mostly
+                const aspect_ratio = @intToFloat(f32, t.texture.width) / @intToFloat(f32, t.texture.height);
+                const p = render_dest.centerPoint();
+
+                // A = aspect ratio, W = width, H = height
+                //
+                // A = W/H
+                // H = W/A
+                // W = AH
+                //
+                // A > 1 means rect is wider than tall
+                // A < 1 means rect is taller than wide
+                //
+                // we can maintain A at different sizes by setting W or H and then
+                // doing one of the above transforms for the other axis
+                if (aspect_ratio > 1) {
+                    render_dest.w = rect.w;
+                    render_dest.h = @floatToInt(i32, @intToFloat(f32, render_dest.w) / aspect_ratio);
+                    render_dest.centerOn(p[0], p[1]);
+                } else {
+                    render_dest.h = rect.h;
+                    render_dest.w = @floatToInt(i32, @intToFloat(f32, render_dest.h) * aspect_ratio);
+                    render_dest.centerOn(p[0], p[1]);
+                }
+
+                opts.r_batch.drawQuad(render_src, render_dest);
+                opts.r_batch.end();
+
+                if (control.getText()) |text| {
+                    opts.r_font.begin(.{
+                        .texture = opts.font_texture,
+                        .spec = opts.font_spec,
+                    });
+                    opts.r_font.drawText(text, .{
+                        .dest = rect,
+                        .h_alignment = .center,
+                        .v_alignment = .middle,
+                    });
+                    opts.r_font.end();
+                }
             }
         }
     }
+
     if (control.getChildren()) |children| {
         for (children) |child| {
             renderControl(opts, child, .{
+                .opts = renderstate.opts,
                 .translate_x = renderstate.translate_x + control.interactRect().?.x,
                 .translate_y = renderstate.translate_y + control.interactRect().?.y,
             });
@@ -663,8 +779,37 @@ fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRe
     }
 }
 
+fn drawLineImpl(ptr: *anyopaque, x0: f32, y0: f32, x1: f32, y1: f32) void {
+    var state = @ptrCast(*ControlRenderState, @alignCast(@alignOf(ControlRenderState), ptr));
+    state.opts.r_imm.beginUntextured();
+    state.opts.r_imm.drawLine(
+        @Vector(4, f32){ @intToFloat(f32, state.translate_x) + x0, @intToFloat(f32, state.translate_y) + y0, 0, 1 },
+        @Vector(4, f32){ @intToFloat(f32, state.translate_x) + x1, @intToFloat(f32, state.translate_y) + y1, 0, 1 },
+        @Vector(4, f32){ 1, 1, 1, 1 },
+    );
+}
+
+fn drawTextureImpl(ptr: *anyopaque, texture: *const Texture, dest: Rect) void {
+    var state = @ptrCast(*ControlRenderState, @alignCast(@alignOf(ControlRenderState), ptr));
+    state.opts.r_batch.begin(.{ .texture = texture });
+    const src = Rect.init(0, 0, @intCast(i32, texture.width), @intCast(i32, texture.height));
+    var t_dest = dest;
+    t_dest.translate(state.translate_x, state.translate_y);
+    state.opts.r_batch.drawQuad(src, t_dest);
+    state.opts.r_batch.end();
+}
+
+const CRVTable = CustomRenderContext.VTable{
+    .drawLineFn = drawLineImpl,
+    .drawTextureFn = drawTextureImpl,
+};
+
 pub fn renderUI(opts: UIRenderOptions, ui_root: Root) void {
+    var state = ControlRenderState{
+        .opts = &opts,
+    };
+
     for (ui_root.children.items) |child| {
-        renderControl(opts, child, .{});
+        renderControl(opts, child, state);
     }
 }

@@ -577,6 +577,21 @@ pub const Goal = struct {
     }
 };
 
+pub const TileRange = struct {
+    /// Indices inclusive
+    min: TileCoord,
+    /// Indices inclusive
+    max: TileCoord,
+
+    pub fn getWidth(self: TileRange) usize {
+        return self.max.x - self.min.x;
+    }
+
+    pub fn getHeight(self: TileRange) usize {
+        return self.max.y - self.min.y;
+    }
+};
+
 pub const World = struct {
     allocator: Allocator,
     map: Tilemap = .{},
@@ -626,6 +641,20 @@ pub const World = struct {
         self.pending_projectiles.deinit(self.allocator);
         self.sprite_effects.deinit(self.allocator);
         self.tower_map.deinit(self.allocator);
+    }
+
+    pub fn getPlayableRange(self: World) TileRange {
+        if (self.play_area) |area| {
+            return TileRange{
+                .min = TileCoord.initSignedWorld(area.left(), area.top()),
+                .max = TileCoord.initSignedWorld(area.right(), area.bottom()),
+            };
+        } else {
+            return TileRange{
+                .min = TileCoord{ .x = 0, .y = 0 },
+                .max = TileCoord{ .x = self.getWidth() - 1, .y = self.getHeight() - 1 },
+            };
+        }
     }
 
     pub fn getWidth(self: World) usize {
