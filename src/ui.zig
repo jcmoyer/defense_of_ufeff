@@ -895,7 +895,7 @@ fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRe
 
                 // touch inside of dest rect
                 // this is for the minimap, mostly
-                const aspect_ratio = @intToFloat(f32, t.texture.width) / @intToFloat(f32, t.texture.height);
+                const aspect_ratio = @intToFloat(f32, render_src.w) / @intToFloat(f32, render_src.h);
                 const p = render_dest.centerPoint();
 
                 // A = aspect ratio, W = width, H = height
