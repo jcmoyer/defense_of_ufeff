@@ -43,13 +43,15 @@ pub fn create(game: *Game) !*MenuState {
         .r_batch = SpriteBatch.create(),
         .r_font = undefined,
         .fontspec = undefined,
-        .ui_root = ui.Root.init(game.allocator),
+        .ui_root = ui.Root.init(game.allocator, ui.SDLBackend.init(game.window)),
         .rng = std.rand.DefaultPrng.init(@intCast(u64, std.time.milliTimestamp())),
         // Initialized below
         .ui_tip = undefined,
         .btn_newgame = undefined,
     };
     self.r_font = BitmapFont.init(&self.r_batch);
+    self.ui_root.backend.coord_scale_x = 2;
+    self.ui_root.backend.coord_scale_y = 2;
 
     self.btn_newgame = try self.ui_root.createButton();
     self.btn_newgame.text = "New Game";
@@ -142,7 +144,7 @@ pub fn render(self: *MenuState, alpha: f64) void {
         .spec = &self.fontspec,
     });
 
-    var measured = self.r_font.measureText(tips[self.tip_index]);
+    var measured = self.fontspec.measureText(tips[self.tip_index]);
     measured.centerOn(Game.INTERNAL_WIDTH / 2, @floatToInt(i32, 0.8 * Game.INTERNAL_HEIGHT));
 
     self.r_font.drawText(tips[self.tip_index], .{ .dest = Rect.init(0, 200, 512, 50), .h_alignment = .center });

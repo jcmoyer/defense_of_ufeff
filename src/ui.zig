@@ -108,6 +108,7 @@ pub const Button = struct {
         // .disabled
         Rect.init(32, 32, 32, 32),
     },
+    tooltip_text: ?[]const u8 = null,
 
     pub fn deinit(self: *Button) void {
         self.root.allocator.destroy(self);
@@ -165,6 +166,10 @@ pub const Button = struct {
         return self.text;
     }
 
+    pub fn getTooltipText(self: *Button) ?[]const u8 {
+        return self.tooltip_text;
+    }
+
     pub fn control(self: *Button) Control {
         return Control.init(self, .{
             .deinitFn = deinit,
@@ -172,6 +177,7 @@ pub const Button = struct {
             .interactRectFn = interactRect,
             .getTextureFn = getTexture,
             .getTextFn = getText,
+            .getTooltipTextFn = getTooltipText,
             .handleMouseEnterFn = handleMouseEnter,
             .handleMouseLeaveFn = handleMouseLeave,
             .handleMouseDownFn = handleMouseDown,
@@ -334,6 +340,7 @@ fn ControlImpl(comptime PointerT: type) type {
         handleMouseUpFn: ?*const fn (PointerT, MouseEventArgs) void = null,
         handleMouseMoveFn: ?*const fn (PointerT, MouseEventArgs) void = null,
         getTextFn: ?*const fn (PointerT) ?[]const u8 = null,
+        getTooltipTextFn: ?*const fn (PointerT) ?[]const u8 = null,
         customRenderFn: ?*const fn (PointerT, CustomRenderContext) void = null,
     };
 }
@@ -348,6 +355,7 @@ pub const Control = struct {
         interactRectFn: *const fn (self: *anyopaque) ?Rect,
         getTextureFn: *const fn (self: *anyopaque) ?ControlTexture,
         getTextFn: *const fn (self: *anyopaque) ?[]const u8,
+        getTooltipTextFn: *const fn (*anyopaque) ?[]const u8,
         getChildrenFn: *const fn (self: *anyopaque) []Control,
         handleMouseEnterFn: *const fn (*anyopaque) void,
         handleMouseLeaveFn: *const fn (*anyopaque) void,
@@ -453,12 +461,19 @@ pub const Control = struct {
                 }
             }
 
+            fn getTooltipTextImpl(ptr: *anyopaque) ?[]const u8 {
+                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                const f = fns.getTooltipTextFn orelse return null;
+                return f(inst);
+            }
+
             const vtable = VTable{
                 .deinitFn = deinitImpl,
                 .handleMouseClickFn = handleMouseClickImpl,
                 .interactRectFn = interactRectImpl,
                 .getTextureFn = getTextureImpl,
                 .getTextFn = getTextImpl,
+                .getTooltipTextFn = getTooltipTextImpl,
                 .getChildrenFn = getChildrenImpl,
                 .handleMouseEnterFn = handleMouseEnterImpl,
                 .handleMouseLeaveFn = handleMouseLeaveImpl,
@@ -526,6 +541,10 @@ pub const Control = struct {
     pub fn customRender(self: Control, ctx: CustomRenderContext) void {
         self.vtable.customRenderFn.?(self.instance, ctx);
     }
+
+    pub fn getTooltipText(self: Control) ?[]const u8 {
+        return self.vtable.getTooltipTextFn(self.instance);
+    }
 };
 
 pub const InteractionHint = enum {
@@ -541,15 +560,16 @@ pub const Root = struct {
     controls: std.ArrayListUnmanaged(Control),
     hover: ?Control = null,
     mouse_down_control: ?Control = null,
+    tooltip_text: ?[]const u8 = null,
     interaction_hint: InteractionHint = .none,
     backend: SDLBackend,
 
-    pub fn init(allocator: Allocator) Root {
+    pub fn init(allocator: Allocator, backend: SDLBackend) Root {
         return .{
             .allocator = allocator,
             .children = .{},
             .controls = .{},
-            .backend = SDLBackend.init(),
+            .backend = backend,
         };
     }
 
@@ -623,11 +643,13 @@ pub const Root = struct {
                 .buttons = args.buttons,
             };
             result.control.handleMouseMove(local_args);
+            self.tooltip_text = result.control.getTooltipText();
         } else {
             if (self.hover) |h| {
                 h.handleMouseLeave();
                 self.hover = null;
             }
+            self.tooltip_text = null;
         }
         self.backend.setCursorForHint(self.interaction_hint);
     }
@@ -714,10 +736,16 @@ pub const SDLBackend = struct {
     c_arrow: ?*sdl.SDL_Cursor = null,
     c_hand: ?*sdl.SDL_Cursor = null,
 
-    fn init() SDLBackend {
+    window: *sdl.SDL_Window,
+
+    coord_scale_x: f32 = 1,
+    coord_scale_y: f32 = 1,
+
+    pub fn init(window: *sdl.SDL_Window) SDLBackend {
         return SDLBackend{
             .c_arrow = sdl.SDL_CreateSystemCursor(.SDL_SYSTEM_CURSOR_ARROW),
             .c_hand = sdl.SDL_CreateSystemCursor(.SDL_SYSTEM_CURSOR_HAND),
+            .window = window,
         };
     }
 
@@ -765,6 +793,36 @@ pub const SDLBackend = struct {
                 @panic("mouseEventToButtons got unrecognized event");
             },
         }
+    }
+
+    /// Maps OS-space window client coordinates to virtual coordinates using scaling constants
+    /// `coord_scale_x` and `coord_scale_y`.
+    pub fn clientToVirtual(self: SDLBackend, x: i32, y: i32) [2]i32 {
+        return [2]i32{
+            @floatToInt(i32, @intToFloat(f64, x) / self.coord_scale_x),
+            @floatToInt(i32, @intToFloat(f64, y) / self.coord_scale_y),
+        };
+    }
+
+    pub fn mouseVirtual(self: SDLBackend) [2]i32 {
+        var x: c_int = 0;
+        var y: c_int = 0;
+        _ = sdl.SDL_GetMouseState(&x, &y);
+        return self.clientToVirtual(x, y);
+    }
+
+    fn clientRect(self: SDLBackend) Rect {
+        var x: c_int = 0;
+        var y: c_int = 0;
+        sdl.SDL_GetWindowSize(self.window, &x, &y);
+        return Rect.init(0, 0, x, y);
+    }
+
+    fn virtualRect(self: SDLBackend) Rect {
+        var r = self.clientRect();
+        r.w = @floatToInt(i32, @intToFloat(f32, r.w) / self.coord_scale_x);
+        r.h = @floatToInt(i32, @intToFloat(f32, r.h) / self.coord_scale_y);
+        return r;
     }
 };
 
@@ -915,5 +973,45 @@ pub fn renderUI(opts: UIRenderOptions, ui_root: Root) void {
 
     for (ui_root.children.items) |child| {
         renderControl(opts, child, state);
+    }
+
+    if (ui_root.tooltip_text) |text| {
+        const tooltip_padding = 4;
+
+        var text_rect = opts.font_spec.measureText(text);
+        var m = ui_root.backend.mouseVirtual();
+
+        var frame_rect = text_rect;
+        frame_rect.inflate(tooltip_padding, tooltip_padding);
+        // tooltips always shift downward
+        frame_rect.translate(m[0], m[1] + 16);
+
+        const render_rect = ui_root.backend.virtualRect();
+
+        if (!render_rect.containsRect(frame_rect)) {
+            // if there's not enough space on the right, draw to the left of the cursor
+            if (frame_rect.right() > render_rect.right()) {
+                frame_rect.alignRight(frame_rect.left());
+            }
+            // clamp to bottom of screen
+            if (frame_rect.bottom() > render_rect.bottom()) {
+                frame_rect.alignBottom(render_rect.bottom());
+            }
+        }
+
+        text_rect.alignLeft(frame_rect.left() + tooltip_padding);
+        text_rect.alignTop(frame_rect.top() + tooltip_padding);
+
+        opts.r_imm.beginUntextured();
+        opts.r_imm.drawQuadRGBA(frame_rect, @Vector(4, f32){ 0, 0, 0, 1 });
+
+        opts.r_font.begin(.{
+            .texture = opts.font_texture,
+            .spec = opts.font_spec,
+        });
+        opts.r_font.drawText(text, .{
+            .dest = text_rect,
+        });
+        opts.r_font.end();
     }
 }

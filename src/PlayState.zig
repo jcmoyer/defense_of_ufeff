@@ -128,12 +128,14 @@ pub fn create(game: *Game) !*PlayState {
         .r_quad = QuadBatch.create(),
         // Created/destroyed in update()
         .frame_arena = undefined,
-        .ui_root = ui.Root.init(game.allocator),
+        .ui_root = ui.Root.init(game.allocator, ui.SDLBackend.init(game.window)),
         .ui_buttons = undefined,
         .ui_minimap = undefined,
         .t_minimap = game.texman.createInMemory(),
     };
     self.r_font = BitmapFont.init(&self.r_batch);
+    self.ui_root.backend.coord_scale_x = 2;
+    self.ui_root.backend.coord_scale_y = 2;
 
     const t_panel = self.game.texman.getNamedTexture("ui_panel.png");
     var ui_panel = try self.ui_root.createPanel();
@@ -143,6 +145,7 @@ pub fn create(game: *Game) !*PlayState {
     try self.ui_root.addChild(ui_panel.control());
     for (self.ui_buttons) |*b, i| {
         b.* = try self.ui_root.createButton();
+        b.*.tooltip_text = "test tooltip\nanother line";
         try ui_panel.addChild(b.*.control());
 
         const x: i32 = if (i % 2 == 0) 18 else 50;
@@ -164,7 +167,7 @@ pub fn create(game: *Game) !*PlayState {
 
     // TODO probably want a better way to manage this, direct IO shouldn't be here
     // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
-    self.fontspec = try loadFontSpec(self.game.allocator, "assets/tables/text16.json");
+    self.fontspec = try loadFontSpec(self.game.allocator, "assets/tables/CommonCase.json");
     self.fontspec_numbers = try loadFontSpec(self.game.allocator, "assets/tables/number3x5.json");
     return self;
 }

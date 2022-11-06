@@ -1319,3 +1319,4 @@ pub const SDL_SystemCursor = enum(c_int) {
 pub extern fn SDL_CreateSystemCursor(id: SDL_SystemCursor) ?*SDL_Cursor;
 pub extern fn SDL_FreeCursor(cursor: *SDL_Cursor) void;
 pub extern fn SDL_SetCursor(cursor: ?*SDL_Cursor) void;
+pub extern fn SDL_GetMouseState(x: ?*c_int, y: ?*c_int) u32;

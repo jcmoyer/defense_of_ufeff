@@ -91,6 +91,31 @@ pub const BitmapFontSpec = struct {
         const key = (@as(u16, first) << 8) | second;
         return self.kerning_map.get(key) orelse 0;
     }
+
+    pub fn measureText(self: BitmapFontSpec, text: []const u8) Rect {
+        var width_this_line: i32 = 0;
+        var width: i32 = 0;
+        var height: i32 = 0;
+        var height_this_line: i32 = 0;
+        var last_ch: u8 = 0;
+        for (text) |ch| {
+            if (ch == '\n') {
+                width = std.math.max(width, width_this_line);
+                height += height_this_line;
+                width_this_line = 0;
+                height_this_line = 0;
+                continue;
+            }
+            const glyph_rect = self.mapGlyph(ch);
+            width_this_line += glyph_rect.w + self.space + self.kerning(last_ch, ch);
+            height_this_line = std.math.max(height_this_line, glyph_rect.h);
+            last_ch = ch;
+        }
+        width_this_line -= self.space;
+        width = std.math.max(width, width_this_line);
+        height += height_this_line;
+        return Rect.init(0, 0, width, height);
+    }
 };
 
 pub const BitmapFontParams = struct {
@@ -162,14 +187,14 @@ pub const BitmapFont = struct {
     }
 
     pub fn drawText(self: BitmapFont, text: []const u8, opts: DrawTextOptions) void {
-        var dims = self.measureText(text);
+        var dims = self.fontspec.measureText(text);
         var dx: i32 = 0;
         var dy = getYStart(opts.v_alignment, opts.dest, dims);
         if (std.mem.indexOfScalar(u8, text, '\n')) |linebreak| {
-            const line_dims = self.measureText(text[0..linebreak]);
+            const line_dims = self.fontspec.measureText(text[0..linebreak]);
             dx = getXStart(opts.h_alignment, opts.dest, dims, line_dims);
         } else {
-            const line_dims = self.measureText(text);
+            const line_dims = self.fontspec.measureText(text);
             dx = getXStart(opts.h_alignment, opts.dest, dims, line_dims);
         }
         var last_ch: u8 = 0;
@@ -178,10 +203,10 @@ pub const BitmapFont = struct {
                 dy += self.mapGlyph(' ').h;
                 dx = opts.dest.x;
                 if (std.mem.indexOfScalar(u8, text[i + 1 ..], '\n')) |linebreak| {
-                    const line_dims = self.measureText(text[i + 1 .. linebreak]);
+                    const line_dims = self.fontspec.measureText(text[i + 1 .. linebreak]);
                     dx = getXStart(opts.h_alignment, opts.dest, dims, line_dims);
                 } else {
-                    const line_dims = self.measureText(text[i + 1 ..]);
+                    const line_dims = self.fontspec.measureText(text[i + 1 ..]);
                     dx = getXStart(opts.h_alignment, opts.dest, dims, line_dims);
                 }
                 continue;
@@ -202,31 +227,6 @@ pub const BitmapFont = struct {
             dx += src.w + self.fontspec.space;
             last_ch = ch;
         }
-    }
-
-    pub fn measureText(self: BitmapFont, text: []const u8) Rect {
-        var width_this_line: i32 = 0;
-        var width: i32 = 0;
-        var height: i32 = 0;
-        var height_this_line: i32 = 0;
-        var last_ch: u8 = 0;
-        for (text) |ch| {
-            if (ch == '\n') {
-                width = std.math.max(width, width_this_line);
-                height += height_this_line;
-                width_this_line = 0;
-                height_this_line = 0;
-                continue;
-            }
-            const glyph_rect = self.mapGlyph(ch);
-            width_this_line += glyph_rect.w + self.fontspec.space + self.fontspec.kerning(last_ch, ch);
-            height_this_line = std.math.max(height_this_line, glyph_rect.h);
-            last_ch = ch;
-        }
-        width_this_line -= self.fontspec.space;
-        width = std.math.max(width, width_this_line);
-        height += height_this_line;
-        return Rect.init(0, 0, width, height);
     }
 
     pub fn mapGlyph(self: BitmapFont, glyph: u8) Rect {
