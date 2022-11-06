@@ -31,6 +31,8 @@ ui_tip: *ui.Button,
 rng: std.rand.DefaultPrng,
 tip_index: usize = 0,
 menu_start: i32 = 80,
+p_scroll_offset: f32 = 0,
+scroll_offset: f32 = 0,
 
 const tips = [_][]const u8{
     "You can build over top of walls!\nThis lets you maze first, then build towers.",
@@ -158,14 +160,19 @@ pub fn leave(self: *MenuState, to: ?Game.StateId) void {
 }
 
 pub fn update(self: *MenuState) void {
-    _ = self;
+    self.p_scroll_offset = self.scroll_offset;
+    self.scroll_offset += 0.5;
+    while (self.scroll_offset >= 32) {
+        self.scroll_offset -= 32;
+        self.p_scroll_offset -= 32;
+    }
 }
 
 pub fn render(self: *MenuState, alpha: f64) void {
-    _ = alpha;
-
     gl.clearColor(0x64.0 / 255.0, 0x95.0 / 255.0, 0xED.0 / 255.0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
+
+    self.renderBackground(alpha);
 
     self.r_font.begin(.{
         .texture = self.game.texman.getNamedTexture("CommonCase.png"),
@@ -234,4 +241,36 @@ pub fn handleEvent(self: *MenuState, ev: sdl.SDL_Event) void {
         };
         _ = self.ui_root.handleMouseUp(ui_args);
     }
+}
+
+fn renderBackground(self: *MenuState, alpha: f64) void {
+    self.r_batch.begin(.{
+        .texture = self.game.texman.getNamedTexture("special.png"),
+    });
+
+    const src = Rect.init(224, 128, 32, 32).toRectf();
+
+    const num_x = @divTrunc(Game.INTERNAL_WIDTH, 32) + 1;
+    const num_y = @divTrunc(Game.INTERNAL_HEIGHT, 32) + 1;
+
+    const scroll_offset = zm.lerpV(self.p_scroll_offset, self.scroll_offset, @floatCast(f32, alpha));
+
+    var y: i32 = 0;
+    var x: i32 = 0;
+    while (y < num_y) : (y += 1) {
+        x = 0;
+        while (x < num_x) : (x += 1) {
+            self.r_batch.drawQuadOptions(.{
+                .src = src,
+                .dest = Rectf.init(
+                    @intToFloat(f32, x) * src.w - scroll_offset,
+                    @intToFloat(f32, y) * src.h - scroll_offset,
+                    src.w,
+                    src.h,
+                ),
+                .color = @Vector(4, u8){ 100, 100, 100, 255 },
+            });
+        }
+    }
+    self.r_batch.end();
 }
