@@ -633,9 +633,9 @@
         },
         {
             "rect": {
-                "x": 136,
-                "y": 22,
-                "w": 7,
+                "x": 16,
+                "y": 48,
+                "w": 6,
                 "h": 11
             },
             "glyph": "$"
@@ -856,7 +856,7 @@
         "C fj,; -1",
         "D T.,; -1",
         "E OQacdefgoqtv- -1",
-        "F GJOQacdefgmnopqrstuvwxyz0:#<@$%-+=>~{☺☻♥♦♣♠ -1",
+        "F GJOQacdefgmnopqrstuvwxyz0:#<@%-+=>~{☺☻♥♦♣♠ -1",
         "F A.,;/ -2",
         "F j_ -3",
         "G j,; -1",
@@ -893,7 +893,7 @@
         "c VYj7,; -1",
         "c T -2",
         "e TVYtjvx7)?\"' -1",
-        "f CJQSacdefgmnopqrstuvwxyz:@#$%^*-+=<>~{↑↓←→☺☻♥♦♣♠ -1",
+        "f CJQSacdefgmnopqrstuvwxyz:@#%^*-+=<>~{↑↓←→☺☻♥♦♣♠ -1",
         "f Aj.,;/_ -2",
         "h V? -1",
         "h TY7 -2",
@@ -903,7 +903,7 @@
         "o TYj7 -2",
         "p AIV.,;?_\"' -1",
         "p TYj -2",
-        "q AGHIJMOPQRSUVWXYZabcdefghikloqrstuvwxyz0123456789.!?@#$%^\"' -1",
+        "q AGHIJMOPQRSUVWXYZabcdefghikloqrstuvwxyz0123456789.!?@#%^\"' -1",
         "q T -2",
         "r IT.; -1",
         "r j, -2",
@@ -930,7 +930,7 @@
         "7 , -2",
         "8 , -1",
         "9 , -1",
-        ". OQTUVYacdefgotv047@#$<?\\↑↓♥♦♣♠ -1",
+        ". OQTUVYacdefgotv047@#<?\\↑↓♥♦♣♠ -1",
         ", TVftv7↑↓ -1",
         ", Y -2",
         "; TV7 -1",
@@ -939,7 +939,6 @@
         "@ T -1",
         "# IV17. -1",
         "# TY -2",
-        "$ 7 -1",
         "% 7 -1",
         "^ AJ7 -1",
         "^ j/ -3",
@@ -989,6 +988,7 @@
         "♣ AIXt17. -1",
         "♣ TYj -2",
         "♠ AIXt17. -1",
-        "♠ TYj -2"
+        "♠ TYj -2",
+        "$ 0123456789 4"
     ]
 }
