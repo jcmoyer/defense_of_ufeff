@@ -636,7 +636,8 @@ pub const Root = struct {
         return null;
     }
 
-    pub fn handleMouseMove(self: *Root, args: MouseEventArgs) void {
+    pub fn handleMouseMove(self: *Root, args: MouseEventArgs) bool {
+        var handled: bool = false;
         if (self.findElementAt(args.x, args.y)) |result| {
             if (self.hover) |h| {
                 if (result.control.instance != h.instance) {
@@ -652,6 +653,7 @@ pub const Root = struct {
             };
             result.control.handleMouseMove(local_args);
             self.tooltip_text = result.control.getTooltipText();
+            handled = true;
         } else {
             if (self.hover) |h| {
                 h.handleMouseLeave();
@@ -660,6 +662,7 @@ pub const Root = struct {
             self.tooltip_text = null;
         }
         self.backend.setCursorForHint(self.interaction_hint);
+        return handled;
     }
 
     /// Returns true if a UI element handled the event.
@@ -770,6 +773,39 @@ pub const SDLBackend = struct {
         switch (hint) {
             .none => sdl.SDL_SetCursor(self.c_arrow),
             .clickable => sdl.SDL_SetCursor(self.c_hand),
+        }
+    }
+
+    pub fn dispatchEvent(self: SDLBackend, ev: sdl.SDL_Event, root: *Root) bool {
+        switch (ev.type) {
+            .SDL_MOUSEMOTION => {
+                const mouse_p = self.mouseVirtual();
+                const mouse_args = MouseEventArgs{
+                    .x = mouse_p[0],
+                    .y = mouse_p[1],
+                    .buttons = mouseEventToButtons(ev),
+                };
+                return root.handleMouseMove(mouse_args);
+            },
+            .SDL_MOUSEBUTTONDOWN => {
+                const mouse_p = self.mouseVirtual();
+                const mouse_args = MouseEventArgs{
+                    .x = mouse_p[0],
+                    .y = mouse_p[1],
+                    .buttons = mouseEventToButtons(ev),
+                };
+                return root.handleMouseDown(mouse_args);
+            },
+            .SDL_MOUSEBUTTONUP => {
+                const mouse_p = self.mouseVirtual();
+                const mouse_args = MouseEventArgs{
+                    .x = mouse_p[0],
+                    .y = mouse_p[1],
+                    .buttons = mouseEventToButtons(ev),
+                };
+                return root.handleMouseUp(mouse_args);
+            },
+            else => return false,
         }
     }
 

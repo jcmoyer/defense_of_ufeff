@@ -196,51 +196,7 @@ pub fn render(self: *MenuState, alpha: f64) void {
 }
 
 pub fn handleEvent(self: *MenuState, ev: sdl.SDL_Event) void {
-    if (ev.type == .SDL_KEYDOWN) {
-        switch (ev.key.keysym.sym) {
-            sdl.SDLK_ESCAPE => std.process.exit(0),
-            else => {},
-        }
-    }
-
-    if (ev.type == .SDL_MOUSEMOTION) {
-        const mouse_p = self.game.unproject(
-            self.game.input.mouse.client_x,
-            self.game.input.mouse.client_y,
-        );
-        const ui_args = ui.MouseEventArgs{
-            .x = mouse_p[0],
-            .y = mouse_p[1],
-            .buttons = ui.SDLBackend.mouseEventToButtons(ev),
-        };
-        self.ui_root.handleMouseMove(ui_args);
-    }
-
-    if (ev.type == .SDL_MOUSEBUTTONDOWN) {
-        const mouse_p = self.game.unproject(
-            self.game.input.mouse.client_x,
-            self.game.input.mouse.client_y,
-        );
-        const ui_args = ui.MouseEventArgs{
-            .x = mouse_p[0],
-            .y = mouse_p[1],
-            .buttons = ui.SDLBackend.mouseEventToButtons(ev),
-        };
-        _ = self.ui_root.handleMouseDown(ui_args);
-    }
-
-    if (ev.type == .SDL_MOUSEBUTTONUP) {
-        const mouse_p = self.game.unproject(
-            self.game.input.mouse.client_x,
-            self.game.input.mouse.client_y,
-        );
-        const ui_args = ui.MouseEventArgs{
-            .x = mouse_p[0],
-            .y = mouse_p[1],
-            .buttons = ui.SDLBackend.mouseEventToButtons(ev),
-        };
-        _ = self.ui_root.handleMouseUp(ui_args);
-    }
+    _ = self.ui_root.backend.dispatchEvent(ev, &self.ui_root);
 }
 
 fn renderBackground(self: *MenuState, alpha: f64) void {

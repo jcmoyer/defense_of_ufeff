@@ -318,10 +318,13 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
         return;
     }
 
+    if (self.ui_root.backend.dispatchEvent(ev, &self.ui_root)) {
+        return;
+    }
+
     if (ev.type == .SDL_KEYDOWN) {
         switch (ev.key.keysym.sym) {
             sdl.SDLK_F1 => self.deb_render_tile_collision = !self.deb_render_tile_collision,
-            sdl.SDLK_F6 => self.beginTransitionGameOver(),
             sdl.SDLK_ESCAPE => if (self.interact_state == .build) {
                 self.interact_state = .none;
             },
@@ -329,38 +332,14 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
         }
     }
 
-    if (ev.type == .SDL_MOUSEMOTION) {
-        const mouse_p = self.game.unproject(
-            self.game.input.mouse.client_x,
-            self.game.input.mouse.client_y,
-        );
-        const ui_args = ui.MouseEventArgs{
-            .x = mouse_p[0],
-            .y = mouse_p[1],
-            .buttons = ui.SDLBackend.mouseEventToButtons(ev),
-        };
-        self.ui_root.handleMouseMove(ui_args);
-    }
-
     if (ev.type == .SDL_MOUSEBUTTONDOWN) {
         if (ev.button.button == sdl.SDL_BUTTON_LEFT) {
-            const mouse_p = self.game.unproject(
-                self.game.input.mouse.client_x,
-                self.game.input.mouse.client_y,
-            );
-            const ui_args = ui.MouseEventArgs{
-                .x = mouse_p[0],
-                .y = mouse_p[1],
-                .buttons = ui.SDLBackend.mouseEventToButtons(ev),
-            };
-            if (!self.ui_root.handleMouseDown(ui_args)) {
-                if (self.interact_state == .build) {
-                    const tile_coord = self.mouseToTile();
-                    if (self.world.canBuildAt(tile_coord)) {
-                        _ = self.world.spawnTower(self.interact_state.build.tower_spec, tile_coord, self.game.frame_counter) catch unreachable;
-                        if (sdl.SDL_GetModState() & sdl.KMOD_SHIFT == 0) {
-                            self.interact_state = .none;
-                        }
+            if (self.interact_state == .build) {
+                const tile_coord = self.mouseToTile();
+                if (self.world.canBuildAt(tile_coord)) {
+                    _ = self.world.spawnTower(self.interact_state.build.tower_spec, tile_coord, self.game.frame_counter) catch unreachable;
+                    if (sdl.SDL_GetModState() & sdl.KMOD_SHIFT == 0) {
+                        self.interact_state = .none;
                     }
                 }
             }
@@ -369,19 +348,6 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
                 self.interact_state = .none;
             }
         }
-    }
-
-    if (ev.type == .SDL_MOUSEBUTTONUP) {
-        const mouse_p = self.game.unproject(
-            self.game.input.mouse.client_x,
-            self.game.input.mouse.client_y,
-        );
-        const ui_args = ui.MouseEventArgs{
-            .x = mouse_p[0],
-            .y = mouse_p[1],
-            .buttons = ui.SDLBackend.mouseEventToButtons(ev),
-        };
-        _ = self.ui_root.handleMouseUp(ui_args);
     }
 }
 
