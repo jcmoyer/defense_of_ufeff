@@ -1005,11 +1005,9 @@ pub const World = struct {
     }
 
     fn playPositionalSound(self: World, sound: [:0]const u8, world_x: i32, world_y: i32) void {
-        var params = audio.AudioSystem.instance.playSound(sound);
-        defer params.release();
-
         const sound_position = [2]i32{ world_x, world_y };
-        audio.computePositionalParameters(self.view, sound_position, params);
+        var params = audio.AudioSystem.instance.playSound(sound, audio.computePositionalOptions(self.view, sound_position));
+        defer params.release();
     }
 };
 

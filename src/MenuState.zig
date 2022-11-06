@@ -113,13 +113,13 @@ fn showRandomTip(self: *MenuState) void {
 
 fn onNewGameClick(button: *ui.Button, self: *MenuState) void {
     _ = button;
-    self.game.audio.playSound("assets/sounds/click.ogg").release();
+    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.game.changeState(.play);
 }
 
 fn onOptionsClick(button: *ui.Button, self: *MenuState) void {
     _ = button;
-    self.game.audio.playSound("assets/sounds/click.ogg").release();
+    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
 }
 
 fn onQuitClick(button: *ui.Button, self: *MenuState) void {
@@ -130,7 +130,7 @@ fn onQuitClick(button: *ui.Button, self: *MenuState) void {
 fn onButtonClick(button: *ui.Button, userdata: ?*anyopaque) void {
     _ = button;
     var data = @ptrCast(*MenuState, @alignCast(@alignOf(MenuState), userdata));
-    data.game.audio.playSound("assets/sounds/click.ogg").release();
+    data.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     data.showRandomTip();
 }
 

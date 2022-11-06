@@ -43,22 +43,6 @@ const FoamDraw = struct {
     bottom: bool,
 };
 
-const ButtonData = struct {
-    state: *PlayState,
-    spec: *const wo.TowerSpec,
-};
-
-const button_specs = [8]*const wo.TowerSpec{
-    &wo.t_wall,
-    &wo.tspec_test,
-    &wo.t_wall,
-    &wo.t_wall,
-    &wo.t_wall,
-    &wo.t_wall,
-    &wo.t_wall,
-    &wo.t_wall,
-};
-
 const InteractStateBuild = struct {
     /// What the player will build when he clicks
     tower_spec: *const wo.TowerSpec,
@@ -143,22 +127,26 @@ pub fn create(game: *Game) !*PlayState {
     ui_panel.rect.alignRight(Game.INTERNAL_WIDTH);
     ui_panel.texture = t_panel;
     try self.ui_root.addChild(ui_panel.control());
-    for (self.ui_buttons) |*b, i| {
-        b.* = try self.ui_root.createButton();
-        b.*.tooltip_text = "Wall\n$1";
-        try ui_panel.addChild(b.*.control());
 
-        const x: i32 = if (i % 2 == 0) 18 else 50;
-        const y: i32 = 114 + @intCast(i32, i / 2) * 32;
+    var btn_y: i32 = 146;
+    var btn_x: i32 = 18;
+    var b_wall = try self.ui_root.createButton();
+    b_wall.tooltip_text = "Build Wall\n$1\n\nBlocks monster movement.\nCan be built over.";
+    b_wall.text = "Wall";
+    b_wall.rect = Rect.init(btn_x, btn_y, 28, 28);
+    b_wall.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
+    b_wall.setCallback(self, onWallClick);
+    try ui_panel.addChild(b_wall.control());
 
-        b.*.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
-        b.*.rect = Rect.init(x, y, 28, 28);
+    btn_x += 32;
+    var b_tower = try self.ui_root.createButton();
+    b_tower.tooltip_text = "Hire Soldier\n$10\n\nBlocks monster movement.\nUpgrades into other units.";
+    b_tower.text = "Hire";
+    b_tower.rect = Rect.init(btn_x, btn_y, 28, 28);
+    b_tower.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
+    b_tower.setCallback(self, onTowerClick);
+    try ui_panel.addChild(b_tower.control());
 
-        var userdata_ptr = try self.game.allocator.create(ButtonData);
-        userdata_ptr.state = self;
-        userdata_ptr.spec = button_specs[i];
-        b.*.setCallback(userdata_ptr, onButtonClick);
-    }
     self.ui_minimap = try self.ui_root.createMinimap();
     self.ui_minimap.rect = Rect.init(16, 16, 64, 64);
     self.ui_minimap.texture = self.t_minimap;
@@ -172,11 +160,19 @@ pub fn create(game: *Game) !*PlayState {
     return self;
 }
 
-fn onButtonClick(button: *ui.Button, data: *ButtonData) void {
+fn onWallClick(button: *ui.Button, self: *PlayState) void {
     _ = button;
-    data.state.game.audio.playSound("assets/sounds/click.ogg").release();
-    data.state.interact_state = .{ .build = InteractStateBuild{
-        .tower_spec = data.spec,
+    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
+    self.interact_state = .{ .build = InteractStateBuild{
+        .tower_spec = &wo.t_wall,
+    } };
+}
+
+fn onTowerClick(button: *ui.Button, self: *PlayState) void {
+    _ = button;
+    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
+    self.interact_state = .{ .build = InteractStateBuild{
+        .tower_spec = &wo.tspec_test,
     } };
 }
 
@@ -197,10 +193,6 @@ fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.Bitm
 }
 
 pub fn destroy(self: *PlayState) void {
-    for (self.ui_buttons) |b| {
-        var data = @ptrCast(*ButtonData, @alignCast(@alignOf(ButtonData), b.userdata));
-        self.game.allocator.destroy(data);
-    }
     self.fontspec.deinit();
     self.fontspec_numbers.deinit();
     self.r_quad.destroy();
@@ -337,7 +329,7 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
             if (self.interact_state == .build) {
                 const tile_coord = self.mouseToTile();
                 if (self.world.canBuildAt(tile_coord)) {
-                    self.game.audio.playSound("assets/sounds/build.ogg").release();
+                    self.game.audio.playSound("assets/sounds/build.ogg", .{}).release();
                     _ = self.world.spawnTower(self.interact_state.build.tower_spec, tile_coord, self.game.frame_counter) catch unreachable;
                     if (sdl.SDL_GetModState() & sdl.KMOD_SHIFT == 0) {
                         self.interact_state = .none;

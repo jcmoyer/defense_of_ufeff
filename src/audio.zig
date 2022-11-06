@@ -66,6 +66,11 @@ const DecodeRequest = struct {
     parameters: *AudioParameters,
 };
 
+pub const AudioOptions = struct {
+    initial_volume: f32 = 1,
+    initial_pan: f32 = 0.5,
+};
+
 pub const AudioSystem = struct {
     pub var instance: *AudioSystem = undefined;
 
@@ -212,6 +217,7 @@ pub const AudioSystem = struct {
                 log.err("Failed to allocate audio buffer: {!}", .{err});
                 std.process.exit(1);
             };
+            ptr.* = .{};
             gop.value_ptr.* = ptr;
             self.cache_m.unlock();
 
@@ -260,6 +266,9 @@ pub const AudioSystem = struct {
             // stereo. This may need to change in the future.
             const buffer_sample_count = 2 * input_buffer.sample_count.load(.SeqCst);
 
+            const m_left = 1 - pan;
+            const m_right = pan;
+
             var i: usize = 0;
             while (i < buffer.len) : (i += 2) {
                 if (track.done) {
@@ -267,38 +276,16 @@ pub const AudioSystem = struct {
                 }
 
                 const output_left = &buffer[i];
-                const m_left = 1 - pan;
                 const output_right = &buffer[i + 1];
-                const m_right = pan;
+                const input_left = input_buffer.samples.?[track.cursor];
+                const input_right = input_buffer.samples.?[track.cursor + 1];
 
-                // Here we do the math using 32-bit integers and then clamp the
-                // result to 16-bits. This is not really correct since we can "clip"
-                // the sample in this track and continue adding/subtracting
-                // the pre-clipped value in the next. It would be more correct to
-                // clamp once at the end, but then we would need another buffer.
-                const left_sample_to_mix = @floatToInt(
-                    i32,
-                    @intToFloat(f32, input_buffer.samples.?[track.cursor]) * volume * m_left,
-                );
-                const left_sample_in_mix = @intCast(i32, output_left.*);
-                const left_mixed = left_sample_to_mix + left_sample_in_mix;
-                output_left.* = @intCast(i16, std.math.clamp(
-                    left_mixed,
-                    std.math.minInt(i16),
-                    std.math.maxInt(i16),
-                ));
+                std.debug.assert(m_left >= 0 and m_left <= 1);
+                std.debug.assert(m_right >= 0 and m_right <= 1);
+                std.debug.assert(volume >= 0 and volume <= 1);
 
-                const right_sample_to_mix = @floatToInt(
-                    i32,
-                    @intToFloat(f32, input_buffer.samples.?[track.cursor]) * volume * m_right,
-                );
-                const right_sample_in_mix = @intCast(i32, output_right.*);
-                const right_mixed = right_sample_to_mix + right_sample_in_mix;
-                output_right.* = @intCast(i16, std.math.clamp(
-                    right_mixed,
-                    std.math.minInt(i16),
-                    std.math.maxInt(i16),
-                ));
+                output_left.* +|= @intCast(i16, (@floatToInt(i32, @intToFloat(f32, input_left) * volume * m_left)));
+                output_right.* +|= @intCast(i16, (@floatToInt(i32, @intToFloat(f32, input_right) * volume * m_right)));
 
                 track.cursor += 2;
                 if (track.cursor == buffer_sample_count) {
@@ -331,11 +318,13 @@ pub const AudioSystem = struct {
         );
     }
 
-    pub fn playMusic(self: *AudioSystem, filename: [:0]const u8) *AudioParameters {
+    pub fn playMusic(self: *AudioSystem, filename: [:0]const u8, opts: AudioOptions) *AudioParameters {
         const parameters = AudioParameters.create(self.allocator) catch |err| {
             log.err("Failed to create AudioParameters for music: {!}", .{err});
             std.process.exit(1);
         };
+        parameters.volume.storeUnchecked(opts.initial_volume);
+        parameters.pan.storeUnchecked(opts.initial_pan);
         var req = DecodeRequest{
             .filename = filename,
             .loop = true,
@@ -351,11 +340,13 @@ pub const AudioSystem = struct {
         return parameters.addRef();
     }
 
-    pub fn playSound(self: *AudioSystem, filename: [:0]const u8) *AudioParameters {
+    pub fn playSound(self: *AudioSystem, filename: [:0]const u8, opts: AudioOptions) *AudioParameters {
         const parameters = AudioParameters.create(self.allocator) catch |err| {
             log.err("Failed to create AudioParameters for sound: {!}", .{err});
             std.process.exit(1);
         };
+        parameters.volume.storeUnchecked(opts.initial_volume);
+        parameters.pan.storeUnchecked(opts.initial_pan);
         var req = DecodeRequest{
             .filename = filename,
             .loop = false,
@@ -394,16 +385,22 @@ pub const AudioSystem = struct {
 const Rect = @import("Rect.zig");
 const mathutil = @import("mathutil.zig");
 
-pub fn computePositionalParameters(view: Rect, audio_position: [2]i32, output: *AudioParameters) void {
-    const pan = std.math.max(0, @intToFloat(f32, audio_position[0] - view.left())) / @intToFloat(f32, view.right());
+pub fn computePositionalOptions(view: Rect, audio_position: [2]i32) AudioOptions {
+    const V2 = @Vector(2, f32);
+
+    const view_center = view.centerPoint();
+    const theta = mathutil.angleBetween(
+        V2{ @intToFloat(f32, view_center[0]), @intToFloat(f32, view_center[1]) },
+        V2{ @intToFloat(f32, audio_position[0]), @intToFloat(f32, audio_position[1]) },
+    );
+    var pan = 0.5 * (1.0 + std.math.cos(theta));
 
     const d_center = mathutil.dist(view.centerPoint(), audio_position);
-    const d_edge = mathutil.dist(
-        view.centerPoint(),
-        [2]i32{ view.left(), view.centerPoint()[1] },
-    );
-    const volume = 1 - (d_center / d_edge);
+    const d_edge = @intToFloat(f32, view.w);
+    const volume = std.math.clamp(0.9 - (d_center / d_edge), 0, 1);
 
-    output.pan.store(pan, .SeqCst);
-    output.volume.store(volume, .SeqCst);
+    return .{
+        .initial_pan = pan,
+        .initial_volume = volume,
+    };
 }
