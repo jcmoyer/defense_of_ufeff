@@ -28,13 +28,36 @@ r_font: BitmapFont,
 fontspec: bmfont.BitmapFontSpec,
 ui_root: ui.Root,
 ui_tip: *ui.Button,
-btn_newgame: *ui.Button,
 rng: std.rand.DefaultPrng,
 tip_index: usize = 0,
+menu_start: i32 = 80,
 
 const tips = [_][]const u8{
     "You can build over top of walls!\nThis lets you maze first, then build towers.",
 };
+
+fn createMenuButton(self: *MenuState, comptime text: []const u8, comptime cb: anytype) !*ui.Button {
+    var btn = try self.ui_root.createButton();
+    btn.text = text;
+    btn.rect = Rect.init(0, 0, 128, 32);
+    btn.rect.centerOn(Game.INTERNAL_WIDTH / 2, 0);
+    btn.rect.y = self.menu_start;
+    self.menu_start += btn.rect.h;
+    btn.texture = self.game.texman.getNamedTexture("menu_button.png");
+    btn.texture_rects = [4]Rect{
+        // .normal
+        Rect.init(0, 0, 128, 32),
+        // .hover
+        Rect.init(0, 0, 128, 32),
+        // .down
+        Rect.init(0, 32, 128, 32),
+        // .disabled
+        Rect.init(0, 0, 128, 32),
+    };
+    btn.setCallback(self, cb);
+    try self.ui_root.addChild(btn.control());
+    return btn;
+}
 
 pub fn create(game: *Game) !*MenuState {
     var self = try game.allocator.create(MenuState);
@@ -47,19 +70,14 @@ pub fn create(game: *Game) !*MenuState {
         .rng = std.rand.DefaultPrng.init(@intCast(u64, std.time.milliTimestamp())),
         // Initialized below
         .ui_tip = undefined,
-        .btn_newgame = undefined,
     };
     self.r_font = BitmapFont.init(&self.r_batch);
     self.ui_root.backend.coord_scale_x = 2;
     self.ui_root.backend.coord_scale_y = 2;
 
-    self.btn_newgame = try self.ui_root.createButton();
-    self.btn_newgame.text = "New Game";
-    self.btn_newgame.rect = Rect.init(0, 0, 128, 32);
-    self.btn_newgame.rect.centerOn(Game.INTERNAL_WIDTH / 2, 100);
-    self.btn_newgame.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
-    self.btn_newgame.setCallback(self, onNewGameClick);
-    try self.ui_root.addChild(self.btn_newgame.control());
+    _ = try self.createMenuButton("New Game", onNewGameClick);
+    _ = try self.createMenuButton("Options", onOptionsClick);
+    _ = try self.createMenuButton("Quit", onQuitClick);
 
     self.ui_tip = try self.ui_root.createButton();
     self.ui_tip.texture = self.game.texman.getNamedTexture("special.png");
@@ -95,6 +113,16 @@ fn onNewGameClick(button: *ui.Button, self: *MenuState) void {
     _ = button;
     self.game.audio.playSound("assets/sounds/click.ogg").release();
     self.game.changeState(.play);
+}
+
+fn onOptionsClick(button: *ui.Button, self: *MenuState) void {
+    _ = button;
+    self.game.audio.playSound("assets/sounds/click.ogg").release();
+}
+
+fn onQuitClick(button: *ui.Button, self: *MenuState) void {
+    _ = button;
+    self.game.quit();
 }
 
 fn onButtonClick(button: *ui.Button, userdata: ?*anyopaque) void {

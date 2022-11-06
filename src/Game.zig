@@ -155,6 +155,10 @@ fn init(self: *Game) void {
     self.initFramebuffer();
 }
 
+pub fn quit(self: *Game) void {
+    self.running = false;
+}
+
 /// Initialize game and run main loop.
 pub fn run(self: *Game) void {
     self.running = true;
