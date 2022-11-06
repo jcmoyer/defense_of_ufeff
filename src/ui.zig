@@ -964,7 +964,7 @@ fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRe
                         .spec = opts.font_spec,
                     });
                     opts.r_font.drawText(text, .{
-                        .dest = rect,
+                        .dest = render_dest,
                         .h_alignment = .center,
                         .v_alignment = .middle,
                     });
