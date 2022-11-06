@@ -145,7 +145,7 @@ pub fn create(game: *Game) !*PlayState {
     try self.ui_root.addChild(ui_panel.control());
     for (self.ui_buttons) |*b, i| {
         b.* = try self.ui_root.createButton();
-        b.*.tooltip_text = "test tooltip\nanother line";
+        b.*.tooltip_text = "Wall\n$1";
         try ui_panel.addChild(b.*.control());
 
         const x: i32 = if (i % 2 == 0) 18 else 50;

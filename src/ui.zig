@@ -220,16 +220,23 @@ pub const Minimap = struct {
 
     fn handleMouseEvent(self: *Minimap, args: MouseEventArgs) void {
         const cr = self.computeClickableRect();
-        if (args.buttons.left and cr.contains(args.x, args.y)) {
-            const crf = cr.toRectf();
-            const xf = @intToFloat(f32, args.x);
-            const yf = @intToFloat(f32, args.y);
-            const percent_x = (xf - crf.left()) / crf.w;
-            const percent_y = (yf - crf.top()) / crf.h;
-            if (self.pan_callback) |cb| {
-                cb(self, self.pan_userdata, percent_x, percent_y);
+        if (cr.contains(args.x, args.y)) {
+            self.root.interaction_hint = .clickable;
+            if (args.buttons.left) {
+                const crf = cr.toRectf();
+                const xf = @intToFloat(f32, args.x);
+                const yf = @intToFloat(f32, args.y);
+                const percent_x = (xf - crf.left()) / crf.w;
+                const percent_y = (yf - crf.top()) / crf.h;
+                if (self.pan_callback) |cb| {
+                    cb(self, self.pan_userdata, percent_x, percent_y);
+                }
             }
         }
+    }
+
+    fn handleMouseLeave(self: *Minimap) void {
+        self.root.interaction_hint = .none;
     }
 
     pub fn interactRect(self: *Minimap) ?Rect {
@@ -254,6 +261,7 @@ pub const Minimap = struct {
             .deinitFn = deinit,
             .handleMouseMoveFn = handleMouseMove,
             .handleMouseDownFn = handleMouseDown,
+            .handleMouseLeaveFn = handleMouseLeave,
             .interactRectFn = interactRect,
             .getTextureFn = getTexture,
             .customRenderFn = customRender,
