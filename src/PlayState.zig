@@ -337,6 +337,7 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
             if (self.interact_state == .build) {
                 const tile_coord = self.mouseToTile();
                 if (self.world.canBuildAt(tile_coord)) {
+                    self.game.audio.playSound("assets/sounds/build.ogg").release();
                     _ = self.world.spawnTower(self.interact_state.build.tower_spec, tile_coord, self.game.frame_counter) catch unreachable;
                     if (sdl.SDL_GetModState() & sdl.KMOD_SHIFT == 0) {
                         self.interact_state = .none;
