@@ -103,7 +103,7 @@ pub const BitmapFontSpec = struct {
                 width = std.math.max(width, width_this_line);
                 height += height_this_line;
                 width_this_line = 0;
-                height_this_line = 0;
+                height_this_line = self.mapGlyph(' ').h;
                 continue;
             }
             const glyph_rect = self.mapGlyph(ch);
@@ -202,7 +202,7 @@ pub const BitmapFont = struct {
             if (ch == '\n') {
                 dy += self.mapGlyph(' ').h;
                 dx = opts.dest.x;
-                if (std.mem.indexOfScalar(u8, text[i + 1 ..], '\n')) |linebreak| {
+                if (std.mem.indexOfScalarPos(u8, text, i + 1, '\n')) |linebreak| {
                     const line_dims = self.fontspec.measureText(text[i + 1 .. linebreak]);
                     dx = getXStart(opts.h_alignment, opts.dest, dims, line_dims);
                 } else {
