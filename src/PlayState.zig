@@ -87,6 +87,8 @@ t_minimap: *Texture,
 interact_state: InteractState = .none,
 sub: Substate = .none,
 fade_timer: FrameTimer = .{},
+gold_text: [32]u8 = undefined,
+ui_gold: *ui.Button,
 
 deb_render_tile_collision: bool = false,
 
@@ -115,6 +117,7 @@ pub fn create(game: *Game) !*PlayState {
         .ui_root = ui.Root.init(game.allocator, ui.SDLBackend.init(game.window)),
         .ui_buttons = undefined,
         .ui_minimap = undefined,
+        .ui_gold = undefined,
         .t_minimap = game.texman.createInMemory(),
     };
     self.r_font = BitmapFont.init(&self.r_batch);
@@ -152,6 +155,13 @@ pub fn create(game: *Game) !*PlayState {
     self.ui_minimap.texture = self.t_minimap;
     self.ui_minimap.setPanCallback(self, onMinimapPan);
     try ui_panel.addChild(self.ui_minimap.control());
+
+    // TODO: replace with label-type control
+    self.ui_gold = try self.ui_root.createButton();
+    self.ui_gold.rect = Rect.init(0, 96, 6 * 16, 32);
+    self.ui_gold.text = "$0";
+    self.ui_gold.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
+    try ui_panel.addChild(self.ui_gold.control());
 
     // TODO probably want a better way to manage this, direct IO shouldn't be here
     // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
@@ -248,6 +258,7 @@ pub fn update(self: *PlayState) void {
 
     self.world.view = self.camera.view;
     self.world.update(self.game.frame_counter, arena);
+    self.updateUI();
 
     if (self.sub == .none and self.world.recoverable_lives == 0) {
         self.beginTransitionGameOver();
@@ -256,6 +267,10 @@ pub fn update(self: *PlayState) void {
     if (self.sub == .gameover_fadeout and self.fade_timer.expired(self.game.frame_counter)) {
         self.game.changeState(.menu);
     }
+}
+
+fn updateUI(self: *PlayState) void {
+    self.ui_gold.text = std.fmt.bufPrint(&self.gold_text, "${d}", .{self.world.player_gold}) catch unreachable;
 }
 
 pub fn render(self: *PlayState, alpha: f64) void {
@@ -327,10 +342,12 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
     if (ev.type == .SDL_MOUSEBUTTONDOWN) {
         if (ev.button.button == sdl.SDL_BUTTON_LEFT) {
             if (self.interact_state == .build) {
+                const spec = self.interact_state.build.tower_spec;
                 const tile_coord = self.mouseToTile();
-                if (self.world.canBuildAt(tile_coord)) {
+                if (self.world.canBuildAt(tile_coord) and self.world.canAfford(spec)) {
                     self.game.audio.playSound("assets/sounds/build.ogg", .{}).release();
-                    _ = self.world.spawnTower(self.interact_state.build.tower_spec, tile_coord, self.game.frame_counter) catch unreachable;
+                    _ = self.world.spawnTower(spec, tile_coord, self.game.frame_counter) catch unreachable;
+                    self.world.player_gold -= spec.gold_cost;
                     if (sdl.SDL_GetModState() & sdl.KMOD_SHIFT == 0) {
                         self.interact_state = .none;
                     }
@@ -428,9 +445,9 @@ fn renderFloatingText(
             .{
                 .dest = dest,
                 .color = @Vector(4, u8){
-                    255,
-                    255,
-                    255,
+                    t.color[0],
+                    t.color[1],
+                    t.color[2],
                     @floatToInt(u8, 255 * a_coef),
                 },
                 .v_alignment = .middle,

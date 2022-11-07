@@ -108,11 +108,13 @@ pub const MonsterSpec = struct {
     spawnFn: ?*const fn (*Monster, u64) void = null,
     updateFn: ?*const fn (*Monster, u64) void = null,
     max_hp: u32,
+    gold: u32,
 };
 
 pub const mon_human = MonsterSpec{
     .anim_set = anim.a_chara.animationSet(),
     .max_hp = 5,
+    .gold = 1,
 };
 
 pub const Monster = struct {
@@ -306,11 +308,20 @@ pub const Monster = struct {
         std.debug.assert(self.dead == false);
         self.hp -|= amt;
         if (self.hp == 0) {
-            self.dead = true;
-            if (self.carrying_life) {
-                self.world.lives_at_goal += 1;
-            }
+            self.kill();
         }
+    }
+
+    pub fn kill(self: *Monster) void {
+        self.dead = true;
+        if (self.carrying_life) {
+            self.world.lives_at_goal += 1;
+        }
+        const text_id = self.world.spawnPrintFloatingText("+{d}", .{self.spec.gold}, @intCast(i32, self.world_x), @intCast(i32, self.world_y)) catch unreachable;
+        var text_obj = self.world.floating_text.getPtr(text_id);
+        text_obj.color = @Vector(4, u8){ 255, 255, 0, 255 };
+        text_obj.vel_y = -1;
+        self.world.player_gold += self.spec.gold;
     }
 };
 
@@ -320,9 +331,12 @@ pub const TowerSpec = struct {
     updateFn: ?*const fn (*Tower, u64) void = null,
     min_range: f32 = 0,
     max_range: f32 = 0,
+    gold_cost: u32 = 0,
 };
 
-pub const t_wall = TowerSpec{};
+pub const t_wall = TowerSpec{
+    .gold_cost = 1,
+};
 
 pub const tspec_test = TowerSpec{
     .anim_set = anim.a_chara.animationSet(),
@@ -330,6 +344,7 @@ pub const tspec_test = TowerSpec{
     .updateFn = tspecTestUpdate,
     .min_range = 50,
     .max_range = 100,
+    .gold_cost = 10,
 };
 
 fn tspecTestSpawn(self: *Tower, frame: u64) void {
@@ -519,6 +534,7 @@ pub const FloatingText = struct {
     max_life: u32 = 30,
     life: u32 = 30,
     dead: bool = false,
+    color: @Vector(4, u8) = @splat(4, @as(u8, 255)),
 
     fn update(self: *FloatingText) void {
         self.p_world_x = self.world_x;
@@ -613,6 +629,7 @@ pub const World = struct {
     play_area: ?Rect = null,
     lives_at_goal: u32 = 30,
     recoverable_lives: u32 = 30,
+    player_gold: u32 = 50,
 
     pub fn init(allocator: Allocator) World {
         return .{
@@ -680,6 +697,10 @@ pub const World = struct {
             @intToFloat(f32, coord.x * 16) + 8,
             @intToFloat(f32, coord.y * 16) + 16,
         };
+    }
+
+    pub fn canAfford(self: *World, spec: *const TowerSpec) bool {
+        return self.player_gold >= spec.gold_cost;
     }
 
     pub fn canBuildAt(self: *World, coord: TileCoord) bool {
