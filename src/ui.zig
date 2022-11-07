@@ -267,19 +267,21 @@ pub const Minimap = struct {
 
     fn handleMouseEvent(self: *Minimap, args: MouseEventArgs) void {
         const cr = self.computeClickableRect();
-        if (cr.contains(args.x, args.y)) {
-            self.root.interaction_hint = .clickable;
-            if (args.buttons.left) {
-                const crf = cr.toRectf();
-                const xf = @intToFloat(f32, args.x);
-                const yf = @intToFloat(f32, args.y);
-                const percent_x = (xf - crf.left()) / crf.w;
-                const percent_y = (yf - crf.top()) / crf.h;
-                if (self.pan_callback) |cb| {
-                    cb(self, self.pan_userdata, percent_x, percent_y);
-                }
+        const p = cr.clampPoint(args.x, args.y);
+        if (args.buttons.left) {
+            const crf = cr.toRectf();
+            const xf = @intToFloat(f32, p[0]);
+            const yf = @intToFloat(f32, p[1]);
+            const percent_x = (xf - crf.left()) / crf.w;
+            const percent_y = (yf - crf.top()) / crf.h;
+            if (self.pan_callback) |cb| {
+                cb(self, self.pan_userdata, percent_x, percent_y);
             }
         }
+    }
+
+    fn handleMouseEnter(self: *Minimap) void {
+        self.root.interaction_hint = .clickable;
     }
 
     fn handleMouseLeave(self: *Minimap) void {
@@ -308,6 +310,7 @@ pub const Minimap = struct {
             .deinitFn = deinit,
             .handleMouseMoveFn = handleMouseMove,
             .handleMouseDownFn = handleMouseDown,
+            .handleMouseEnterFn = handleMouseEnter,
             .handleMouseLeaveFn = handleMouseLeave,
             .interactRectFn = interactRect,
             .getBackgroundFn = getBackground,
