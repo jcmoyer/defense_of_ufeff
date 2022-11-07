@@ -1128,7 +1128,7 @@ pub fn renderUI(opts: UIRenderOptions, ui_root: Root) void {
         text_rect.alignTop(frame_rect.top() + tooltip_padding);
 
         opts.r_imm.beginUntextured();
-        opts.r_imm.drawQuadRGBA(frame_rect, @Vector(4, f32){ 0, 0, 0, 1 });
+        opts.r_imm.drawQuadRGBA(frame_rect, @Vector(4, f32){ 0, 0, 0, 0.6 });
 
         opts.r_font.begin(.{
             .texture = opts.font_texture,
