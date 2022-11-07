@@ -317,7 +317,8 @@ pub const Monster = struct {
         if (self.carrying_life) {
             self.world.lives_at_goal += 1;
         }
-        const text_id = self.world.spawnPrintFloatingText("+{d}", .{self.spec.gold}, @intCast(i32, self.world_x), @intCast(i32, self.world_y)) catch unreachable;
+        const pos = self.getWorldCollisionRect().centerPoint();
+        const text_id = self.world.spawnPrintFloatingText("+{d}", .{self.spec.gold}, pos[0], pos[1]) catch unreachable;
         var text_obj = self.world.floating_text.getPtr(text_id);
         text_obj.color = @Vector(4, u8){ 255, 255, 0, 255 };
         text_obj.vel_y = -1;
