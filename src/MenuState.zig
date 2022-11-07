@@ -171,6 +171,8 @@ pub fn update(self: *MenuState) void {
 }
 
 pub fn render(self: *MenuState, alpha: f64) void {
+    self.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
+
     gl.clearColor(0x64.0 / 255.0, 0x95.0 / 255.0, 0xED.0 / 255.0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -187,7 +189,6 @@ pub fn render(self: *MenuState, alpha: f64) void {
     self.r_font.drawText(tips[self.tip_index], .{ .dest = Rect.init(0, 200, 512, 50), .h_alignment = .center });
     self.r_font.end();
 
-    self.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
     ui.renderUI(.{
         .r_batch = &self.r_batch,
         .r_font = &self.r_font,
