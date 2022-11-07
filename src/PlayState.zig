@@ -166,7 +166,7 @@ pub fn create(game: *Game) !*PlayState {
     // TODO probably want a better way to manage this, direct IO shouldn't be here
     // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
     self.fontspec = try loadFontSpec(self.game.allocator, "assets/tables/CommonCase.json");
-    self.fontspec_numbers = try loadFontSpec(self.game.allocator, "assets/tables/number3x5.json");
+    self.fontspec_numbers = try loadFontSpec(self.game.allocator, "assets/tables/floating_text.json");
     return self;
 }
 
@@ -428,7 +428,7 @@ fn renderFloatingText(
     alpha: f64,
 ) void {
     self.r_font.begin(.{
-        .texture = self.game.texman.getNamedTexture("text16.png"),
+        .texture = self.game.texman.getNamedTexture("floating_text.png"),
         .spec = &self.fontspec_numbers,
     });
     for (self.world.floating_text.slice()) |*t| {
