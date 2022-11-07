@@ -88,7 +88,7 @@ interact_state: InteractState = .none,
 sub: Substate = .none,
 fade_timer: FrameTimer = .{},
 gold_text: [32]u8 = undefined,
-ui_gold: *ui.Button,
+ui_gold: *ui.Label,
 
 deb_render_tile_collision: bool = false,
 
@@ -128,7 +128,7 @@ pub fn create(game: *Game) !*PlayState {
     var ui_panel = try self.ui_root.createPanel();
     ui_panel.rect = Rect.init(0, 0, @intCast(i32, t_panel.width), @intCast(i32, t_panel.height));
     ui_panel.rect.alignRight(Game.INTERNAL_WIDTH);
-    ui_panel.texture = t_panel;
+    ui_panel.background = .{ .texture = .{ .texture = t_panel } };
     try self.ui_root.addChild(ui_panel.control());
 
     var btn_y: i32 = 146;
@@ -137,7 +137,7 @@ pub fn create(game: *Game) !*PlayState {
     b_wall.tooltip_text = "Build Wall\n$1\n\nBlocks monster movement.\nCan be built over.";
     b_wall.text = "Wall";
     b_wall.rect = Rect.init(btn_x, btn_y, 28, 28);
-    b_wall.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
+    b_wall.setTexture(self.game.texman.getNamedTexture("ui_iconframe.png"));
     b_wall.setCallback(self, onWallClick);
     try ui_panel.addChild(b_wall.control());
 
@@ -146,7 +146,7 @@ pub fn create(game: *Game) !*PlayState {
     b_tower.tooltip_text = "Hire Soldier\n$10\n\nBlocks monster movement.\nUpgrades into other units.";
     b_tower.text = "Hire";
     b_tower.rect = Rect.init(btn_x, btn_y, 28, 28);
-    b_tower.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
+    b_tower.setTexture(self.game.texman.getNamedTexture("ui_iconframe.png"));
     b_tower.setCallback(self, onTowerClick);
     try ui_panel.addChild(b_tower.control());
 
@@ -157,10 +157,10 @@ pub fn create(game: *Game) !*PlayState {
     try ui_panel.addChild(self.ui_minimap.control());
 
     // TODO: replace with label-type control
-    self.ui_gold = try self.ui_root.createButton();
-    self.ui_gold.rect = Rect.init(0, 96, 6 * 16, 32);
+    self.ui_gold = try self.ui_root.createLabel();
+    self.ui_gold.rect = Rect.init(16, 96, 4 * 16, 32);
     self.ui_gold.text = "$0";
-    self.ui_gold.texture = self.game.texman.getNamedTexture("ui_iconframe.png");
+    self.ui_gold.background = .{ .color = ui.ControlColor.black };
     try ui_panel.addChild(self.ui_gold.control());
 
     // TODO probably want a better way to manage this, direct IO shouldn't be here

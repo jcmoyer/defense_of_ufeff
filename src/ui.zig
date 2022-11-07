@@ -10,6 +10,14 @@ pub const ControlTexture = struct {
     texture_rect: ?Rect = null,
 };
 
+pub const ControlColor = struct {
+    const Vec4b = @Vector(4, u8);
+    color: Vec4b,
+
+    pub const white = ControlColor{ .color = Vec4b{ 255, 255, 255, 255 } };
+    pub const black = ControlColor{ .color = Vec4b{ 0, 0, 0, 255 } };
+};
+
 pub const MouseButtons = struct {
     left: bool = false,
     middle: bool = false,
@@ -24,11 +32,17 @@ pub const MouseEventArgs = struct {
     buttons: MouseButtons,
 };
 
+pub const Background = union(enum) {
+    none,
+    texture: ControlTexture,
+    color: ControlColor,
+};
+
 pub const Panel = struct {
     root: *Root,
     children: std.ArrayListUnmanaged(Control),
     rect: Rect,
-    texture: ?*const Texture = null,
+    background: Background = .none,
 
     pub fn deinit(self: *Panel) void {
         self.children.deinit(self.root.allocator);
@@ -65,17 +79,13 @@ pub const Panel = struct {
             .deinitFn = deinit,
             .handleMouseClickFn = handleMouseClick,
             .interactRectFn = interactRect,
-            .getTextureFn = getTexture,
+            .getBackgroundFn = getBackground,
             .getChildrenFn = getChildren,
         });
     }
 
-    pub fn getTexture(self: *Panel) ?ControlTexture {
-        if (self.texture) |t| {
-            return ControlTexture{ .texture = t };
-        } else {
-            return null;
-        }
+    pub fn getBackground(self: *Panel) Background {
+        return self.background;
     }
 
     pub fn getChildren(self: *Panel) []Control {
@@ -94,7 +104,7 @@ pub const Button = struct {
     root: *Root,
     text: ?[]const u8,
     rect: Rect,
-    texture: ?*const Texture = null,
+    background: Background = .none,
     userdata: ?*anyopaque = null,
     callback: ?*const fn (*Button, ?*anyopaque) void = null,
     state: ButtonState = .normal,
@@ -175,7 +185,7 @@ pub const Button = struct {
             .deinitFn = deinit,
             .handleMouseClickFn = handleMouseClick,
             .interactRectFn = interactRect,
-            .getTextureFn = getTexture,
+            .getBackgroundFn = getBackground,
             .getTextFn = getText,
             .getTooltipTextFn = getTooltipText,
             .handleMouseEnterFn = handleMouseEnter,
@@ -185,15 +195,52 @@ pub const Button = struct {
         });
     }
 
-    pub fn getTexture(self: *Button) ?ControlTexture {
-        if (self.texture) |t| {
-            return ControlTexture{
-                .texture = t,
-                .texture_rect = self.texture_rects[@enumToInt(self.state)],
+    pub fn setTexture(self: *Button, t: *const Texture) void {
+        self.background = Background{ .texture = .{ .texture = t } };
+    }
+
+    pub fn getBackground(self: *Button) Background {
+        if (self.background == .texture) {
+            return Background{
+                .texture = ControlTexture{
+                    .texture = self.background.texture.texture,
+                    .texture_rect = self.texture_rects[@enumToInt(self.state)],
+                },
             };
-        } else {
-            return null;
         }
+        return self.background;
+    }
+};
+
+pub const Label = struct {
+    root: *Root,
+    text: ?[]const u8 = null,
+    rect: Rect,
+    background: Background = .none,
+
+    pub fn deinit(self: *Label) void {
+        self.root.allocator.destroy(self);
+    }
+
+    pub fn interactRect(self: *Label) ?Rect {
+        return self.rect;
+    }
+
+    pub fn getText(self: *Label) ?[]const u8 {
+        return self.text;
+    }
+
+    pub fn control(self: *Label) Control {
+        return Control.init(self, .{
+            .deinitFn = deinit,
+            .interactRectFn = interactRect,
+            .getBackgroundFn = getBackground,
+            .getTextFn = getText,
+        });
+    }
+
+    pub fn getBackground(self: *Label) Background {
+        return self.background;
     }
 };
 
@@ -263,22 +310,27 @@ pub const Minimap = struct {
             .handleMouseDownFn = handleMouseDown,
             .handleMouseLeaveFn = handleMouseLeave,
             .interactRectFn = interactRect,
-            .getTextureFn = getTexture,
+            .getBackgroundFn = getBackground,
             .customRenderFn = customRender,
         });
     }
 
-    pub fn getTexture(self: *Minimap) ?ControlTexture {
+    pub fn getBackground(self: *Minimap) Background {
         if (self.texture) |t| {
-            return ControlTexture{ .texture = t };
+            return Background{ .texture = ControlTexture{ .texture = t } };
         } else {
-            return null;
+            return .none;
         }
     }
 
     fn computeClickableRect(self: *Minimap) Rect {
         const rect = self.rect;
-        const t = self.getTexture() orelse return .{};
+        const background = self.getBackground();
+        if (background != .texture) {
+            return .{};
+        }
+
+        const t = background.texture;
 
         var render_dest = rect;
 
@@ -312,7 +364,12 @@ pub const Minimap = struct {
     }
 
     pub fn customRender(self: *Minimap, ctx: CustomRenderContext) void {
-        const t = self.getTexture() orelse return;
+        const background = self.getBackground();
+        if (background != .texture) {
+            return;
+        }
+
+        const t = background.texture;
         const cr = self.computeClickableRect();
         ctx.drawTexture(t.texture, cr);
 
@@ -340,7 +397,7 @@ fn ControlImpl(comptime PointerT: type) type {
 
         handleMouseClickFn: ?*const fn (PointerT, MouseEventArgs) void = null,
         interactRectFn: ?*const fn (self: PointerT) ?Rect = null,
-        getTextureFn: ?*const fn (self: PointerT) ?ControlTexture = null,
+        getBackgroundFn: ?*const fn (self: PointerT) Background = null,
         getChildrenFn: ?*const fn (self: PointerT) []Control = null,
         handleMouseEnterFn: ?*const fn (self: PointerT) void = null,
         handleMouseLeaveFn: ?*const fn (self: PointerT) void = null,
@@ -361,7 +418,7 @@ pub const Control = struct {
         deinitFn: *const fn (*anyopaque) void,
         handleMouseClickFn: *const fn (*anyopaque, MouseEventArgs) void,
         interactRectFn: *const fn (self: *anyopaque) ?Rect,
-        getTextureFn: *const fn (self: *anyopaque) ?ControlTexture,
+        getBackgroundFn: *const fn (self: *anyopaque) Background,
         getTextFn: *const fn (self: *anyopaque) ?[]const u8,
         getTooltipTextFn: *const fn (*anyopaque) ?[]const u8,
         getChildrenFn: *const fn (self: *anyopaque) []Control,
@@ -403,13 +460,13 @@ pub const Control = struct {
                 return f(inst);
             }
 
-            fn getTextureDefault(_: *anyopaque) ?ControlTexture {
-                return null;
+            fn getBackgroundDefault(_: *anyopaque) Background {
+                return .none;
             }
 
-            fn getTextureImpl(ptr: *anyopaque) ?ControlTexture {
+            fn getBackgroundImpl(ptr: *anyopaque) Background {
                 var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
-                const f = fns.getTextureFn orelse getTextureDefault;
+                const f = fns.getBackgroundFn orelse getBackgroundDefault;
                 return f(inst);
             }
 
@@ -479,7 +536,7 @@ pub const Control = struct {
                 .deinitFn = deinitImpl,
                 .handleMouseClickFn = handleMouseClickImpl,
                 .interactRectFn = interactRectImpl,
-                .getTextureFn = getTextureImpl,
+                .getBackgroundFn = getBackgroundImpl,
                 .getTextFn = getTextImpl,
                 .getTooltipTextFn = getTooltipTextImpl,
                 .getChildrenFn = getChildrenImpl,
@@ -514,8 +571,8 @@ pub const Control = struct {
         return self.vtable.interactRectFn(self.instance);
     }
 
-    pub fn getTexture(self: Control) ?ControlTexture {
-        return self.vtable.getTextureFn(self.instance);
+    pub fn getBackground(self: Control) Background {
+        return self.vtable.getBackgroundFn(self.instance);
     }
 
     pub fn getChildren(self: Control) ?[]Control {
@@ -728,6 +785,16 @@ pub const Root = struct {
         return ptr;
     }
 
+    pub fn createLabel(self: *Root) !*Label {
+        var ptr = try self.allocator.create(Label);
+        ptr.* = Label{
+            .root = self,
+            .rect = Rect.init(0, 0, 0, 0),
+        };
+        try self.controls.append(self.allocator, ptr.control());
+        return ptr;
+    }
+
     pub fn createMinimap(self: *Root) !*Minimap {
         var ptr = try self.allocator.create(Minimap);
         ptr.* = Minimap{
@@ -874,6 +941,7 @@ pub const SDLBackend = struct {
 const SpriteBatch = @import("SpriteBatch.zig");
 const font = @import("bmfont.zig");
 const ImmRenderer = @import("ImmRenderer.zig");
+const zm = @import("zmath");
 
 const CustomRenderContext = struct {
     instance: *anyopaque,
@@ -921,55 +989,68 @@ fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRe
         control.customRender(rs.createRenderContext());
     } else {
         if (control.interactRect()) |rect| {
-            if (control.getTexture()) |t| {
-                var render_src = t.texture_rect orelse Rect.init(0, 0, @intCast(i32, t.texture.width), @intCast(i32, t.texture.height));
-                var render_dest = rect;
-                render_dest.translate(renderstate.translate_x, renderstate.translate_y);
-                opts.r_batch.begin(.{
-                    .texture = t.texture,
+            var render_dest = rect;
+            render_dest.translate(renderstate.translate_x, renderstate.translate_y);
+
+            switch (control.getBackground()) {
+                .texture => |t| {
+                    var render_src = t.texture_rect orelse Rect.init(0, 0, @intCast(i32, t.texture.width), @intCast(i32, t.texture.height));
+                    opts.r_batch.begin(.{
+                        .texture = t.texture,
+                    });
+
+                    // touch inside of dest rect
+                    // this is for the minimap, mostly
+                    const aspect_ratio = @intToFloat(f32, render_src.w) / @intToFloat(f32, render_src.h);
+                    const p = render_dest.centerPoint();
+
+                    // A = aspect ratio, W = width, H = height
+                    //
+                    // A = W/H
+                    // H = W/A
+                    // W = AH
+                    //
+                    // A > 1 means rect is wider than tall
+                    // A < 1 means rect is taller than wide
+                    //
+                    // we can maintain A at different sizes by setting W or H and then
+                    // doing one of the above transforms for the other axis
+                    if (aspect_ratio > 1) {
+                        render_dest.w = rect.w;
+                        render_dest.h = @floatToInt(i32, @intToFloat(f32, render_dest.w) / aspect_ratio);
+                        render_dest.centerOn(p[0], p[1]);
+                    } else {
+                        render_dest.h = rect.h;
+                        render_dest.w = @floatToInt(i32, @intToFloat(f32, render_dest.h) * aspect_ratio);
+                        render_dest.centerOn(p[0], p[1]);
+                    }
+
+                    opts.r_batch.drawQuad(render_src, render_dest);
+                    opts.r_batch.end();
+                },
+                .color => |c| {
+                    opts.r_imm.beginUntextured();
+                    opts.r_imm.drawQuadRGBA(render_dest, zm.Vec{
+                        @intToFloat(f32, c.color[0]),
+                        @intToFloat(f32, c.color[1]),
+                        @intToFloat(f32, c.color[2]),
+                        @intToFloat(f32, c.color[3]),
+                    });
+                },
+                .none => {},
+            }
+
+            if (control.getText()) |text| {
+                opts.r_font.begin(.{
+                    .texture = opts.font_texture,
+                    .spec = opts.font_spec,
                 });
-
-                // touch inside of dest rect
-                // this is for the minimap, mostly
-                const aspect_ratio = @intToFloat(f32, render_src.w) / @intToFloat(f32, render_src.h);
-                const p = render_dest.centerPoint();
-
-                // A = aspect ratio, W = width, H = height
-                //
-                // A = W/H
-                // H = W/A
-                // W = AH
-                //
-                // A > 1 means rect is wider than tall
-                // A < 1 means rect is taller than wide
-                //
-                // we can maintain A at different sizes by setting W or H and then
-                // doing one of the above transforms for the other axis
-                if (aspect_ratio > 1) {
-                    render_dest.w = rect.w;
-                    render_dest.h = @floatToInt(i32, @intToFloat(f32, render_dest.w) / aspect_ratio);
-                    render_dest.centerOn(p[0], p[1]);
-                } else {
-                    render_dest.h = rect.h;
-                    render_dest.w = @floatToInt(i32, @intToFloat(f32, render_dest.h) * aspect_ratio);
-                    render_dest.centerOn(p[0], p[1]);
-                }
-
-                opts.r_batch.drawQuad(render_src, render_dest);
-                opts.r_batch.end();
-
-                if (control.getText()) |text| {
-                    opts.r_font.begin(.{
-                        .texture = opts.font_texture,
-                        .spec = opts.font_spec,
-                    });
-                    opts.r_font.drawText(text, .{
-                        .dest = render_dest,
-                        .h_alignment = .center,
-                        .v_alignment = .middle,
-                    });
-                    opts.r_font.end();
-                }
+                opts.r_font.drawText(text, .{
+                    .dest = render_dest,
+                    .h_alignment = .center,
+                    .v_alignment = .middle,
+                });
+                opts.r_font.end();
             }
         }
     }

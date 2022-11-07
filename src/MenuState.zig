@@ -45,7 +45,9 @@ fn createMenuButton(self: *MenuState, comptime text: []const u8, comptime cb: an
     btn.rect.centerOn(Game.INTERNAL_WIDTH / 2, 0);
     btn.rect.y = self.menu_start;
     self.menu_start += btn.rect.h;
-    btn.texture = self.game.texman.getNamedTexture("menu_button.png");
+    btn.background = ui.Background{
+        .texture = .{ .texture = self.game.texman.getNamedTexture("menu_button.png") },
+    };
     btn.texture_rects = [4]Rect{
         // .normal
         Rect.init(0, 0, 128, 32),
@@ -82,7 +84,7 @@ pub fn create(game: *Game) !*MenuState {
     _ = try self.createMenuButton("Quit", onQuitClick);
 
     self.ui_tip = try self.ui_root.createButton();
-    self.ui_tip.texture = self.game.texman.getNamedTexture("special.png");
+    self.ui_tip.background = .{ .texture = .{ .texture = self.game.texman.getNamedTexture("special.png") } };
     self.ui_tip.texture_rects = [4]Rect{
         // .normal
         Rect.init(208, 48, 16, 16),
