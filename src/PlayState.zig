@@ -227,6 +227,8 @@ pub fn create(game: *Game) !*PlayState {
 
     self.ui_upgrade_panel = try self.ui_root.createPanel();
     self.ui_upgrade_panel.rect = Rect.init(0, 0, 4 * 32, 32);
+    self.ui_upgrade_panel.rect.centerOn(Game.INTERNAL_WIDTH / 2, 0);
+    self.ui_upgrade_panel.rect.alignBottom(Game.INTERNAL_HEIGHT);
     self.ui_upgrade_panel.background = .{ .color = ui.ControlColor.black };
     try self.ui_root.addChild(self.ui_upgrade_panel.control());
 
