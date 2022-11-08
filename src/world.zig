@@ -333,6 +333,7 @@ pub const TowerSpec = struct {
     min_range: f32 = 0,
     max_range: f32 = 0,
     gold_cost: u32 = 0,
+    upgrades: [3]?*const TowerSpec = [3]?*const TowerSpec{ null, null, null },
 };
 
 pub const t_wall = TowerSpec{
@@ -346,6 +347,16 @@ pub const tspec_test = TowerSpec{
     .min_range = 50,
     .max_range = 100,
     .gold_cost = 10,
+    .upgrades = [3]?*const TowerSpec{ &tspec_test_lv2, null, null },
+};
+
+pub const tspec_test_lv2 = TowerSpec{
+    .anim_set = anim.a_chara.animationSet(),
+    .spawnFn = tspecTestSpawn,
+    .updateFn = tspecTestUpdate,
+    .min_range = 50,
+    .max_range = 100,
+    .gold_cost = 5,
 };
 
 fn tspecTestSpawn(self: *Tower, frame: u64) void {
@@ -872,6 +883,14 @@ pub const World = struct {
 
         self.playPositionalSound("assets/sounds/spawn.ogg", @intCast(i32, pos.worldX()), @intCast(i32, pos.worldY()));
         return id;
+    }
+
+    pub fn getTowerAt(self: *World, coord: TileCoord) ?u32 {
+        if (self.tower_map.get(coord)) |id| {
+            return id;
+        } else {
+            return null;
+        }
     }
 
     pub fn getSpawnPosition(self: *World, spawn_id: usize) TileCoord {

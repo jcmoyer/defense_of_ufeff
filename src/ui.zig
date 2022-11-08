@@ -43,6 +43,7 @@ pub const Panel = struct {
     children: std.ArrayListUnmanaged(Control),
     rect: Rect,
     background: Background = .none,
+    visible: bool = true,
 
     pub fn deinit(self: *Panel) void {
         self.children.deinit(self.root.allocator);
@@ -81,6 +82,7 @@ pub const Panel = struct {
             .interactRectFn = interactRect,
             .getBackgroundFn = getBackground,
             .getChildrenFn = getChildren,
+            .isVisibleFn = isVisible,
         });
     }
 
@@ -90,6 +92,10 @@ pub const Panel = struct {
 
     pub fn getChildren(self: *Panel) []Control {
         return self.children.items;
+    }
+
+    pub fn isVisible(self: *Panel) bool {
+        return self.visible;
     }
 };
 
@@ -148,21 +154,32 @@ pub const Button = struct {
 
     pub fn handleMouseLeave(self: *Button) void {
         self.root.interaction_hint = .none;
-        self.state = .normal;
+        if (self.state != .disabled) {
+            self.state = .normal;
+        }
     }
 
     pub fn handleMouseDown(self: *Button, args: MouseEventArgs) void {
+        if (self.state == .disabled) {
+            return;
+        }
         if (args.buttons.left) {
             self.state = .down;
         }
     }
 
     pub fn handleMouseUp(self: *Button, args: MouseEventArgs) void {
+        if (self.state == .disabled) {
+            return;
+        }
         _ = args;
         self.state = .hover;
     }
 
     pub fn handleMouseClick(self: *Button, args: MouseEventArgs) void {
+        if (self.state == .disabled) {
+            return;
+        }
         if (args.buttons.left) {
             if (self.callback) |cb| {
                 cb(self, self.userdata);
@@ -411,6 +428,7 @@ fn ControlImpl(comptime PointerT: type) type {
         handleMouseMoveFn: ?*const fn (PointerT, MouseEventArgs) void = null,
         getTextFn: ?*const fn (PointerT) ?[]const u8 = null,
         getTooltipTextFn: ?*const fn (PointerT) ?[]const u8 = null,
+        isVisibleFn: ?*const fn (PointerT) bool = null,
         customRenderFn: ?*const fn (PointerT, CustomRenderContext) void = null,
     };
 }
@@ -432,6 +450,7 @@ pub const Control = struct {
         handleMouseDownFn: *const fn (*anyopaque, MouseEventArgs) void,
         handleMouseUpFn: *const fn (*anyopaque, MouseEventArgs) void,
         handleMouseMoveFn: *const fn (*anyopaque, MouseEventArgs) void,
+        isVisibleFn: *const fn (*anyopaque) bool,
         customRenderFn: ?*const fn (*anyopaque, CustomRenderContext) void = null,
     };
 
@@ -537,6 +556,15 @@ pub const Control = struct {
                 return f(inst);
             }
 
+            fn isVisibleImpl(ptr: *anyopaque) bool {
+                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                if (fns.isVisibleFn) |f| {
+                    return f(inst);
+                } else {
+                    return true;
+                }
+            }
+
             const vtable = VTable{
                 .deinitFn = deinitImpl,
                 .handleMouseClickFn = handleMouseClickImpl,
@@ -550,6 +578,7 @@ pub const Control = struct {
                 .handleMouseDownFn = handleMouseDownImpl,
                 .handleMouseUpFn = handleMouseUpImpl,
                 .handleMouseMoveFn = handleMouseMoveImpl,
+                .isVisibleFn = isVisibleImpl,
                 .customRenderFn = if (fns.customRenderFn != null) customRenderImpl else null,
             };
         };
@@ -615,6 +644,10 @@ pub const Control = struct {
     pub fn getTooltipText(self: Control) ?[]const u8 {
         return self.vtable.getTooltipTextFn(self.instance);
     }
+
+    pub fn isVisible(self: Control) bool {
+        return self.vtable.isVisibleFn(self.instance);
+    }
 };
 
 pub const InteractionHint = enum {
@@ -654,6 +687,9 @@ pub const Root = struct {
 
     pub fn isMouseOnElement(self: *Root, x: i32, y: i32) bool {
         for (self.children.items) |child| {
+            if (!child.isVisible()) {
+                continue;
+            }
             if (child.interactRect()) |rect| {
                 if (rect.contains(x, y)) {
                     return true;
@@ -672,6 +708,9 @@ pub const Root = struct {
     fn findElementChild(self: *Root, at: Control, x: i32, y: i32) FindElementResult {
         if (at.getChildren()) |children| {
             for (children) |child| {
+                if (!child.isVisible()) {
+                    continue;
+                }
                 if (child.interactRect()) |rect| {
                     if (rect.contains(x, y)) {
                         return self.findElementChild(child, x, y);
@@ -688,6 +727,9 @@ pub const Root = struct {
 
     fn findElementAt(self: *Root, x: i32, y: i32) ?FindElementResult {
         for (self.children.items) |child| {
+            if (!child.isVisible()) {
+                continue;
+            }
             if (child.interactRect()) |rect| {
                 if (rect.contains(x, y)) {
                     const lowest = self.findElementChild(child, x - rect.x, y - rect.y);
@@ -988,6 +1030,10 @@ const UIRenderOptions = struct {
 };
 
 fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRenderState) void {
+    if (!control.isVisible()) {
+        return;
+    }
+
     if (control.supportsCustomRender()) {
         // nasty temporary but we die of const poisoning otherwise
         var rs = renderstate;

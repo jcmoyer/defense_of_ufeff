@@ -48,9 +48,20 @@ const InteractStateBuild = struct {
     tower_spec: *const wo.TowerSpec,
 };
 
+const InteractStateSelect = struct {
+    selected_tower: u32,
+};
+
 const InteractState = union(enum) {
     none: void,
     build: InteractStateBuild,
+    select: InteractStateSelect,
+};
+
+const UpgradeButtonState = struct {
+    play_state: *PlayState,
+    tower_id: u32,
+    tower_spec: *const wo.TowerSpec,
 };
 
 const Substate = enum {
@@ -94,6 +105,9 @@ gold_text: [32]u8 = undefined,
 lives_text: [32]u8 = undefined,
 ui_gold: *ui.Label,
 ui_lives: *ui.Label,
+ui_upgrade_panel: *ui.Panel,
+ui_upgrade_buttons: [4]*ui.Button,
+ui_upgrade_states: [3]UpgradeButtonState,
 
 paused: bool = false,
 
@@ -128,9 +142,10 @@ pub fn create(game: *Game) !*PlayState {
         .fontspec_numbers = undefined,
         .r_finger = FingerRenderer.create(),
         .r_quad = QuadBatch.create(),
+        .ui_root = ui.Root.init(game.allocator, ui.SDLBackend.init(game.window)),
+        .t_minimap = game.texman.createInMemory(),
         // Created/destroyed in update()
         .frame_arena = undefined,
-        .ui_root = ui.Root.init(game.allocator, ui.SDLBackend.init(game.window)),
         .ui_buttons = undefined,
         .ui_minimap = undefined,
         .ui_gold = undefined,
@@ -138,7 +153,9 @@ pub fn create(game: *Game) !*PlayState {
         .btn_pause_resume = undefined,
         .btn_demolish = undefined,
         .btn_fastforward = undefined,
-        .t_minimap = game.texman.createInMemory(),
+        .ui_upgrade_panel = undefined,
+        .ui_upgrade_buttons = undefined,
+        .ui_upgrade_states = undefined,
     };
     self.r_font = BitmapFont.init(&self.r_batch);
     self.ui_root.backend.coord_scale_x = 2;
@@ -208,6 +225,23 @@ pub fn create(game: *Game) !*PlayState {
     self.btn_demolish.tooltip_text = "Demolish\n\nReturns 50% of the total gold\ninvested into the tower.";
     try ui_panel.addChild(self.btn_demolish.control());
 
+    self.ui_upgrade_panel = try self.ui_root.createPanel();
+    self.ui_upgrade_panel.rect = Rect.init(0, 0, 4 * 32, 32);
+    self.ui_upgrade_panel.background = .{ .color = ui.ControlColor.black };
+    try self.ui_root.addChild(self.ui_upgrade_panel.control());
+
+    for (self.ui_upgrade_buttons) |*b, i| {
+        b.* = try self.ui_root.createButton();
+        b.*.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
+        b.*.texture_rects = makeStandardButtonRects(0, 0);
+        b.*.rect = Rect.init(@intCast(i32, i) * 32, 0, 32, 32);
+        try self.ui_upgrade_panel.addChild(b.*.control());
+        // only first 3 buttons are upgrades, 4th is demolish
+        if (i < 3) {
+            b.*.setCallback(&self.ui_upgrade_states[i], onUpgradeClick);
+        }
+    }
+
     // TODO probably want a better way to manage this, direct IO shouldn't be here
     // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
     self.fontspec = try loadFontSpec(self.game.allocator, "assets/tables/CommonCase.json");
@@ -240,6 +274,16 @@ fn onPauseClick(button: *ui.Button, self: *PlayState) void {
     } else {
         button.tooltip_text = "Resume";
         button.texture_rects = makeStandardButtonRects(96, 0);
+    }
+}
+
+fn onUpgradeClick(button: *ui.Button, upgrade: *UpgradeButtonState) void {
+    _ = button;
+    upgrade.play_state.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
+    if (upgrade.play_state.world.canAfford(upgrade.tower_spec)) {
+        upgrade.play_state.world.player_gold -= upgrade.tower_spec.gold_cost;
+        upgrade.play_state.world.towers.getPtr(upgrade.tower_id).spec = upgrade.tower_spec;
+        upgrade.play_state.updateUpgradeButtons();
     }
 }
 
@@ -329,6 +373,7 @@ pub fn update(self: *PlayState) void {
 fn updateUI(self: *PlayState) void {
     self.ui_gold.text = std.fmt.bufPrint(&self.gold_text, "${d}", .{self.world.player_gold}) catch unreachable;
     self.ui_lives.text = std.fmt.bufPrint(&self.lives_text, "\x03{d}", .{self.world.lives_at_goal}) catch unreachable;
+    self.updateUpgradeButtons();
 }
 
 pub fn render(self: *PlayState, alpha: f64) void {
@@ -410,9 +455,20 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
                         self.interact_state = .none;
                     }
                 }
+            } else {
+                const tile_coord = self.mouseToTile();
+                if (self.world.getTowerAt(tile_coord)) |id| {
+                    std.log.debug("Selected {d}", .{id});
+                    self.interact_state = .{
+                        .select = InteractStateSelect{
+                            .selected_tower = id,
+                        },
+                    };
+                    self.updateUpgradeButtons();
+                }
             }
         } else if (ev.button.button == sdl.SDL_BUTTON_RIGHT) {
-            if (self.interact_state == .build) {
+            if (self.interact_state == .build or self.interact_state == .select) {
                 self.interact_state = .none;
             }
         }
@@ -1111,4 +1167,29 @@ fn renderFade(self: *PlayState) void {
 
     self.game.imm.beginUntextured();
     self.game.imm.drawQuadRGBA(Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT), zm.f32x4(0, 0, 0, a));
+}
+
+fn updateUpgradeButtons(self: *PlayState) void {
+    self.ui_upgrade_panel.visible = self.interact_state == .select;
+    if (!self.ui_upgrade_panel.visible) {
+        return;
+    }
+
+    const t = self.world.towers.getPtr(self.interact_state.select.selected_tower);
+    const s = t.spec;
+    var i: usize = 0;
+    while (i < 3) : (i += 1) {
+        if (s.upgrades[i]) |spec| {
+            if (self.world.canAfford(spec)) {
+                self.ui_upgrade_buttons[i].state = .normal;
+                self.ui_upgrade_states[i].play_state = self;
+                self.ui_upgrade_states[i].tower_spec = spec;
+                self.ui_upgrade_states[i].tower_id = self.interact_state.select.selected_tower;
+            } else {
+                self.ui_upgrade_buttons[i].state = .disabled;
+            }
+        } else {
+            self.ui_upgrade_buttons[i].state = .disabled;
+        }
+    }
 }
