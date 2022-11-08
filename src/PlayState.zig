@@ -148,22 +148,19 @@ pub fn create(game: *Game) !*PlayState {
     ui_panel.background = .{ .texture = .{ .texture = t_panel } };
     try self.ui_root.addChild(ui_panel.control());
 
-    var btn_y: i32 = 144;
-    var btn_x: i32 = 16;
     var b_wall = try self.ui_root.createButton();
     b_wall.tooltip_text = "Build Wall\n$1\n\nBlocks monster movement.\nCan be built over.";
-    b_wall.text = "Wall";
-    b_wall.rect = Rect.init(btn_x, btn_y, 32, 32);
-    b_wall.setTexture(self.game.texman.getNamedTexture("ui_iconframe.png"));
+    b_wall.rect = Rect.init(16, 144, 32, 32);
+    b_wall.texture_rects = makeStandardButtonRects(128, 0);
+    b_wall.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
     b_wall.setCallback(self, onWallClick);
     try ui_panel.addChild(b_wall.control());
 
-    btn_x += 32;
     var b_tower = try self.ui_root.createButton();
     b_tower.tooltip_text = "Hire Soldier\n$10\n\nBlocks monster movement.\nUpgrades into other units.";
-    b_tower.text = "Hire";
-    b_tower.rect = Rect.init(btn_x, btn_y, 32, 32);
-    b_tower.setTexture(self.game.texman.getNamedTexture("ui_iconframe.png"));
+    b_tower.rect = Rect.init(48, 144, 32, 32);
+    b_tower.texture_rects = makeStandardButtonRects(160, 0);
+    b_tower.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
     b_tower.setCallback(self, onTowerClick);
     try ui_panel.addChild(b_tower.control());
 
