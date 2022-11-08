@@ -368,13 +368,12 @@ fn tspecTestSpawn(self: *Tower, frame: u64) void {
 fn tspecTestUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
         const m = self.world.pickClosestMonster(self.world_x, self.world_y, 100) orelse return;
-        const target_x = self.world.monsters.get(m).world_x;
-        const target_y = self.world.monsters.get(m).world_y;
+        const target = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
 
         self.world.playPositionalSound("assets/sounds/bow.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
-        self.setAssocEffectAimed(&se_bow, target_x, target_y, frame);
-        var proj = self.fireProjectileTowards(&proj_arrow, target_x, target_y);
+        self.setAssocEffectAimed(&se_bow, target[0], target[1], frame);
+        var proj = self.fireProjectileTowards(&proj_arrow, target[0], target[1]);
         self.cooldown.restart(frame);
 
         if (self.spec == &tspec_test_lv2) {
@@ -403,7 +402,7 @@ pub const Tower = struct {
         return TileCoord.initWorld(self.world_x, self.world_y);
     }
 
-    pub fn setAssocEffectAimed(self: *Tower, se_spec: *const SpriteEffectSpec, world_x: u32, world_y: u32, frame: u64) void {
+    pub fn setAssocEffectAimed(self: *Tower, se_spec: *const SpriteEffectSpec, world_x: i32, world_y: i32, frame: u64) void {
         var r = mu.angleBetween(
             @Vector(2, f32){ @intToFloat(f32, self.world_x), @intToFloat(f32, self.world_y) },
             @Vector(2, f32){ @intToFloat(f32, world_x), @intToFloat(f32, world_y) },
@@ -423,10 +422,10 @@ pub const Tower = struct {
         self.world.sprite_effects.getPtr(self.assoc_effect.?).world_y = @intToFloat(f32, ey);
     }
 
-    pub fn fireProjectileTowards(self: *Tower, pspec: *const ProjectileSpec, world_x: u32, world_y: u32) *Projectile {
+    pub fn fireProjectileTowards(self: *Tower, pspec: *const ProjectileSpec, world_x: i32, world_y: i32) *Projectile {
         var proj = self.world.spawnProjectile(pspec, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8)) catch unreachable;
         var r = mu.angleBetween(
-            @Vector(2, f32){ @intToFloat(f32, self.world_x), @intToFloat(f32, self.world_y) },
+            @Vector(2, f32){ @intToFloat(f32, self.world_x + 8), @intToFloat(f32, self.world_y + 8) },
             @Vector(2, f32){ @intToFloat(f32, world_x), @intToFloat(f32, world_y) },
         );
 
