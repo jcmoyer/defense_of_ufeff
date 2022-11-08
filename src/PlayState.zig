@@ -91,7 +91,9 @@ interact_state: InteractState = .none,
 sub: Substate = .none,
 fade_timer: FrameTimer = .{},
 gold_text: [32]u8 = undefined,
+lives_text: [32]u8 = undefined,
 ui_gold: *ui.Label,
+ui_lives: *ui.Label,
 
 paused: bool = false,
 
@@ -132,6 +134,7 @@ pub fn create(game: *Game) !*PlayState {
         .ui_buttons = undefined,
         .ui_minimap = undefined,
         .ui_gold = undefined,
+        .ui_lives = undefined,
         .btn_pause_resume = undefined,
         .btn_demolish = undefined,
         .btn_fastforward = undefined,
@@ -172,10 +175,16 @@ pub fn create(game: *Game) !*PlayState {
 
     // TODO: replace with label-type control
     self.ui_gold = try self.ui_root.createLabel();
-    self.ui_gold.rect = Rect.init(16, 96, 4 * 16, 32);
+    self.ui_gold.rect = Rect.init(16, 96, 4 * 16, 16);
     self.ui_gold.text = "$0";
     self.ui_gold.background = .{ .color = ui.ControlColor.black };
     try ui_panel.addChild(self.ui_gold.control());
+
+    self.ui_lives = try self.ui_root.createLabel();
+    self.ui_lives.rect = Rect.init(16, 112, 4 * 16, 16);
+    self.ui_lives.text = "\x030";
+    self.ui_lives.background = .{ .color = ui.ControlColor.black };
+    try ui_panel.addChild(self.ui_lives.control());
 
     self.btn_pause_resume = try self.ui_root.createButton();
     self.btn_pause_resume.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
@@ -319,6 +328,7 @@ pub fn update(self: *PlayState) void {
 
 fn updateUI(self: *PlayState) void {
     self.ui_gold.text = std.fmt.bufPrint(&self.gold_text, "${d}", .{self.world.player_gold}) catch unreachable;
+    self.ui_lives.text = std.fmt.bufPrint(&self.lives_text, "\x03{d}", .{self.world.lives_at_goal}) catch unreachable;
 }
 
 pub fn render(self: *PlayState, alpha: f64) void {
