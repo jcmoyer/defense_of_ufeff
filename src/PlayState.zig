@@ -466,6 +466,8 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
                         },
                     };
                     self.updateUpgradeButtons();
+                } else {
+                    self.interact_state = .none;
                 }
             }
         } else if (ev.button.button == sdl.SDL_BUTTON_RIGHT) {
