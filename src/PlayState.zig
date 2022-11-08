@@ -998,6 +998,7 @@ fn createMinimap(self: *PlayState) !void {
 
     var fbo: gl.GLuint = 0;
     gl.genFramebuffers(1, &fbo);
+    defer gl.deleteFramebuffers(1, &fbo);
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
     gl.bindTexture(gl.TEXTURE_2D, self.t_minimap.handle);
