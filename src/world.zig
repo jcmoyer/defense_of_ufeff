@@ -344,11 +344,7 @@ pub const Monster = struct {
             self.world.lives_at_goal += 1;
         }
         const pos = self.getWorldCollisionRect().centerPoint();
-        const text_id = self.world.spawnPrintFloatingText("+{d}", .{self.spec.gold}, pos[0], pos[1]) catch unreachable;
-        var text_obj = self.world.floating_text.getPtr(text_id);
-        text_obj.color = @Vector(4, u8){ 255, 255, 0, 255 };
-        text_obj.vel_y = -1;
-        self.world.player_gold += self.spec.gold;
+        self.world.spawnGoldGain(self.spec.gold, pos[0], pos[1]) catch unreachable;
     }
 };
 
@@ -402,7 +398,10 @@ pub const t_archer = TowerSpec{
 
 fn archerUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
-        const m = self.world.pickClosestMonster(self.world_x, self.world_y, 100) orelse return;
+        const m = self.world.pickClosestMonster(self.world_x, self.world_y, 100) orelse {
+            self.killAssocEffect();
+            return;
+        };
         const target = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
 
         self.world.playPositionalSound("assets/sounds/bow.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
@@ -436,6 +435,7 @@ pub const Tower = struct {
     target_mobid: usize = 0,
     cooldown: timing.FrameTimer = .{},
     assoc_effect: ?u32 = null,
+    invested_gold: u32 = 0,
 
     pub fn setWorldPosition(self: *Tower, new_x: u32, new_y: u32) void {
         self.world_x = new_x;
@@ -464,6 +464,13 @@ pub const Tower = struct {
         self.world.sprite_effects.getPtr(self.assoc_effect.?).angle = r;
         self.world.sprite_effects.getPtr(self.assoc_effect.?).world_x = @intToFloat(f32, ex);
         self.world.sprite_effects.getPtr(self.assoc_effect.?).world_y = @intToFloat(f32, ey);
+    }
+
+    pub fn killAssocEffect(self: *Tower) void {
+        if (self.assoc_effect) |eid| {
+            self.world.sprite_effects.getPtr(eid).dead = true;
+            self.assoc_effect = null;
+        }
     }
 
     pub fn fireProjectileTowards(self: *Tower, pspec: *const ProjectileSpec, world_x: i32, world_y: i32) *Projectile {
@@ -517,6 +524,7 @@ pub const Tower = struct {
         if (self.spec.spawnFn) |spawnFn| {
             spawnFn(self, frame);
         }
+        self.invested_gold += self.spec.gold_cost;
     }
 
     fn update(self: *Tower, frame: u64) void {
@@ -528,11 +536,16 @@ pub const Tower = struct {
         }
     }
 
+    fn sell(self: *Tower) void {
+        self.killAssocEffect();
+    }
+
     pub fn upgradeInto(self: *Tower, spec: *const TowerSpec) void {
         self.spec = spec;
         if (self.spec.anim_set) |as| {
             self.animator = as.createAnimator("down");
         }
+        self.invested_gold += self.spec.gold_cost;
     }
 };
 
@@ -869,7 +882,21 @@ pub const World = struct {
         return self.spawnFloatingText(s.getWritten(), world_x, world_y);
     }
 
+    pub fn spawnGoldGain(self: *World, amt: u32, world_x: i32, world_y: i32) !void {
+        const text_id = try self.spawnPrintFloatingText("+{d}", .{amt}, world_x, world_y);
+        var text_obj = self.floating_text.getPtr(text_id);
+        text_obj.color = @Vector(4, u8){ 255, 255, 0, 255 };
+        text_obj.vel_y = -1;
+        self.player_gold += amt;
+    }
+
     pub fn spawnTower(self: *World, spec: *const TowerSpec, coord: TileCoord, frame: u64) !u32 {
+        // if we're building over a wall, delete it first so we're not bloating the towers slotmap
+        if (self.tower_map.get(coord)) |id| {
+            const wall = self.towers.getPtr(id);
+            std.debug.assert(wall.spec == &t_wall);
+            self.towers.erase(id);
+        }
         self.map.at2DPtr(.base, coord.x, coord.y).flags.contains_tower = true;
         var id = try self.spawnTowerWorld(
             spec,
@@ -880,6 +907,20 @@ pub const World = struct {
         try self.tower_map.put(self.allocator, coord, id);
         self.invalidatePathCache();
         return id;
+    }
+
+    pub fn sellTower(self: *World, id: u32) void {
+        const tower = self.towers.getPtr(id);
+        const gold = std.math.max(1, tower.invested_gold / 2);
+        const p = tower.getWorldCollisionRect().centerPoint();
+        self.spawnGoldGain(gold, p[0], p[1]) catch unreachable;
+        const coord = tower.getTilePosition();
+        const removed = self.tower_map.remove(coord);
+        std.debug.assert(removed);
+        tower.sell();
+        self.map.at2DPtr(.base, coord.x, coord.y).flags.contains_tower = false;
+        self.towers.erase(id);
+        self.invalidatePathCache();
     }
 
     pub fn spawnSpriteEffect(self: *World, spec: *const SpriteEffectSpec, world_x: i32, world_y: i32) !u32 {

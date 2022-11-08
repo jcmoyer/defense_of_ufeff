@@ -241,6 +241,9 @@ pub fn create(game: *Game) !*PlayState {
         // only first 3 buttons are upgrades, 4th is demolish
         if (i < 3) {
             b.*.setCallback(&self.ui_upgrade_states[i], onUpgradeClick);
+        } else if (i == 3) {
+            b.*.tooltip_text = "Demolish\n\nReturns 50% of the total gold\ninvested into the tower.";
+            b.*.setCallback(self, onUpgradeDemolishClick);
         }
     }
 
@@ -287,6 +290,14 @@ fn onUpgradeClick(button: *ui.Button, upgrade: *UpgradeButtonState) void {
         upgrade.play_state.world.towers.getPtr(upgrade.tower_id).upgradeInto(upgrade.tower_spec);
         upgrade.play_state.updateUpgradeButtons();
     }
+}
+
+fn onUpgradeDemolishClick(button: *ui.Button, self: *PlayState) void {
+    std.debug.assert(self.interact_state == .select);
+    _ = button;
+    self.game.audio.playSound("assets/sounds/coindrop.ogg", .{}).release();
+    self.world.sellTower(self.interact_state.select.selected_tower);
+    self.interact_state = .none;
 }
 
 fn onMinimapPan(_: *ui.Minimap, self: *PlayState, x: f32, y: f32) void {
