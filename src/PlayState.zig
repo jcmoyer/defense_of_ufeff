@@ -169,7 +169,7 @@ pub fn create(game: *Game) !*PlayState {
     try self.ui_root.addChild(ui_panel.control());
 
     var b_wall = try self.ui_root.createButton();
-    b_wall.tooltip_text = "Build Wall\n$1\n\nBlocks monster movement.\nCan be built over.";
+    b_wall.tooltip_text = wo.t_wall.tooltip;
     b_wall.rect = Rect.init(16, 144, 32, 32);
     b_wall.texture_rects = makeStandardButtonRects(128, 0);
     b_wall.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
@@ -177,7 +177,7 @@ pub fn create(game: *Game) !*PlayState {
     try ui_panel.addChild(b_wall.control());
 
     var b_tower = try self.ui_root.createButton();
-    b_tower.tooltip_text = "Hire Soldier\n$10\n\nBlocks monster movement.\nUpgrades into other units.";
+    b_tower.tooltip_text = wo.t_soldier.tooltip;
     b_tower.rect = Rect.init(48, 144, 32, 32);
     b_tower.texture_rects = makeStandardButtonRects(160, 0);
     b_tower.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
@@ -263,7 +263,7 @@ fn onTowerClick(button: *ui.Button, self: *PlayState) void {
     _ = button;
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.interact_state = .{ .build = InteractStateBuild{
-        .tower_spec = &wo.tspec_test,
+        .tower_spec = &wo.t_soldier,
     } };
 }
 
@@ -281,10 +281,10 @@ fn onPauseClick(button: *ui.Button, self: *PlayState) void {
 
 fn onUpgradeClick(button: *ui.Button, upgrade: *UpgradeButtonState) void {
     _ = button;
-    upgrade.play_state.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
+    upgrade.play_state.game.audio.playSound("assets/sounds/coindrop.ogg", .{}).release();
     if (upgrade.play_state.world.canAfford(upgrade.tower_spec)) {
         upgrade.play_state.world.player_gold -= upgrade.tower_spec.gold_cost;
-        upgrade.play_state.world.towers.getPtr(upgrade.tower_id).spec = upgrade.tower_spec;
+        upgrade.play_state.world.towers.getPtr(upgrade.tower_id).upgradeInto(upgrade.tower_spec);
         upgrade.play_state.updateUpgradeButtons();
     }
 }
@@ -1199,6 +1199,7 @@ fn updateUpgradeButtons(self: *PlayState) void {
     var i: usize = 0;
     while (i < 3) : (i += 1) {
         if (s.upgrades[i]) |spec| {
+            self.ui_upgrade_buttons[i].tooltip_text = spec.tooltip;
             if (self.world.canAfford(spec)) {
                 self.ui_upgrade_buttons[i].state = .normal;
                 self.ui_upgrade_states[i].play_state = self;
@@ -1208,6 +1209,7 @@ fn updateUpgradeButtons(self: *PlayState) void {
                 self.ui_upgrade_buttons[i].state = .disabled;
             }
         } else {
+            self.ui_upgrade_buttons[i].tooltip_text = null;
             self.ui_upgrade_buttons[i].state = .disabled;
         }
     }

@@ -87,6 +87,11 @@ pub const Projectile = struct {
         }
     }
 
+    fn hit(self: *Projectile, monster: *Monster) void {
+        monster.hurtDirectionalGenericDamage(self.damage, [2]f32{ self.vel_x, self.vel_y });
+        self.dead = true;
+    }
+
     pub fn getWorldCollisionRect(self: Projectile) Rect {
         var r = Rect.init(@floatToInt(i32, self.world_x), @floatToInt(i32, self.world_y), 0, 0);
         // TODO: replace with projectile size?
@@ -306,11 +311,31 @@ pub const Monster = struct {
     }
 
     pub fn hurt(self: *Monster, amt: u32) void {
+        self.hurtDirectional(amt, [2]f32{ 0, -1 });
+    }
+
+    pub fn hurtDirectional(self: *Monster, amt: u32, dir: [2]f32) void {
         std.debug.assert(self.dead == false);
+        self.flash_frames = 1;
         self.hp -|= amt;
         if (self.hp == 0) {
             self.kill();
         }
+        const p = self.getWorldCollisionRect().centerPoint();
+        const text_id = self.world.spawnPrintFloatingText("{d}", .{amt}, p[0], p[1]) catch unreachable;
+        var text = self.world.floating_text.getPtr(text_id);
+        text.vel_x = dir[0];
+        text.vel_y = dir[1];
+    }
+
+    pub fn hurtDirectionalGenericDamage(self: *Monster, amt: u32, dir: [2]f32) void {
+        const p = self.getWorldCollisionRect().centerPoint();
+        self.world.playPositionalSound("assets/sounds/hit.ogg", p[0], p[1]);
+        self.hurtDirectional(amt, dir);
+        const se_id = self.world.spawnSpriteEffect(&se_hurt_generic, p[0], p[1]) catch unreachable;
+        self.world.sprite_effects.getPtr(se_id).angle = std.math.atan2(f32, dir[1], dir[0]);
+        self.world.sprite_effects.getPtr(se_id).world_x -= std.math.cos(self.world.sprite_effects.getPtr(se_id).angle) * 8.0;
+        self.world.sprite_effects.getPtr(se_id).world_y -= std.math.sin(self.world.sprite_effects.getPtr(se_id).angle) * 8.0;
     }
 
     pub fn kill(self: *Monster) void {
@@ -335,45 +360,56 @@ pub const TowerSpec = struct {
     max_range: f32 = 0,
     gold_cost: u32 = 0,
     upgrades: [3]?*const TowerSpec = [3]?*const TowerSpec{ null, null, null },
+    tooltip: ?[]const u8 = null,
 };
 
 pub const t_wall = TowerSpec{
     .gold_cost = 1,
+    .tooltip = "Build Wall\n$1\n\nBlocks monster movement.\nCan be built over.",
 };
 
-pub const tspec_test = TowerSpec{
+pub const t_soldier = TowerSpec{
+    .gold_cost = 10,
+    .tooltip = "Hire Soldier\n$10\n\nWeak melee attack.\nBlocks monster movement.\nUpgrades into other units.",
+    .upgrades = [3]?*const TowerSpec{ &t_archer, null, null },
     .anim_set = anim.a_chara.animationSet(),
-    .spawnFn = tspecTestSpawn,
-    .updateFn = tspecTestUpdate,
+    .updateFn = soldierUpdate,
+};
+
+fn soldierUpdate(self: *Tower, frame: u64) void {
+    if (self.cooldown.expired(frame)) {
+        const m = self.world.pickClosestMonster(self.world_x, self.world_y, 20) orelse return;
+        const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
+        const r = self.angleTo(p[0], p[1]);
+
+        self.world.monsters.getPtr(m).hurtDirectionalGenericDamage(1, [2]f32{ std.math.cos(r), std.math.sin(r) });
+        const target = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
+        self.lookTowards(target[0], target[1]);
+        self.cooldown.restart(frame);
+    }
+}
+
+pub const t_archer = TowerSpec{
+    .gold_cost = 10,
+    .tooltip = "Train Archery\n$10\n\nFires slow moving projectiles.",
+
+    .anim_set = anim.a_chara.animationSet(),
+    .updateFn = archerUpdate,
     .min_range = 50,
     .max_range = 100,
-    .gold_cost = 10,
     .upgrades = [3]?*const TowerSpec{ &tspec_test_lv2, null, null },
 };
 
-pub const tspec_test_lv2 = TowerSpec{
-    .anim_set = anim.a_chara.animationSet(),
-    .spawnFn = tspecTestSpawn,
-    .updateFn = tspecTestUpdate,
-    .min_range = 50,
-    .max_range = 100,
-    .gold_cost = 5,
-};
-
-fn tspecTestSpawn(self: *Tower, frame: u64) void {
-    _ = self;
-    _ = frame;
-}
-
-fn tspecTestUpdate(self: *Tower, frame: u64) void {
+fn archerUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
         const m = self.world.pickClosestMonster(self.world_x, self.world_y, 100) orelse return;
         const target = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
 
         self.world.playPositionalSound("assets/sounds/bow.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
-        self.setAssocEffectAimed(&se_bow, target[0], target[1], frame);
+        self.setAssocEffectAimed(&se_bow, target[0], target[1]);
         var proj = self.fireProjectileTowards(&proj_arrow, target[0], target[1]);
+        self.lookTowards(target[0], target[1]);
         self.cooldown.restart(frame);
 
         if (self.spec == &tspec_test_lv2) {
@@ -381,6 +417,14 @@ fn tspecTestUpdate(self: *Tower, frame: u64) void {
         }
     }
 }
+
+pub const tspec_test_lv2 = TowerSpec{
+    .anim_set = anim.a_chara.animationSet(),
+    .updateFn = archerUpdate,
+    .min_range = 50,
+    .max_range = 100,
+    .gold_cost = 5,
+};
 
 pub const Tower = struct {
     id: u32 = undefined,
@@ -406,19 +450,15 @@ pub const Tower = struct {
         return Rect.init(@intCast(i32, self.world_x), @intCast(i32, self.world_y), 16, 16);
     }
 
-    pub fn setAssocEffectAimed(self: *Tower, se_spec: *const SpriteEffectSpec, world_x: i32, world_y: i32, frame: u64) void {
-        var r = mu.angleBetween(
-            @Vector(2, f32){ @intToFloat(f32, self.world_x), @intToFloat(f32, self.world_y) },
-            @Vector(2, f32){ @intToFloat(f32, world_x), @intToFloat(f32, world_y) },
-        );
-
+    pub fn setAssocEffectAimed(self: *Tower, se_spec: *const SpriteEffectSpec, world_x: i32, world_y: i32) void {
+        const r = self.angleTo(world_x, world_y);
         const cos_r = std.math.cos(r);
         const sin_r = std.math.sin(r);
         const ex = @floatToInt(i32, (cos_r * 6) + @intToFloat(f32, self.world_x + 8));
         const ey = @floatToInt(i32, (sin_r * 6) + @intToFloat(f32, self.world_y + 8));
 
         if (self.assoc_effect == null) {
-            self.assoc_effect = self.world.spawnSpriteEffect(se_spec, ex, ey, frame) catch unreachable;
+            self.assoc_effect = self.world.spawnSpriteEffect(se_spec, ex, ey) catch unreachable;
         }
 
         self.world.sprite_effects.getPtr(self.assoc_effect.?).angle = r;
@@ -428,16 +468,29 @@ pub const Tower = struct {
 
     pub fn fireProjectileTowards(self: *Tower, pspec: *const ProjectileSpec, world_x: i32, world_y: i32) *Projectile {
         var proj = self.world.spawnProjectile(pspec, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8)) catch unreachable;
-        var r = mu.angleBetween(
-            @Vector(2, f32){ @intToFloat(f32, self.world_x + 8), @intToFloat(f32, self.world_y + 8) },
-            @Vector(2, f32){ @intToFloat(f32, world_x), @intToFloat(f32, world_y) },
-        );
 
+        const r = self.angleTo(world_x, world_y);
         const cos_r = std.math.cos(r);
         const sin_r = std.math.sin(r);
 
         proj.vel_x = cos_r * 2;
         proj.vel_y = sin_r * 2;
+
+        return proj;
+    }
+
+    pub fn angleTo(self: *Tower, world_x: i32, world_y: i32) f32 {
+        var r = mu.angleBetween(
+            @Vector(2, f32){ @intToFloat(f32, self.world_x + 8), @intToFloat(f32, self.world_y + 8) },
+            @Vector(2, f32){ @intToFloat(f32, world_x), @intToFloat(f32, world_y) },
+        );
+        return r;
+    }
+
+    pub fn lookTowards(self: *Tower, world_x: i32, world_y: i32) void {
+        const r = self.angleTo(world_x, world_y);
+        const cos_r = std.math.cos(r);
+        const sin_r = std.math.sin(r);
 
         if (self.animator) |*animator| {
             if (std.math.fabs(sin_r) < 0.7) {
@@ -455,8 +508,6 @@ pub const Tower = struct {
                 }
             }
         }
-
-        return proj;
     }
 
     fn spawn(self: *Tower, frame: u64) void {
@@ -474,6 +525,13 @@ pub const Tower = struct {
         }
         if (self.animator) |*animator| {
             animator.update();
+        }
+    }
+
+    pub fn upgradeInto(self: *Tower, spec: *const TowerSpec) void {
+        self.spec = spec;
+        if (self.spec.anim_set) |as| {
+            self.animator = as.createAnimator("down");
         }
     }
 };
@@ -666,6 +724,7 @@ pub const World = struct {
     lives_at_goal: u32 = 30,
     recoverable_lives: u32 = 30,
     player_gold: u32 = 50,
+    world_frame: u64 = 0,
 
     pub fn init(allocator: Allocator) World {
         return .{
@@ -823,14 +882,14 @@ pub const World = struct {
         return id;
     }
 
-    pub fn spawnSpriteEffect(self: *World, spec: *const SpriteEffectSpec, world_x: i32, world_y: i32, frame: u64) !u32 {
+    pub fn spawnSpriteEffect(self: *World, spec: *const SpriteEffectSpec, world_x: i32, world_y: i32) !u32 {
         const id = try self.sprite_effects.put(self.allocator, SpriteEffect{
             .world = self,
             .spec = spec,
             .world_x = @intToFloat(f32, world_x),
             .world_y = @intToFloat(f32, world_y),
         });
-        self.sprite_effects.getPtr(id).spawn(frame);
+        self.sprite_effects.getPtr(id).spawn(self.world_frame);
         return id;
     }
 
@@ -976,19 +1035,13 @@ pub const World = struct {
                     }
                     // take care to not double-delete
                     if (!p.dead) {
-                        m.flash_frames = 1;
-                        self.playPositionalSound("assets/sounds/hit.ogg", @intCast(i32, m.world_x), @intCast(i32, m.world_y));
-                        proj_pending_removal.append(frame_arena, p.id) catch unreachable;
-                        p.dead = true;
-                        m.hurt(p.damage);
+                        p.hit(m);
                         if (m.dead) {
                             mon_pending_removal.append(frame_arena, m.id) catch unreachable;
                         }
-                        const se_id = self.spawnSpriteEffect(&se_hurt_generic, @floatToInt(i32, p.world_x), @floatToInt(i32, p.world_y), frame) catch unreachable;
-                        self.sprite_effects.getPtr(se_id).angle = std.math.atan2(f32, p.vel_y, p.vel_x);
-                        const text_id = self.spawnPrintFloatingText("{d}", .{p.damage}, @intCast(i32, m.world_x + 8), @intCast(i32, m.world_y + 8)) catch unreachable;
-                        self.floating_text.getPtr(text_id).vel_x = p.vel_x;
-                        self.floating_text.getPtr(text_id).vel_y = p.vel_y;
+                        if (p.dead) {
+                            proj_pending_removal.append(frame_arena, p.id) catch unreachable;
+                        }
                     }
                 }
             }
@@ -1019,6 +1072,8 @@ pub const World = struct {
             self.projectiles.getPtr(id).spawn(frame);
         }
         self.pending_projectiles.clearRetainingCapacity();
+
+        self.world_frame += 1;
     }
 
     pub fn tryMove(self: *World, mobid: u32, dir: Direction) bool {
