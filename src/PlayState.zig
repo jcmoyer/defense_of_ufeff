@@ -196,7 +196,7 @@ pub fn create(game: *Game) !*PlayState {
     self.btn_demolish.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
     self.btn_demolish.rect = Rect.init(16, 176, 32, 32);
     self.btn_demolish.texture_rects = makeStandardButtonRects(0, 0);
-    self.btn_demolish.tooltip_text = "Demolish\n\nReturns 50% of the total gold invested into the tower.";
+    self.btn_demolish.tooltip_text = "Demolish\n\nReturns 50% of the total gold\ninvested into the tower.";
     try ui_panel.addChild(self.btn_demolish.control());
 
     // TODO probably want a better way to manage this, direct IO shouldn't be here
