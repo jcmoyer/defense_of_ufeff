@@ -82,6 +82,9 @@ r_finger: FingerRenderer,
 frame_arena: std.heap.ArenaAllocator,
 ui_root: ui.Root,
 ui_buttons: [8]*ui.Button,
+btn_pause_resume: *ui.Button,
+btn_demolish: *ui.Button,
+btn_fastforward: *ui.Button,
 ui_minimap: *ui.Minimap,
 t_minimap: *Texture,
 interact_state: InteractState = .none,
@@ -90,9 +93,20 @@ fade_timer: FrameTimer = .{},
 gold_text: [32]u8 = undefined,
 ui_gold: *ui.Label,
 
+paused: bool = false,
+
 deb_render_tile_collision: bool = false,
 
 rng: std.rand.DefaultPrng = std.rand.DefaultPrng.init(0),
+
+fn makeStandardButtonRects(x: i32, y: i32) [4]Rect {
+    return [4]Rect{
+        Rect.init(x, y, 32, 32),
+        Rect.init(x, y + 32, 32, 32),
+        Rect.init(x, y + 64, 32, 32),
+        Rect.init(x, y + 96, 32, 32),
+    };
+}
 
 pub fn create(game: *Game) !*PlayState {
     var self = try game.allocator.create(PlayState);
@@ -118,6 +132,9 @@ pub fn create(game: *Game) !*PlayState {
         .ui_buttons = undefined,
         .ui_minimap = undefined,
         .ui_gold = undefined,
+        .btn_pause_resume = undefined,
+        .btn_demolish = undefined,
+        .btn_fastforward = undefined,
         .t_minimap = game.texman.createInMemory(),
     };
     self.r_font = BitmapFont.init(&self.r_batch);
@@ -131,12 +148,12 @@ pub fn create(game: *Game) !*PlayState {
     ui_panel.background = .{ .texture = .{ .texture = t_panel } };
     try self.ui_root.addChild(ui_panel.control());
 
-    var btn_y: i32 = 146;
-    var btn_x: i32 = 18;
+    var btn_y: i32 = 144;
+    var btn_x: i32 = 16;
     var b_wall = try self.ui_root.createButton();
     b_wall.tooltip_text = "Build Wall\n$1\n\nBlocks monster movement.\nCan be built over.";
     b_wall.text = "Wall";
-    b_wall.rect = Rect.init(btn_x, btn_y, 28, 28);
+    b_wall.rect = Rect.init(btn_x, btn_y, 32, 32);
     b_wall.setTexture(self.game.texman.getNamedTexture("ui_iconframe.png"));
     b_wall.setCallback(self, onWallClick);
     try ui_panel.addChild(b_wall.control());
@@ -145,7 +162,7 @@ pub fn create(game: *Game) !*PlayState {
     var b_tower = try self.ui_root.createButton();
     b_tower.tooltip_text = "Hire Soldier\n$10\n\nBlocks monster movement.\nUpgrades into other units.";
     b_tower.text = "Hire";
-    b_tower.rect = Rect.init(btn_x, btn_y, 28, 28);
+    b_tower.rect = Rect.init(btn_x, btn_y, 32, 32);
     b_tower.setTexture(self.game.texman.getNamedTexture("ui_iconframe.png"));
     b_tower.setCallback(self, onTowerClick);
     try ui_panel.addChild(b_tower.control());
@@ -162,6 +179,28 @@ pub fn create(game: *Game) !*PlayState {
     self.ui_gold.text = "$0";
     self.ui_gold.background = .{ .color = ui.ControlColor.black };
     try ui_panel.addChild(self.ui_gold.control());
+
+    self.btn_pause_resume = try self.ui_root.createButton();
+    self.btn_pause_resume.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
+    self.btn_pause_resume.rect = Rect.init(16, 208, 32, 32);
+    self.btn_pause_resume.texture_rects = makeStandardButtonRects(64, 0);
+    self.btn_pause_resume.tooltip_text = "Pause";
+    try ui_panel.addChild(self.btn_pause_resume.control());
+    self.btn_pause_resume.setCallback(self, onPauseClick);
+
+    self.btn_fastforward = try self.ui_root.createButton();
+    self.btn_fastforward.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
+    self.btn_fastforward.rect = Rect.init(48, 208, 32, 32);
+    self.btn_fastforward.texture_rects = makeStandardButtonRects(32, 0);
+    self.btn_fastforward.tooltip_text = "Fast-forward";
+    try ui_panel.addChild(self.btn_fastforward.control());
+
+    self.btn_demolish = try self.ui_root.createButton();
+    self.btn_demolish.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
+    self.btn_demolish.rect = Rect.init(16, 176, 32, 32);
+    self.btn_demolish.texture_rects = makeStandardButtonRects(0, 0);
+    self.btn_demolish.tooltip_text = "Demolish\n\nReturns 50% of the total gold invested into the tower.";
+    try ui_panel.addChild(self.btn_demolish.control());
 
     // TODO probably want a better way to manage this, direct IO shouldn't be here
     // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
@@ -184,6 +223,18 @@ fn onTowerClick(button: *ui.Button, self: *PlayState) void {
     self.interact_state = .{ .build = InteractStateBuild{
         .tower_spec = &wo.tspec_test,
     } };
+}
+
+fn onPauseClick(button: *ui.Button, self: *PlayState) void {
+    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
+    self.paused = !self.paused;
+    if (!self.paused) {
+        button.tooltip_text = "Pause";
+        button.texture_rects = makeStandardButtonRects(64, 0);
+    } else {
+        button.tooltip_text = "Resume";
+        button.texture_rects = makeStandardButtonRects(96, 0);
+    }
 }
 
 fn onMinimapPan(_: *ui.Minimap, self: *PlayState, x: f32, y: f32) void {
