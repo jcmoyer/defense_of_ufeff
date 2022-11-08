@@ -58,6 +58,7 @@ pub const Projectile = struct {
     vel_y: f32 = 0,
     angle: f32 = 0,
     dead: bool = false,
+    damage: u32 = 1,
     // storage that ProjectileSpecs can use
     userbuf: [16]u8 align(16) = undefined,
 
@@ -366,8 +367,19 @@ fn tspecTestSpawn(self: *Tower, frame: u64) void {
 
 fn tspecTestUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
-        self.fireProjectile(frame);
+        const m = self.world.pickClosestMonster(self.world_x, self.world_y, 100) orelse return;
+        const target_x = self.world.monsters.get(m).world_x;
+        const target_y = self.world.monsters.get(m).world_y;
+
+        self.world.playPositionalSound("assets/sounds/bow.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
+
+        self.setAssocEffectAimed(&se_bow, target_x, target_y, frame);
+        var proj = self.fireProjectileTowards(&proj_arrow, target_x, target_y);
         self.cooldown.restart(frame);
+
+        if (self.spec == &tspec_test_lv2) {
+            proj.damage = 3;
+        }
     }
 }
 
@@ -391,13 +403,31 @@ pub const Tower = struct {
         return TileCoord.initWorld(self.world_x, self.world_y);
     }
 
-    pub fn fireProjectile(self: *Tower, frame: u64) void {
-        const id = self.world.pickClosestMonster(self.world_x, self.world_y, 100) orelse return;
-        self.world.playPositionalSound("assets/sounds/bow.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
-        var proj = self.world.spawnProjectile(&proj_arrow, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8)) catch unreachable;
+    pub fn setAssocEffectAimed(self: *Tower, se_spec: *const SpriteEffectSpec, world_x: u32, world_y: u32, frame: u64) void {
         var r = mu.angleBetween(
             @Vector(2, f32){ @intToFloat(f32, self.world_x), @intToFloat(f32, self.world_y) },
-            @Vector(2, f32){ @intToFloat(f32, self.world.monsters.get(id).world_x), @intToFloat(f32, self.world.monsters.get(id).world_y) },
+            @Vector(2, f32){ @intToFloat(f32, world_x), @intToFloat(f32, world_y) },
+        );
+
+        const cos_r = std.math.cos(r);
+        const sin_r = std.math.sin(r);
+        const ex = @floatToInt(i32, (cos_r * 6) + @intToFloat(f32, self.world_x + 8));
+        const ey = @floatToInt(i32, (sin_r * 6) + @intToFloat(f32, self.world_y + 8));
+
+        if (self.assoc_effect == null) {
+            self.assoc_effect = self.world.spawnSpriteEffect(se_spec, ex, ey, frame) catch unreachable;
+        }
+
+        self.world.sprite_effects.getPtr(self.assoc_effect.?).angle = r;
+        self.world.sprite_effects.getPtr(self.assoc_effect.?).world_x = @intToFloat(f32, ex);
+        self.world.sprite_effects.getPtr(self.assoc_effect.?).world_y = @intToFloat(f32, ey);
+    }
+
+    pub fn fireProjectileTowards(self: *Tower, pspec: *const ProjectileSpec, world_x: u32, world_y: u32) *Projectile {
+        var proj = self.world.spawnProjectile(pspec, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8)) catch unreachable;
+        var r = mu.angleBetween(
+            @Vector(2, f32){ @intToFloat(f32, self.world_x), @intToFloat(f32, self.world_y) },
+            @Vector(2, f32){ @intToFloat(f32, world_x), @intToFloat(f32, world_y) },
         );
 
         const cos_r = std.math.cos(r);
@@ -423,16 +453,7 @@ pub const Tower = struct {
             }
         }
 
-        const ex = @floatToInt(i32, (cos_r * 6) + @intToFloat(f32, self.world_x + 8));
-        const ey = @floatToInt(i32, (sin_r * 6) + @intToFloat(f32, self.world_y + 8));
-
-        if (self.assoc_effect == null) {
-            self.assoc_effect = self.world.spawnSpriteEffect(&se_bow, ex, ey, frame) catch unreachable;
-        }
-
-        self.world.sprite_effects.getPtr(self.assoc_effect.?).angle = r;
-        self.world.sprite_effects.getPtr(self.assoc_effect.?).world_x = @intToFloat(f32, ex);
-        self.world.sprite_effects.getPtr(self.assoc_effect.?).world_y = @intToFloat(f32, ey);
+        return proj;
     }
 
     fn spawn(self: *Tower, frame: u64) void {
@@ -956,13 +977,13 @@ pub const World = struct {
                         self.playPositionalSound("assets/sounds/hit.ogg", @intCast(i32, m.world_x), @intCast(i32, m.world_y));
                         proj_pending_removal.append(frame_arena, p.id) catch unreachable;
                         p.dead = true;
-                        m.hurt(1);
+                        m.hurt(p.damage);
                         if (m.dead) {
                             mon_pending_removal.append(frame_arena, m.id) catch unreachable;
                         }
                         const se_id = self.spawnSpriteEffect(&se_hurt_generic, @floatToInt(i32, p.world_x), @floatToInt(i32, p.world_y), frame) catch unreachable;
                         self.sprite_effects.getPtr(se_id).angle = std.math.atan2(f32, p.vel_y, p.vel_x);
-                        const text_id = self.spawnPrintFloatingText("{d}", .{1}, @intCast(i32, m.world_x + 8), @intCast(i32, m.world_y + 8)) catch unreachable;
+                        const text_id = self.spawnPrintFloatingText("{d}", .{p.damage}, @intCast(i32, m.world_x + 8), @intCast(i32, m.world_y + 8)) catch unreachable;
                         self.floating_text.getPtr(text_id).vel_x = p.vel_x;
                         self.floating_text.getPtr(text_id).vel_y = p.vel_y;
                     }
