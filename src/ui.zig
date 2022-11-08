@@ -152,8 +152,9 @@ pub const Button = struct {
     }
 
     pub fn handleMouseDown(self: *Button, args: MouseEventArgs) void {
-        _ = args;
-        self.state = .down;
+        if (args.buttons.left) {
+            self.state = .down;
+        }
     }
 
     pub fn handleMouseUp(self: *Button, args: MouseEventArgs) void {
@@ -162,9 +163,10 @@ pub const Button = struct {
     }
 
     pub fn handleMouseClick(self: *Button, args: MouseEventArgs) void {
-        _ = args;
-        if (self.callback) |cb| {
-            cb(self, self.userdata);
+        if (args.buttons.left) {
+            if (self.callback) |cb| {
+                cb(self, self.userdata);
+            }
         }
     }
 
