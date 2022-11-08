@@ -121,6 +121,19 @@ pub fn drawLine(self: ImmRenderer, p0: zm.Vec, p1: zm.Vec, rgba: zm.Vec) void {
     gl.drawArrays(gl.LINES, 0, 2);
 }
 
+pub fn drawRectangle(self: ImmRenderer, p0: zm.Vec, p1: zm.Vec, rgba: zm.Vec) void {
+    const vertices = [4]Vertex{
+        Vertex{ .xyuv = zm.f32x4(p0[0], p0[1], 0, 0), .rgba = rgba },
+        Vertex{ .xyuv = zm.f32x4(p0[0], p1[1], 0, 0), .rgba = rgba },
+        Vertex{ .xyuv = zm.f32x4(p1[0], p1[1], 0, 0), .rgba = rgba },
+        Vertex{ .xyuv = zm.f32x4(p1[0], p0[1], 0, 0), .rgba = rgba },
+    };
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, self.buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices.len * @sizeOf(Vertex), &vertices, gl.STREAM_DRAW);
+    gl.drawArrays(gl.LINE_LOOP, 0, vertices.len);
+}
+
 pub fn drawCircle(self: ImmRenderer, comptime segs: comptime_int, p0: zm.Vec, r: f32, rgba: zm.Vec) void {
     var vertices: [segs]Vertex = undefined;
     inline for (vertices) |*v, i| {

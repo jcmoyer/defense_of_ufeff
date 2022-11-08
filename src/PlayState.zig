@@ -399,6 +399,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.renderFloatingText(cam_interp, alpha);
     self.renderBlockedConstructionRects(cam_interp);
     self.renderGrid(cam_interp);
+    self.renderSelection(cam_interp);
     if (!self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
         self.renderPlacementIndicator(cam_interp);
     }
@@ -934,6 +935,20 @@ fn renderPlacementIndicator(self: *PlayState, cam: Camera) void {
         self.interact_state.build.tower_spec.max_range,
         zm.f32x4(0, 1, 0, 1),
     );
+}
+
+fn renderSelection(self: *PlayState, cam: Camera) void {
+    if (self.interact_state != .select) {
+        return;
+    }
+
+    const t = self.world.towers.getPtr(self.interact_state.select.selected_tower);
+    var r = t.getWorldCollisionRect().toRectf();
+    const cf = cam.view.toRectf();
+    r.translate(-cf.left(), -cf.top());
+
+    self.game.imm.beginUntextured();
+    self.game.imm.drawRectangle(zm.f32x4(r.left(), r.top(), 0, 0), zm.f32x4(r.right(), r.bottom(), 0, 0), zm.f32x4(0, 1, 0, 1));
 }
 
 fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {

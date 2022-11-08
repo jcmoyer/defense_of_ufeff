@@ -402,6 +402,10 @@ pub const Tower = struct {
         return TileCoord.initWorld(self.world_x, self.world_y);
     }
 
+    pub fn getWorldCollisionRect(self: Tower) Rect {
+        return Rect.init(@intCast(i32, self.world_x), @intCast(i32, self.world_y), 16, 16);
+    }
+
     pub fn setAssocEffectAimed(self: *Tower, se_spec: *const SpriteEffectSpec, world_x: i32, world_y: i32, frame: u64) void {
         var r = mu.angleBetween(
             @Vector(2, f32){ @intToFloat(f32, self.world_x), @intToFloat(f32, self.world_y) },
