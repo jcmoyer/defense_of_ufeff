@@ -1068,6 +1068,9 @@ pub const World = struct {
         const fx = @intToFloat(f32, world_x);
         const fy = @intToFloat(f32, world_y);
         for (self.monsters.slice()) |m| {
+            if (m.dead) {
+                continue;
+            }
             const mx = @intToFloat(f32, m.world_x);
             const my = @intToFloat(f32, m.world_y);
             const dist = mu.dist([2]f32{ fx, fy }, [2]f32{ mx, my });
