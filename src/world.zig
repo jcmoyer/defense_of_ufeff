@@ -748,6 +748,11 @@ pub const WaveEventList = struct {
             return null;
         }
     }
+
+    // TODO: not totally accurate, repeats should probably count as multiple events
+    fn remainingEventCount(self: WaveEventList) usize {
+        return self.events.len - self.current_event;
+    }
 };
 
 pub const Wave = struct {
@@ -768,6 +773,15 @@ pub const Wave = struct {
             }
         }
         return null;
+    }
+
+    fn anyRemainingEvents(self: Wave) bool {
+        for (self.spawn_events.values()) |evlist| {
+            if (evlist.remainingEventCount() != 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     fn deinit(self: *Wave, allocator: Allocator) void {
@@ -838,6 +852,7 @@ pub const World = struct {
     player_gold: u32 = 50,
     world_frame: u64 = 0,
     next_wave: usize = 0,
+    all_waves_clear: bool = false,
 
     pub fn init(allocator: Allocator) World {
         return .{
@@ -1147,8 +1162,12 @@ pub const World = struct {
     }
 
     pub fn startNextWave(self: *World) void {
-        self.startWave(self.next_wave);
-        self.next_wave += 1;
+        if (self.next_wave < self.waves.waves.len) {
+            self.startWave(self.next_wave);
+            self.next_wave += 1;
+        } else {
+            self.all_waves_clear = true;
+        }
     }
 
     pub fn update(self: *World, frame: u64, frame_arena: Allocator) void {
@@ -1157,9 +1176,14 @@ pub const World = struct {
         var mon_pending_removal = std.ArrayListUnmanaged(u32){};
         var effect_pending_removal = std.ArrayListUnmanaged(u32){};
         var text_pending_removal = std.ArrayListUnmanaged(u32){};
+        var active_waves_pending_removal = std.ArrayListUnmanaged(usize){};
         self.goal.update(frame);
 
-        for (self.active_waves.items) |wave_id| {
+        for (self.active_waves.items) |wave_id, active_wave_index| {
+            if (!self.waves.waves[wave_id].anyRemainingEvents()) {
+                active_waves_pending_removal.append(frame_arena, active_wave_index) catch unreachable;
+            }
+
             for (self.spawns.slice()) |*sp| {
                 if (self.waves.waves[wave_id].getReadyEvent(sp.id, self.world_frame)) |e| {
                     switch (e) {
@@ -1244,6 +1268,17 @@ pub const World = struct {
             self.projectiles.getPtr(id).spawn(frame);
         }
         self.pending_projectiles.clearRetainingCapacity();
+
+        // tricky: we can iterate active_waves_pending_removal in reverse and swap-remove from active_waves
+        // because it is sorted by index ascending. Removing higher indices does not invalidate lower ones.
+        var wave_remove_index: usize = active_waves_pending_removal.items.len -% 1;
+        while (wave_remove_index < active_waves_pending_removal.items.len) : (wave_remove_index -%= 1) {
+            _ = self.active_waves.swapRemove(active_waves_pending_removal.items[wave_remove_index]);
+        }
+
+        if (self.active_waves.items.len == 0) {
+            self.startNextWave();
+        }
 
         self.world_frame += 1;
     }
