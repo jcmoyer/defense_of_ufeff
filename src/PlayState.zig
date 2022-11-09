@@ -56,6 +56,7 @@ const InteractState = union(enum) {
     none: void,
     build: InteractStateBuild,
     select: InteractStateSelect,
+    demolish,
 };
 
 const UpgradeButtonState = struct {
@@ -223,6 +224,7 @@ pub fn create(game: *Game) !*PlayState {
     self.btn_demolish.rect = Rect.init(16, 176, 32, 32);
     self.btn_demolish.texture_rects = makeStandardButtonRects(0, 0);
     self.btn_demolish.tooltip_text = "Demolish\n\nReturns 50% of the total gold\ninvested into the tower.";
+    self.btn_demolish.setCallback(self, onDemolishClick);
     try ui_panel.addChild(self.btn_demolish.control());
 
     self.ui_upgrade_panel = try self.ui_root.createPanel();
@@ -295,9 +297,14 @@ fn onUpgradeClick(button: *ui.Button, upgrade: *UpgradeButtonState) void {
 fn onUpgradeDemolishClick(button: *ui.Button, self: *PlayState) void {
     std.debug.assert(self.interact_state == .select);
     _ = button;
-    self.game.audio.playSound("assets/sounds/coindrop.ogg", .{}).release();
     self.world.sellTower(self.interact_state.select.selected_tower);
     self.interact_state = .none;
+}
+
+fn onDemolishClick(button: *ui.Button, self: *PlayState) void {
+    _ = button;
+    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
+    self.interact_state = .demolish;
 }
 
 fn onMinimapPan(_: *ui.Minimap, self: *PlayState, x: f32, y: f32) void {
@@ -415,6 +422,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.renderSelection(cam_interp);
     if (!self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
         self.renderPlacementIndicator(cam_interp);
+        self.renderDemolishIndicator(cam_interp);
     }
     ui.renderUI(.{
         .r_batch = &self.r_batch,
@@ -468,6 +476,16 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
                     if (sdl.SDL_GetModState() & sdl.KMOD_SHIFT == 0) {
                         self.interact_state = .none;
                     }
+                }
+            } else if (self.interact_state == .demolish) {
+                const tile_coord = self.mouseToTile();
+                if (self.world.getTowerAt(tile_coord)) |id| {
+                    self.world.sellTower(id);
+                    if (sdl.SDL_GetModState() & sdl.KMOD_SHIFT == 0) {
+                        self.interact_state = .none;
+                    }
+                } else {
+                    self.interact_state = .none;
                 }
             } else {
                 const tile_coord = self.mouseToTile();
@@ -950,6 +968,24 @@ fn renderPlacementIndicator(self: *PlayState, cam: Camera) void {
         self.interact_state.build.tower_spec.max_range,
         zm.f32x4(0, 1, 0, 1),
     );
+}
+
+fn renderDemolishIndicator(self: *PlayState, cam: Camera) void {
+    if (self.interact_state != .demolish) {
+        return;
+    }
+
+    const tc = self.mouseToTile();
+    if (self.world.getTowerAt(tc) != null) {
+        const dest = Rect.init(
+            @intCast(i32, tc.x * 16) - cam.view.left(),
+            @intCast(i32, tc.y * 16) - cam.view.top(),
+            16,
+            16,
+        );
+        self.game.imm.beginUntextured();
+        self.game.imm.drawQuadRGBA(dest, [4]f32{ 1, 0, 0, 0.5 });
+    }
 }
 
 fn renderSelection(self: *PlayState, cam: Camera) void {

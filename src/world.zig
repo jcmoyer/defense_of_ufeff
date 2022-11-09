@@ -914,6 +914,7 @@ pub const World = struct {
         const gold = std.math.max(1, tower.invested_gold / 2);
         const p = tower.getWorldCollisionRect().centerPoint();
         self.spawnGoldGain(gold, p[0], p[1]) catch unreachable;
+        self.playPositionalSound("assets/sounds/coindrop.ogg", p[0], p[1]);
         const coord = tower.getTilePosition();
         const removed = self.tower_map.remove(coord);
         std.debug.assert(removed);
