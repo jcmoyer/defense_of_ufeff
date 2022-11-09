@@ -1172,14 +1172,14 @@ pub const World = struct {
         }
     }
 
-    pub fn update(self: *World, frame: u64, frame_arena: Allocator) void {
+    pub fn update(self: *World, frame_arena: Allocator) void {
         var new_projectile_ids = std.ArrayListUnmanaged(u32){};
         var proj_pending_removal = std.ArrayListUnmanaged(u32){};
         var mon_pending_removal = std.ArrayListUnmanaged(u32){};
         var effect_pending_removal = std.ArrayListUnmanaged(u32){};
         var text_pending_removal = std.ArrayListUnmanaged(u32){};
         var active_waves_pending_removal = std.ArrayListUnmanaged(usize){};
-        self.goal.update(frame);
+        self.goal.update(self.world_frame);
 
         for (self.active_waves.items) |wave_id, active_wave_index| {
             if (!self.waves.waves[wave_id].anyRemainingEvents()) {
@@ -1190,7 +1190,7 @@ pub const World = struct {
                 if (self.waves.waves[wave_id].getReadyEvent(sp.id, self.world_frame)) |e| {
                     switch (e) {
                         .spawn => |spawn_event| {
-                            _ = self.spawnMonster(spawn_event.monster_spec, sp.id, frame) catch unreachable;
+                            _ = self.spawnMonster(spawn_event.monster_spec, sp.id, self.world_frame) catch unreachable;
                         },
                     }
                 }
@@ -1198,16 +1198,16 @@ pub const World = struct {
         }
 
         for (self.monsters.slice()) |*m| {
-            m.update(frame);
+            m.update(self.world_frame);
             if (m.dead) {
                 mon_pending_removal.append(frame_arena, m.id) catch unreachable;
             }
         }
         for (self.towers.slice()) |*t| {
-            t.update(frame);
+            t.update(self.world_frame);
         }
         for (self.sprite_effects.slice()) |*e| {
-            e.update(frame);
+            e.update(self.world_frame);
             if (e.dead) {
                 effect_pending_removal.append(frame_arena, e.id) catch unreachable;
             }
@@ -1224,7 +1224,7 @@ pub const World = struct {
         // it. Projectiles cannot get spawned projectile handles, but if it turns out to be a feature we need, slotmap
         // API is designed to support this use case with a couple changes.
         for (self.projectiles.slice()) |*p| {
-            p.update(frame);
+            p.update(self.world_frame);
             for (self.monsters.slice()) |*m| {
                 var rect: Rect = undefined;
                 if (p.getWorldCollisionRect().intersect(m.getWorldCollisionRect(), &rect)) {
@@ -1267,7 +1267,7 @@ pub const World = struct {
             new_projectile_ids.append(frame_arena, id) catch unreachable;
         }
         for (new_projectile_ids.items) |id| {
-            self.projectiles.getPtr(id).spawn(frame);
+            self.projectiles.getPtr(id).spawn(self.world_frame);
         }
         self.pending_projectiles.clearRetainingCapacity();
 

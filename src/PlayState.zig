@@ -378,7 +378,9 @@ pub fn update(self: *PlayState) void {
     self.heart_anim.update();
 
     self.world.view = self.camera.view;
-    self.world.update(self.game.frame_counter, arena);
+    if (!self.paused) {
+        self.world.update(arena);
+    }
     self.updateUI();
 
     if (self.sub == .none and self.world.recoverable_lives == 0) {
