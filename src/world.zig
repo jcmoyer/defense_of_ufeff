@@ -1197,14 +1197,14 @@ pub const World = struct {
             }
         }
 
-        for (self.towers.slice()) |*t| {
-            t.update(frame);
-        }
         for (self.monsters.slice()) |*m| {
             m.update(frame);
             if (m.dead) {
                 mon_pending_removal.append(frame_arena, m.id) catch unreachable;
             }
+        }
+        for (self.towers.slice()) |*t| {
+            t.update(frame);
         }
         for (self.sprite_effects.slice()) |*e| {
             e.update(frame);
