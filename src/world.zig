@@ -370,11 +370,12 @@ pub const t_soldier = TowerSpec{
     .upgrades = [3]?*const TowerSpec{ &t_archer, null, null },
     .anim_set = anim.a_chara.animationSet(),
     .updateFn = soldierUpdate,
+    .max_range = 24,
 };
 
 fn soldierUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
-        const m = self.world.pickClosestMonster(self.world_x, self.world_y, 20) orelse return;
+        const m = self.pickMonsterGeneric() orelse return;
         const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         const r = self.angleTo(p[0], p[1]);
 
@@ -398,7 +399,7 @@ pub const t_archer = TowerSpec{
 
 fn archerUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
-        const m = self.world.pickClosestMonster(self.world_x, self.world_y, 100) orelse {
+        const m = self.pickMonsterGeneric() orelse {
             self.killAssocEffect();
             return;
         };
@@ -432,10 +433,23 @@ pub const Tower = struct {
     animator: ?anim.Animator = null,
     world_x: u32,
     world_y: u32,
-    target_mobid: usize = 0,
+    target_mobid: ?u32 = null,
     cooldown: timing.FrameTimer = .{},
     assoc_effect: ?u32 = null,
     invested_gold: u32 = 0,
+
+    fn pickMonsterGeneric(self: *Tower) ?u32 {
+        const p = self.getWorldCollisionRect().centerPoint();
+        if (self.target_mobid) |id| {
+            const q = self.world.monsters.getPtr(id).getWorldCollisionRect().centerPoint();
+            const d = mu.dist(p, q);
+            if (d >= self.spec.min_range and d <= self.spec.max_range) {
+                return id;
+            }
+        }
+        self.target_mobid = self.world.pickClosestMonster(p[0], p[1], self.spec.min_range, self.spec.max_range);
+        return self.target_mobid;
+    }
 
     pub fn setWorldPosition(self: *Tower, new_x: u32, new_y: u32) void {
         self.world_x = new_x;
@@ -1074,7 +1088,7 @@ pub const World = struct {
         return ptr;
     }
 
-    pub fn pickClosestMonster(self: World, world_x: u32, world_y: u32, range: f32) ?u32 {
+    pub fn pickClosestMonster(self: World, world_x: i32, world_y: i32, range_min: f32, range_max: f32) ?u32 {
         if (self.monsters.slice().len == 0) {
             return null;
         }
@@ -1086,10 +1100,11 @@ pub const World = struct {
             if (m.dead) {
                 continue;
             }
-            const mx = @intToFloat(f32, m.world_x);
-            const my = @intToFloat(f32, m.world_y);
+            const p = m.getWorldCollisionRect().centerPoint();
+            const mx = @intToFloat(f32, p[0]);
+            const my = @intToFloat(f32, p[1]);
             const dist = mu.dist([2]f32{ fx, fy }, [2]f32{ mx, my });
-            if (dist <= range and dist < best_dist) {
+            if (dist >= range_min and dist <= range_max and dist < best_dist) {
                 closest = m.id;
                 best_dist = dist;
             }
@@ -1179,6 +1194,8 @@ pub const World = struct {
         var effect_pending_removal = std.ArrayListUnmanaged(u32){};
         var text_pending_removal = std.ArrayListUnmanaged(u32){};
         var active_waves_pending_removal = std.ArrayListUnmanaged(usize){};
+        // mob to list of towers attacking that mob
+        var tower_mobs = std.AutoArrayHashMapUnmanaged(u32, std.ArrayListUnmanaged(u32)){};
         self.goal.update(self.world_frame);
 
         for (self.active_waves.items) |wave_id, active_wave_index| {
@@ -1205,6 +1222,13 @@ pub const World = struct {
         }
         for (self.towers.slice()) |*t| {
             t.update(self.world_frame);
+            if (t.target_mobid) |mobid| {
+                var gop = tower_mobs.getOrPut(frame_arena, mobid) catch unreachable;
+                if (!gop.found_existing) {
+                    gop.value_ptr.* = std.ArrayListUnmanaged(u32){};
+                }
+                gop.value_ptr.append(frame_arena, t.id) catch unreachable;
+            }
         }
         for (self.sprite_effects.slice()) |*e| {
             e.update(self.world_frame);
@@ -1251,6 +1275,11 @@ pub const World = struct {
 
         for (mon_pending_removal.items) |id| {
             self.monsters.erase(id);
+            if (tower_mobs.get(id)) |list| {
+                for (list.items) |tower_id| {
+                    self.towers.getPtr(tower_id).target_mobid = null;
+                }
+            }
         }
 
         for (effect_pending_removal.items) |id| {
