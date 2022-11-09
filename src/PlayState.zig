@@ -1118,6 +1118,8 @@ fn loadWorld(self: *PlayState, mapid: []const u8) void {
     // must be set before calling spawnMonster since it's used for audio parameters...
     // should probably clean this up eventually
     self.world.view = self.camera.view;
+
+    self.world.startNextWave();
 }
 
 fn createMinimap(self: *PlayState) !void {

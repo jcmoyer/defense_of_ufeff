@@ -701,6 +701,101 @@ pub const Goal = struct {
     }
 };
 
+const EventSpawn = struct {
+    monster_spec: *const MonsterSpec,
+    time: u32,
+    repeat: u32,
+};
+
+pub const WaveEvent = union(enum) {
+    spawn: EventSpawn,
+};
+
+pub const WaveEventList = struct {
+    current_event: usize,
+    events: []WaveEvent,
+    next_event_timer: timing.FrameTimer,
+
+    fn deinit(self: *WaveEventList, allocator: Allocator) void {
+        allocator.free(self.events);
+    }
+
+    fn start(self: *WaveEventList, frame: u64) void {
+        if (self.events.len == 0) {
+            return;
+        }
+        // TODO: .spawn may not be the only event type, move time out of union?
+        self.next_event_timer = timing.FrameTimer.initSeconds(frame, @intToFloat(f32, self.events[0].spawn.time));
+    }
+
+    fn advance(self: *WaveEventList, frame: u64) void {
+        switch (self.events[self.current_event]) {
+            .spawn => |*s| {
+                if (s.repeat > 0) {
+                    s.repeat -= 1;
+                    self.next_event_timer.restart(frame);
+                } else {
+                    self.current_event += 1;
+                }
+            },
+        }
+    }
+
+    fn getCurrentEvent(self: *WaveEventList, frame: u64) ?WaveEvent {
+        if (self.current_event < self.events.len and self.next_event_timer.expired(frame)) {
+            return self.events[self.current_event];
+        } else {
+            return null;
+        }
+    }
+};
+
+pub const Wave = struct {
+    // map spawn ID to event list
+    spawn_events: std.AutoArrayHashMapUnmanaged(u32, WaveEventList),
+
+    fn start(self: *Wave, frame: u64) void {
+        for (self.spawn_events.values()) |*list| {
+            list.start(frame);
+        }
+    }
+
+    fn getReadyEvent(self: Wave, spawn_point_id: u32, frame: u64) ?WaveEvent {
+        if (self.spawn_events.getPtr(spawn_point_id)) |events_for_spawn| {
+            if (events_for_spawn.getCurrentEvent(frame)) |e| {
+                events_for_spawn.advance(frame);
+                return e;
+            }
+        }
+        return null;
+    }
+
+    fn deinit(self: *Wave, allocator: Allocator) void {
+        for (self.spawn_events.values()) |*evlist| {
+            evlist.deinit(allocator);
+        }
+        self.spawn_events.deinit(allocator);
+    }
+};
+
+pub const WaveList = struct {
+    waves: []Wave = &[_]Wave{},
+
+    fn startWave(self: WaveList, num: usize, frame: u64) void {
+        self.waves[num].start(frame);
+    }
+
+    fn deinit(self: *WaveList, allocator: Allocator) void {
+        if (self.waves.len == 0) {
+            return;
+        }
+        for (self.waves) |*wave| {
+            wave.deinit(allocator);
+        }
+        allocator.free(self.waves);
+    }
+};
+
 pub const TileRange = struct {
     /// Indices inclusive
     min: TileCoord,
@@ -731,6 +826,8 @@ pub const World = struct {
     pending_projectiles: std.ArrayListUnmanaged(Projectile) = .{},
     sprite_effects: IntrusiveSlotMap(SpriteEffect) = .{},
     floating_text: IntrusiveSlotMap(FloatingText) = .{},
+    waves: WaveList = .{},
+    active_waves: std.ArrayListUnmanaged(usize) = .{},
     pathfinder: PathfindingState,
     path_cache: PathfindingCache,
     goal: Goal,
@@ -740,6 +837,7 @@ pub const World = struct {
     recoverable_lives: u32 = 30,
     player_gold: u32 = 50,
     world_frame: u64 = 0,
+    next_wave: usize = 0,
 
     pub fn init(allocator: Allocator) World {
         return .{
@@ -772,6 +870,8 @@ pub const World = struct {
             self.allocator.free(k);
         }
         self.spawn_map.deinit(self.allocator);
+        self.waves.deinit(self.allocator);
+        self.active_waves.deinit(self.allocator);
     }
 
     pub fn getPlayableRange(self: World) TileRange {
@@ -1034,6 +1134,20 @@ pub const World = struct {
         return self.spawns.getPtr(spawn_id);
     }
 
+    pub fn getSpawnId(self: *World, name: []const u8) ?u32 {
+        return self.spawn_map.get(name);
+    }
+
+    pub fn startWave(self: *World, wave_num: usize) void {
+        self.waves.startWave(wave_num, self.world_frame);
+        self.active_waves.append(self.allocator, wave_num) catch unreachable;
+    }
+
+    pub fn startNextWave(self: *World) void {
+        self.startWave(self.next_wave);
+        self.next_wave += 1;
+    }
+
     pub fn update(self: *World, frame: u64, frame_arena: Allocator) void {
         var new_projectile_ids = std.ArrayListUnmanaged(u32){};
         var proj_pending_removal = std.ArrayListUnmanaged(u32){};
@@ -1042,13 +1156,18 @@ pub const World = struct {
         var text_pending_removal = std.ArrayListUnmanaged(u32){};
         self.goal.update(frame);
 
-        for (self.spawns.slice()) |*s| {
-            if (s.timer.expired(frame)) {
-                s.timer.restart(frame);
-                _ = self.spawnMonster(&m_human, s.id, frame) catch unreachable;
+        for (self.active_waves.items) |wave_id| {
+            for (self.spawns.slice()) |*sp| {
+                if (self.waves.waves[wave_id].getReadyEvent(sp.id, self.world_frame)) |e| {
+                    switch (e) {
+                        .spawn => |spawn_event| {
+                            _ = self.spawnMonster(spawn_event.monster_spec, sp.id, frame) catch unreachable;
+                        },
+                    }
+                }
             }
-            s.emitter.update();
         }
+
         for (self.towers.slice()) |*t| {
             t.update(frame);
         }
@@ -1375,6 +1494,73 @@ const PathfindingState = struct {
     }
 };
 
+const JsonWaveDoc = struct {
+    waves: []JsonWave,
+};
+const JsonWave = struct {
+    spawn_points: []JsonSpawnPoint,
+};
+const JsonSpawnPoint = struct {
+    spawn_point: []const u8,
+    events: []JsonSpawnPointEvent,
+};
+const JsonSpawnPointEvent = struct {
+    type: []const u8,
+    time: u32,
+    name: []const u8,
+    repeat: ?u32 = 1,
+};
+
+pub fn loadWavesFromJson(allocator: Allocator, filename: []const u8, world: *World) !WaveList {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena_allocator = arena.allocator();
+    defer arena.deinit();
+
+    var file = try std.fs.cwd().openFile(filename, .{});
+    defer file.close();
+
+    const buffer = try file.readToEndAlloc(arena_allocator, 1024 * 1024);
+
+    var tokens = std.json.TokenStream.init(buffer);
+    var doc = try std.json.parse(JsonWaveDoc, &tokens, .{ .allocator = arena_allocator, .ignore_unknown_fields = true });
+
+    var waves = try allocator.alloc(Wave, doc.waves.len);
+    errdefer allocator.free(waves);
+
+    for (doc.waves) |doc_wave, wave_index| {
+        waves[wave_index] = Wave{
+            .spawn_events = std.AutoArrayHashMapUnmanaged(u32, WaveEventList){},
+        };
+
+        for (doc_wave.spawn_points) |doc_sp| {
+            const world_spawn_id = world.getSpawnId(doc_sp.spawn_point) orelse return error.InvalidSpawnPoint;
+            var event_list = try allocator.alloc(WaveEvent, doc_sp.events.len);
+            for (doc_sp.events) |doc_event, event_index| {
+                if (std.mem.eql(u8, "spawn", doc_event.type)) {
+                    event_list[event_index].spawn = EventSpawn{
+                        .monster_spec = nameToMonsterSpec(doc_event.name) orelse return error.InvalidMonsterName,
+                        .time = doc_event.time,
+                        .repeat = doc_event.repeat.?,
+                    };
+                } else {
+                    std.log.err("Unrecognized event type `{s}` in `{s}`", .{ doc_event.type, filename });
+                    std.process.exit(1);
+                }
+            }
+
+            try waves[wave_index].spawn_events.put(allocator, world_spawn_id, WaveEventList{
+                .current_event = 0,
+                .events = event_list,
+                .next_event_timer = .{},
+            });
+        }
+    }
+
+    return WaveList{
+        .waves = waves,
+    };
+}
+
 pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !World {
     var arena = std.heap.ArenaAllocator.init(allocator);
     var arena_allocator = arena.allocator();
@@ -1420,6 +1606,17 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !World {
             .tilelayer => |x| try loadTileLayer(x, ctx),
             .objectgroup => |x| try loadObjectGroup(x, ctx),
         }
+    }
+
+    if (doc.getProperty("wave_file")) |wave_file| {
+        if (!wave_file.isFile()) {
+            std.log.err("wave_file must have type `file`", .{});
+            std.process.exit(1);
+        }
+        const dirname_start = std.fs.path.dirname(filename) orelse "";
+        const wave_filename = try std.fs.path.resolve(arena_allocator, &[_][]const u8{ dirname_start, wave_file.value });
+        std.log.debug("Load wave_file from `{s}`", .{wave_filename});
+        world.waves = try loadWavesFromJson(allocator, wave_filename, &world);
     }
 
     return world;
@@ -1613,4 +1810,31 @@ const TiledDoc = struct {
     height: usize,
     tilesets: []TiledTileset,
     layers: []TiledLayer,
+    properties: []TiledMapProperty,
+
+    fn getProperty(self: TiledDoc, name: []const u8) ?TiledMapProperty {
+        for (self.properties) |prop| {
+            if (std.mem.eql(u8, prop.name, name)) {
+                return prop;
+            }
+        }
+        return null;
+    }
 };
+
+const TiledMapProperty = struct {
+    name: []const u8,
+    type: []const u8,
+    value: []const u8,
+
+    fn isFile(self: TiledMapProperty) bool {
+        return std.mem.eql(u8, self.type, "file");
+    }
+};
+
+fn nameToMonsterSpec(name: []const u8) ?*const MonsterSpec {
+    if (std.mem.eql(u8, "m_human", name)) {
+        return &m_human;
+    }
+    return null;
+}
