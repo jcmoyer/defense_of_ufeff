@@ -385,6 +385,10 @@ pub fn update(self: *PlayState) void {
         self.beginTransitionGameOver();
     }
 
+    if (self.sub == .none and self.world.player_won) {
+        self.beginTransitionGameOver();
+    }
+
     if (self.sub == .gameover_fadeout and self.fade_timer.expired(self.game.frame_counter)) {
         self.game.changeState(.menu);
     }
@@ -1119,7 +1123,9 @@ fn loadWorld(self: *PlayState, mapid: []const u8) void {
     // should probably clean this up eventually
     self.world.view = self.camera.view;
 
-    self.world.startNextWave();
+    if (self.world.startNextWave() == false) {
+        std.log.err("No waves in world `{s}`", .{mapid});
+    }
 }
 
 fn createMinimap(self: *PlayState) !void {

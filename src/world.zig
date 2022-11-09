@@ -852,7 +852,7 @@ pub const World = struct {
     player_gold: u32 = 50,
     world_frame: u64 = 0,
     next_wave: usize = 0,
-    all_waves_clear: bool = false,
+    player_won: bool = false,
 
     pub fn init(allocator: Allocator) World {
         return .{
@@ -1161,12 +1161,14 @@ pub const World = struct {
         self.active_waves.append(self.allocator, wave_num) catch unreachable;
     }
 
-    pub fn startNextWave(self: *World) void {
+    /// Returns true if next wave could be started, false means all waves are finished.
+    pub fn startNextWave(self: *World) bool {
         if (self.next_wave < self.waves.waves.len) {
             self.startWave(self.next_wave);
             self.next_wave += 1;
+            return true;
         } else {
-            self.all_waves_clear = true;
+            return false;
         }
     }
 
@@ -1277,7 +1279,11 @@ pub const World = struct {
         }
 
         if (self.active_waves.items.len == 0) {
-            self.startNextWave();
+            if (!self.startNextWave()) {
+                if (self.monsters.slice().len == 0) {
+                    self.player_won = true;
+                }
+            }
         }
 
         self.world_frame += 1;
