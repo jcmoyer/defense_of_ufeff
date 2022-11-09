@@ -437,7 +437,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     }
 
     self.r_quad.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
-    for (self.world.spawns.items) |*s| {
+    for (self.world.spawns.slice()) |*s| {
         s.emitter.render(&self.r_quad, @floatCast(f32, alpha));
     }
 

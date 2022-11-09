@@ -117,7 +117,7 @@ pub const MonsterSpec = struct {
     gold: u32,
 };
 
-pub const mon_human = MonsterSpec{
+pub const m_human = MonsterSpec{
     .anim_set = anim.a_chara.animationSet(),
     .max_hp = 5,
     .gold = 1,
@@ -130,7 +130,7 @@ pub const Monster = struct {
     };
 
     id: u32 = undefined,
-    spawn_id: usize,
+    spawn_id: u32,
     world: *World,
     spec: *const MonsterSpec,
     p_world_x: u32 = 0,
@@ -170,7 +170,7 @@ pub const Monster = struct {
     fn computePath(self: *Monster) void {
         self.path = switch (self.pathing_state) {
             .to_goal => self.world.findPath(self.getTilePosition(), self.world.goal.getTilePosition()).?,
-            .to_spawn => self.world.findPath(self.getTilePosition(), self.world.spawns.items[self.spawn_id].coord).?,
+            .to_spawn => self.world.findPath(self.getTilePosition(), self.world.getSpawnPosition(self.spawn_id)).?,
         };
         self.path_index = 0;
     }
@@ -552,6 +552,7 @@ pub const Tower = struct {
 pub const Spawn = struct {
     var rng = std.rand.Xoshiro256.init(0);
 
+    id: u32 = undefined,
     coord: TileCoord,
     emitter: particle.Emitter,
     timer: timing.FrameTimer,
@@ -724,7 +725,8 @@ pub const World = struct {
     towers: IntrusiveSlotMap(Tower) = .{},
     /// Tile coordinates for tower -> slot map handle
     tower_map: std.AutoHashMapUnmanaged(TileCoord, u32) = .{},
-    spawns: std.ArrayListUnmanaged(Spawn) = .{},
+    spawns: IntrusiveSlotMap(Spawn) = .{},
+    spawn_map: std.StringArrayHashMapUnmanaged(u32) = .{},
     projectiles: IntrusiveSlotMap(Projectile) = .{},
     pending_projectiles: std.ArrayListUnmanaged(Projectile) = .{},
     sprite_effects: IntrusiveSlotMap(SpriteEffect) = .{},
@@ -751,7 +753,7 @@ pub const World = struct {
 
     pub fn deinit(self: *World) void {
         self.path_cache.deinit();
-        for (self.spawns.items) |*s| {
+        for (self.spawns.slice()) |*s| {
             s.emitter.deinit(self.allocator);
         }
         self.spawns.deinit(self.allocator);
@@ -766,6 +768,10 @@ pub const World = struct {
         self.pending_projectiles.deinit(self.allocator);
         self.sprite_effects.deinit(self.allocator);
         self.tower_map.deinit(self.allocator);
+        for (self.spawn_map.keys()) |k| {
+            self.allocator.free(k);
+        }
+        self.spawn_map.deinit(self.allocator);
     }
 
     pub fn getPlayableRange(self: World) TileRange {
@@ -794,17 +800,19 @@ pub const World = struct {
         self.goal = Goal.init(coord.worldX(), coord.worldY());
     }
 
-    fn createSpawn(self: *World, coord: TileCoord) !void {
-        try self.spawns.append(self.allocator, Spawn{
+    fn createSpawn(self: *World, name: []const u8, coord: TileCoord) !void {
+        const s_id = try self.spawns.put(self.allocator, Spawn{
             .coord = coord,
             .timer = timing.FrameTimer.initSeconds(0, 1),
             .spawn_interval = 1,
             .emitter = try particle.Emitter.initCapacity(self.allocator, 16),
         });
-        self.spawns.items[self.spawns.items.len - 1].emitter.pos = [2]f32{
+        self.spawns.getPtr(s_id).emitter.pos = [2]f32{
             @intToFloat(f32, coord.x * 16) + 8,
             @intToFloat(f32, coord.y * 16) + 16,
         };
+        const name_dup = try self.allocator.dupe(u8, name);
+        try self.spawn_map.put(self.allocator, name_dup, s_id);
     }
 
     pub fn canAfford(self: *World, spec: *const TowerSpec) bool {
@@ -845,7 +853,7 @@ pub const World = struct {
         //     }
         // }
 
-        for (self.spawns.items) |*sp| {
+        for (self.spawns.slice()) |*sp| {
             if (!self.findTheoreticalPath(sp.coord, self.goal.getTilePosition())) {
                 return false;
             }
@@ -992,9 +1000,9 @@ pub const World = struct {
         return id;
     }
 
-    pub fn spawnMonster(self: *World, spec: *const MonsterSpec, spawn_id: usize, frame: u64) !u32 {
+    pub fn spawnMonster(self: *World, spec: *const MonsterSpec, spawn_id: u32, frame: u64) !u32 {
         const pos = self.getSpawnPosition(spawn_id);
-        self.getSpawn(spawn_id).emit();
+        self.getSpawnPtr(spawn_id).emit();
         var mon = Monster{
             .world = self,
             .spec = spec,
@@ -1018,12 +1026,12 @@ pub const World = struct {
         }
     }
 
-    pub fn getSpawnPosition(self: *World, spawn_id: usize) TileCoord {
-        return self.spawns.items[spawn_id].coord;
+    pub fn getSpawnPosition(self: *World, spawn_id: u32) TileCoord {
+        return self.getSpawnPtr(spawn_id).coord;
     }
 
-    pub fn getSpawn(self: *World, spawn_id: usize) *Spawn {
-        return &self.spawns.items[spawn_id];
+    pub fn getSpawnPtr(self: *World, spawn_id: u32) *Spawn {
+        return self.spawns.getPtr(spawn_id);
     }
 
     pub fn update(self: *World, frame: u64, frame_arena: Allocator) void {
@@ -1034,10 +1042,10 @@ pub const World = struct {
         var text_pending_removal = std.ArrayListUnmanaged(u32){};
         self.goal.update(frame);
 
-        for (self.spawns.items) |*s, id| {
+        for (self.spawns.slice()) |*s| {
             if (s.timer.expired(frame)) {
                 s.timer.restart(frame);
-                _ = self.spawnMonster(&mon_human, id, frame) catch unreachable;
+                _ = self.spawnMonster(&m_human, s.id, frame) catch unreachable;
             }
             s.emitter.update();
         }
@@ -1461,7 +1469,7 @@ fn loadTileLayer(layer: TiledTileLayer, ctx: LoadContext) !void {
 fn loadObjectGroup(layer: TiledObjectGroup, ctx: LoadContext) !void {
     for (layer.objects) |obj| {
         if (std.mem.eql(u8, obj.class, "spawn_point")) {
-            try ctx.world.createSpawn(TileCoord.initSignedWorld(obj.x, obj.y));
+            try ctx.world.createSpawn(obj.name, TileCoord.initSignedWorld(obj.x, obj.y));
         } else if (std.mem.eql(u8, obj.class, "construction_blocker")) {
             const tile_start = TileCoord.initSignedWorld(obj.x, obj.y);
             const tile_end = TileCoord.initSignedWorld(obj.x + obj.width, obj.y + obj.height);
