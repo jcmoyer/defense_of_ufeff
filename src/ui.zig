@@ -102,9 +102,9 @@ pub const Button = struct {
         // .hover
         Rect.init(0, 32, 32, 32),
         // .down
-        Rect.init(32, 0, 32, 32),
+        Rect.init(0, 64, 32, 32),
         // .disabled
-        Rect.init(32, 32, 32, 32),
+        Rect.init(0, 96, 32, 32),
     },
     tooltip_text: ?[]const u8 = null,
 

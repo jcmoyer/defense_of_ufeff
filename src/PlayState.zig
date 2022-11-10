@@ -113,6 +113,15 @@ fast: bool = false,
 
 paused: bool = false,
 
+// UI textures, generated at runtime
+t_wall: *Texture,
+t_soldier: *Texture,
+t_fast_off: *Texture,
+t_fast_on: *Texture,
+t_pause: *Texture,
+t_resume: *Texture,
+t_demolish: *Texture,
+
 deb_render_tile_collision: bool = false,
 
 rng: std.rand.DefaultPrng = std.rand.DefaultPrng.init(0),
@@ -158,10 +167,29 @@ pub fn create(game: *Game) !*PlayState {
         .ui_upgrade_panel = undefined,
         .ui_upgrade_buttons = undefined,
         .ui_upgrade_states = undefined,
+        .t_wall = undefined,
+        .t_soldier = undefined,
+        .t_fast_off = undefined,
+        .t_fast_on = undefined,
+        .t_pause = undefined,
+        .t_resume = undefined,
+        .t_demolish = undefined,
     };
     self.r_font = BitmapFont.init(&self.r_batch);
     self.ui_root.backend.coord_scale_x = 2;
     self.ui_root.backend.coord_scale_y = 2;
+
+    var btg = ButtonTextureGenerator.init(&self.game.texman, &self.r_batch);
+    defer btg.deinit();
+    var button_base = self.game.texman.getNamedTexture("button_base.png");
+    var button_badges = self.game.texman.getNamedTexture("button_badges.png");
+    self.t_demolish = btg.createButtonWithBadge(button_base, button_badges, Rect.init(0, 0, 32, 32));
+    self.t_fast_off = btg.createButtonWithBadge(button_base, button_badges, Rect.init(32, 0, 32, 32));
+    self.t_pause = btg.createButtonWithBadge(button_base, button_badges, Rect.init(64, 0, 32, 32));
+    self.t_resume = btg.createButtonWithBadge(button_base, button_badges, Rect.init(96, 0, 32, 32));
+    self.t_wall = btg.createButtonWithBadge(button_base, button_badges, Rect.init(128, 0, 32, 32));
+    self.t_soldier = btg.createButtonWithBadge(button_base, button_badges, Rect.init(160, 0, 32, 32));
+    self.t_fast_on = btg.createButtonWithBadge(button_base, button_badges, Rect.init(192, 0, 32, 32));
 
     const t_panel = self.game.texman.getNamedTexture("ui_panel.png");
     var ui_panel = try self.ui_root.createPanel();
@@ -173,16 +201,16 @@ pub fn create(game: *Game) !*PlayState {
     var b_wall = try self.ui_root.createButton();
     b_wall.tooltip_text = wo.t_wall.tooltip;
     b_wall.rect = Rect.init(16, 144, 32, 32);
-    b_wall.texture_rects = makeStandardButtonRects(128, 0);
-    b_wall.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
+    b_wall.texture_rects = makeStandardButtonRects(0, 0);
+    b_wall.setTexture(self.t_wall);
     b_wall.setCallback(self, onWallClick);
     try ui_panel.addChild(b_wall.control());
 
     var b_tower = try self.ui_root.createButton();
     b_tower.tooltip_text = wo.t_soldier.tooltip;
     b_tower.rect = Rect.init(48, 144, 32, 32);
-    b_tower.texture_rects = makeStandardButtonRects(160, 0);
-    b_tower.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
+    b_tower.texture_rects = makeStandardButtonRects(0, 0);
+    b_tower.setTexture(self.t_soldier);
     b_tower.setCallback(self, onTowerClick);
     try ui_panel.addChild(b_tower.control());
 
@@ -206,25 +234,24 @@ pub fn create(game: *Game) !*PlayState {
     try ui_panel.addChild(self.ui_lives.control());
 
     self.btn_pause_resume = try self.ui_root.createButton();
-    self.btn_pause_resume.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
+    self.btn_pause_resume.setTexture(self.t_pause);
     self.btn_pause_resume.rect = Rect.init(16, 208, 32, 32);
-    self.btn_pause_resume.texture_rects = makeStandardButtonRects(64, 0);
+    self.btn_pause_resume.texture_rects = makeStandardButtonRects(0, 0);
     self.btn_pause_resume.tooltip_text = "Pause";
     try ui_panel.addChild(self.btn_pause_resume.control());
     self.btn_pause_resume.setCallback(self, onPauseClick);
 
     self.btn_fastforward = try self.ui_root.createButton();
-    self.btn_fastforward.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
+    self.btn_fastforward.setTexture(self.t_fast_off);
     self.btn_fastforward.rect = Rect.init(48, 208, 32, 32);
-    self.btn_fastforward.texture_rects = makeStandardButtonRects(32, 0);
+    self.btn_fastforward.texture_rects = makeStandardButtonRects(0, 0);
     self.btn_fastforward.tooltip_text = "Fast-forward";
     self.btn_fastforward.setCallback(self, onFastForwardClick);
     try ui_panel.addChild(self.btn_fastforward.control());
 
     self.btn_demolish = try self.ui_root.createButton();
-    self.btn_demolish.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
+    self.btn_demolish.setTexture(self.t_demolish);
     self.btn_demolish.rect = Rect.init(16, 176, 32, 32);
-    self.btn_demolish.texture_rects = makeStandardButtonRects(0, 0);
     self.btn_demolish.tooltip_text = "Demolish\n\nReturns 50% of the total gold\ninvested into the tower.";
     self.btn_demolish.setCallback(self, onDemolishClick);
     try ui_panel.addChild(self.btn_demolish.control());
@@ -238,14 +265,15 @@ pub fn create(game: *Game) !*PlayState {
 
     for (self.ui_upgrade_buttons) |*b, i| {
         b.* = try self.ui_root.createButton();
-        b.*.setTexture(self.game.texman.getNamedTexture("ui_buttons.png"));
         b.*.texture_rects = makeStandardButtonRects(0, 0);
         b.*.rect = Rect.init(@intCast(i32, i) * 32, 0, 32, 32);
         try self.ui_upgrade_panel.addChild(b.*.control());
         // only first 3 buttons are upgrades, 4th is demolish
         if (i < 3) {
+            b.*.setTexture(button_base);
             b.*.setCallback(&self.ui_upgrade_states[i], onUpgradeClick);
         } else if (i == 3) {
+            b.*.setTexture(self.t_demolish);
             b.*.tooltip_text = "Demolish\n\nReturns 50% of the total gold\ninvested into the tower.";
             b.*.setCallback(self, onUpgradeDemolishClick);
         }
@@ -279,10 +307,10 @@ fn onPauseClick(button: *ui.Button, self: *PlayState) void {
     self.paused = !self.paused;
     if (!self.paused) {
         button.tooltip_text = "Pause";
-        button.texture_rects = makeStandardButtonRects(64, 0);
+        button.setTexture(self.t_pause);
     } else {
         button.tooltip_text = "Resume";
-        button.texture_rects = makeStandardButtonRects(96, 0);
+        button.setTexture(self.t_resume);
     }
 }
 
@@ -290,9 +318,9 @@ fn onFastForwardClick(button: *ui.Button, self: *PlayState) void {
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.fast = !self.fast;
     if (!self.fast) {
-        button.texture_rects = makeStandardButtonRects(32, 0);
+        button.setTexture(self.t_fast_off);
     } else {
-        button.texture_rects = makeStandardButtonRects(192, 0);
+        button.setTexture(self.t_fast_on);
     }
 }
 
@@ -1286,3 +1314,63 @@ fn updateUpgradeButtons(self: *PlayState) void {
         }
     }
 }
+
+const TextureManager = @import("texture.zig").TextureManager;
+const ButtonTextureGenerator = struct {
+    texman: *TextureManager,
+    r_batch: *SpriteBatch,
+    fbo: gl.GLuint,
+
+    fn init(texman: *TextureManager, r_batch: *SpriteBatch) ButtonTextureGenerator {
+        var fbo: gl.GLuint = 0;
+        gl.genFramebuffers(1, &fbo);
+        return .{
+            .texman = texman,
+            .r_batch = r_batch,
+            .fbo = fbo,
+        };
+    }
+
+    fn deinit(self: *ButtonTextureGenerator) void {
+        gl.deleteFramebuffers(1, &self.fbo);
+    }
+
+    fn createButtonWithBadge(self: *ButtonTextureGenerator, button_base: *const Texture, badge: *const Texture, badge_rect: Rect) *Texture {
+        var t = self.texman.createInMemory();
+        t.width = button_base.width;
+        t.height = button_base.height;
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, self.fbo);
+
+        gl.bindTexture(gl.TEXTURE_2D, t.handle);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @intCast(gl.GLsizei, button_base.width), @intCast(gl.GLsizei, button_base.height), 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.handle, 0);
+        if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
+            std.log.err("createButtonWithBadge: failed to create framebuffer", .{});
+            std.process.exit(1);
+        }
+        gl.viewport(0, 0, @intCast(c_int, t.width), @intCast(c_int, t.height));
+        self.r_batch.setOutputDimensions(t.width, t.height);
+        self.r_batch.begin(.{
+            .texture = button_base,
+        });
+        self.r_batch.drawQuad(Rect.init(0, 0, @intCast(i32, button_base.width), @intCast(i32, button_base.height)), Rect.init(0, 0, @intCast(i32, t.width), @intCast(i32, t.height)));
+        self.r_batch.end();
+        self.r_batch.begin(.{
+            .texture = badge,
+        });
+        var i: u8 = 0;
+        while (i < 4) : (i += 1) {
+            self.r_batch.drawQuad(
+                badge_rect,
+                Rect.init(0, i * 32, @intCast(i32, 32), @intCast(i32, 32)),
+            );
+        }
+        self.r_batch.end();
+        return t;
+    }
+};
