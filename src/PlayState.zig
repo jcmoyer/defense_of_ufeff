@@ -109,6 +109,7 @@ ui_lives: *ui.Label,
 ui_upgrade_panel: *ui.Panel,
 ui_upgrade_buttons: [4]*ui.Button,
 ui_upgrade_states: [3]UpgradeButtonState,
+fast: bool = false,
 
 paused: bool = false,
 
@@ -217,6 +218,7 @@ pub fn create(game: *Game) !*PlayState {
     self.btn_fastforward.rect = Rect.init(48, 208, 32, 32);
     self.btn_fastforward.texture_rects = makeStandardButtonRects(32, 0);
     self.btn_fastforward.tooltip_text = "Fast-forward";
+    self.btn_fastforward.setCallback(self, onFastForwardClick);
     try ui_panel.addChild(self.btn_fastforward.control());
 
     self.btn_demolish = try self.ui_root.createButton();
@@ -282,6 +284,12 @@ fn onPauseClick(button: *ui.Button, self: *PlayState) void {
         button.tooltip_text = "Resume";
         button.texture_rects = makeStandardButtonRects(96, 0);
     }
+}
+
+fn onFastForwardClick(button: *ui.Button, self: *PlayState) void {
+    _ = button;
+    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
+    self.fast = !self.fast;
 }
 
 fn onUpgradeClick(button: *ui.Button, upgrade: *UpgradeButtonState) void {
@@ -380,6 +388,9 @@ pub fn update(self: *PlayState) void {
     self.world.view = self.camera.view;
     if (!self.paused) {
         self.world.update(arena);
+        if (self.fast) {
+            self.world.update(arena);
+        }
     }
     self.updateUI();
 
