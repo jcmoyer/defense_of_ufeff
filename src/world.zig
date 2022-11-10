@@ -1883,12 +1883,14 @@ const TiledDoc = struct {
     height: usize,
     tilesets: []TiledTileset,
     layers: []TiledLayer,
-    properties: []TiledMapProperty,
+    properties: ?[]TiledMapProperty = null,
 
     fn getProperty(self: TiledDoc, name: []const u8) ?TiledMapProperty {
-        for (self.properties) |prop| {
-            if (std.mem.eql(u8, prop.name, name)) {
-                return prop;
+        if (self.properties) |props| {
+            for (props) |prop| {
+                if (std.mem.eql(u8, prop.name, name)) {
+                    return prop;
+                }
             }
         }
         return null;
