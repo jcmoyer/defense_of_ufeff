@@ -50,23 +50,6 @@ pub const Panel = struct {
         self.root.allocator.destroy(self);
     }
 
-    pub fn handleMouseClick(self: *const Panel, args: MouseEventArgs) void {
-        const local_args = MouseEventArgs{
-            .x = args.x - self.rect.left(),
-            .y = args.y - self.rect.top(),
-            .buttons = args.buttons,
-        };
-
-        for (self.children.items) |child| {
-            if (child.interactRect()) |rect| {
-                if (rect.contains(local_args.x, local_args.y)) {
-                    child.handleMouseClick(local_args);
-                    return;
-                }
-            }
-        }
-    }
-
     pub fn addChild(self: *Panel, c: Control) !void {
         try self.children.append(self.root.allocator, c);
     }
@@ -78,7 +61,6 @@ pub const Panel = struct {
     pub fn control(self: *Panel) Control {
         return Control.init(self, .{
             .deinitFn = deinit,
-            .handleMouseClickFn = handleMouseClick,
             .interactRectFn = interactRect,
             .getBackgroundFn = getBackground,
             .getChildrenFn = getChildren,
