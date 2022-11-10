@@ -1168,6 +1168,8 @@ fn loadWorld(self: *PlayState, mapid: []const u8) void {
         );
     }
 
+    self.camera.view.centerOn(@intCast(i32, self.world.goal.world_x), @intCast(i32, self.world.goal.world_y));
+
     self.prev_camera = self.camera;
 
     // must be set before calling spawnMonster since it's used for audio parameters...
