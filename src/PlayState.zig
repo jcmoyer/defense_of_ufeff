@@ -287,9 +287,13 @@ fn onPauseClick(button: *ui.Button, self: *PlayState) void {
 }
 
 fn onFastForwardClick(button: *ui.Button, self: *PlayState) void {
-    _ = button;
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.fast = !self.fast;
+    if (!self.fast) {
+        button.texture_rects = makeStandardButtonRects(32, 0);
+    } else {
+        button.texture_rects = makeStandardButtonRects(192, 0);
+    }
 }
 
 fn onUpgradeClick(button: *ui.Button, upgrade: *UpgradeButtonState) void {
