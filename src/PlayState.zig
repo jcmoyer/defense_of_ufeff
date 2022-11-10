@@ -114,6 +114,7 @@ fast: bool = false,
 paused: bool = false,
 
 // UI textures, generated at runtime
+button_generator: ButtonTextureGenerator,
 t_wall: *Texture,
 t_soldier: *Texture,
 t_fast_off: *Texture,
@@ -121,6 +122,7 @@ t_fast_on: *Texture,
 t_pause: *Texture,
 t_resume: *Texture,
 t_demolish: *Texture,
+upgrade_texture_cache: std.AutoHashMapUnmanaged(*const wo.TowerSpec, *Texture) = .{},
 
 deb_render_tile_collision: bool = false,
 
@@ -147,7 +149,7 @@ pub fn create(game: *Game) !*PlayState {
         .foam_anim_r = anim.a_foam.animationSet().createAnimator("r"),
         .foam_anim_u = anim.a_foam.animationSet().createAnimator("u"),
         .foam_anim_d = anim.a_foam.animationSet().createAnimator("d"),
-        .world = wo.World.init(self.game.allocator),
+        .world = wo.World.init(game.allocator),
         .r_font = undefined,
         .fontspec = undefined,
         .fontspec_numbers = undefined,
@@ -157,6 +159,7 @@ pub fn create(game: *Game) !*PlayState {
         .t_minimap = game.texman.createInMemory(),
         // Created/destroyed in update()
         .frame_arena = undefined,
+        // Initialized below
         .ui_buttons = undefined,
         .ui_minimap = undefined,
         .ui_gold = undefined,
@@ -174,22 +177,23 @@ pub fn create(game: *Game) !*PlayState {
         .t_pause = undefined,
         .t_resume = undefined,
         .t_demolish = undefined,
+        .button_generator = undefined,
     };
     self.r_font = BitmapFont.init(&self.r_batch);
     self.ui_root.backend.coord_scale_x = 2;
     self.ui_root.backend.coord_scale_y = 2;
 
-    var btg = ButtonTextureGenerator.init(&self.game.texman, &self.r_batch);
-    defer btg.deinit();
+    self.button_generator = ButtonTextureGenerator.init(&game.texman, &self.r_batch);
+
     var button_base = self.game.texman.getNamedTexture("button_base.png");
     var button_badges = self.game.texman.getNamedTexture("button_badges.png");
-    self.t_demolish = btg.createButtonWithBadge(button_base, button_badges, Rect.init(0, 0, 32, 32));
-    self.t_fast_off = btg.createButtonWithBadge(button_base, button_badges, Rect.init(32, 0, 32, 32));
-    self.t_pause = btg.createButtonWithBadge(button_base, button_badges, Rect.init(64, 0, 32, 32));
-    self.t_resume = btg.createButtonWithBadge(button_base, button_badges, Rect.init(96, 0, 32, 32));
-    self.t_wall = btg.createButtonWithBadge(button_base, button_badges, Rect.init(128, 0, 32, 32));
-    self.t_soldier = btg.createButtonWithBadge(button_base, button_badges, Rect.init(160, 0, 32, 32));
-    self.t_fast_on = btg.createButtonWithBadge(button_base, button_badges, Rect.init(192, 0, 32, 32));
+    self.t_demolish = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(0, 0, 32, 32));
+    self.t_fast_off = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(32, 0, 32, 32));
+    self.t_pause = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(64, 0, 32, 32));
+    self.t_resume = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(96, 0, 32, 32));
+    self.t_wall = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(128, 0, 32, 32));
+    self.t_soldier = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(160, 0, 32, 32));
+    self.t_fast_on = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(192, 0, 32, 32));
 
     const t_panel = self.game.texman.getNamedTexture("ui_panel.png");
     var ui_panel = try self.ui_root.createPanel();
@@ -364,6 +368,8 @@ fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.Bitm
 }
 
 pub fn destroy(self: *PlayState) void {
+    self.upgrade_texture_cache.deinit(self.game.allocator);
+    self.button_generator.deinit();
     self.fontspec.deinit();
     self.fontspec_numbers.deinit();
     self.r_quad.destroy();
@@ -1300,19 +1306,32 @@ fn updateUpgradeButtons(self: *PlayState) void {
     while (i < 3) : (i += 1) {
         if (s.upgrades[i]) |spec| {
             self.ui_upgrade_buttons[i].tooltip_text = spec.tooltip;
+            self.ui_upgrade_buttons[i].setTexture(self.getCachedUpgradeButtonTexture(spec));
+            self.ui_upgrade_states[i].play_state = self;
+            self.ui_upgrade_states[i].tower_spec = spec;
+            self.ui_upgrade_states[i].tower_id = self.interact_state.select.selected_tower;
             if (self.world.canAfford(spec)) {
                 self.ui_upgrade_buttons[i].state = .normal;
-                self.ui_upgrade_states[i].play_state = self;
-                self.ui_upgrade_states[i].tower_spec = spec;
-                self.ui_upgrade_states[i].tower_id = self.interact_state.select.selected_tower;
             } else {
                 self.ui_upgrade_buttons[i].state = .disabled;
             }
         } else {
+            self.ui_upgrade_buttons[i].setTexture(self.game.texman.getNamedTexture("button_base.png"));
             self.ui_upgrade_buttons[i].tooltip_text = null;
             self.ui_upgrade_buttons[i].state = .disabled;
         }
     }
+}
+
+fn getCachedUpgradeButtonTexture(self: *PlayState, spec: *const wo.TowerSpec) *const Texture {
+    var gop = self.upgrade_texture_cache.getOrPut(self.game.allocator, spec) catch unreachable;
+    if (!gop.found_existing) {
+        const base_texture = self.game.texman.getNamedTexture("button_base.png");
+        const spec_texture = self.game.texman.getNamedTexture("characters.png");
+        const spec_rect = spec.anim_set.?.createAnimator("down").getCurrentRect();
+        gop.value_ptr.* = self.button_generator.createButtonWithBadge(base_texture, spec_texture, spec_rect);
+    }
+    return gop.value_ptr.*;
 }
 
 const TextureManager = @import("texture.zig").TextureManager;
@@ -1365,9 +1384,13 @@ const ButtonTextureGenerator = struct {
         });
         var i: u8 = 0;
         while (i < 4) : (i += 1) {
+            const button_frame_rect = Rect.init(0, i * 32, 32, 32);
+            const desired_center = button_frame_rect.centerPoint();
+            var adjusted_dest = badge_rect;
+            adjusted_dest.centerOn(desired_center[0], desired_center[1]);
             self.r_batch.drawQuad(
                 badge_rect,
-                Rect.init(0, i * 32, @intCast(i32, 32), @intCast(i32, 32)),
+                adjusted_dest,
             );
         }
         self.r_batch.end();
