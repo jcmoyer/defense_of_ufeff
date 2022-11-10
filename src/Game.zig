@@ -12,6 +12,7 @@ const TextureManager = texture.TextureManager;
 const AudioSystem = @import("audio.zig").AudioSystem;
 const MenuState = @import("MenuState.zig");
 const PlayState = @import("PlayState.zig");
+const OptionsState = @import("OptionsState.zig");
 const InputState = @import("input.zig").InputState;
 
 /// Updates per second
@@ -38,14 +39,18 @@ scene_color: *Texture,
 current_state: ?StateId = null,
 st_menu: *MenuState,
 st_play: *PlayState,
+st_options: *OptionsState,
 
 frame_counter: u64 = 0,
+output_scale_x: f32 = 2,
+output_scale_y: f32 = 2,
 
 input: InputState,
 
 pub const StateId = enum {
     menu,
     play,
+    options,
 };
 
 /// Allocate a Game and initialize core systems.
@@ -63,6 +68,7 @@ pub fn create(allocator: Allocator) !*Game {
         .input = undefined,
         .st_menu = undefined,
         .st_play = undefined,
+        .st_options = undefined,
     };
 
     if (sdl.SDL_Init(sdl.SDL_INIT_EVERYTHING) != 0) {
@@ -89,8 +95,8 @@ pub fn create(allocator: Allocator) !*Game {
         "defense of ufeff",
         sdl.SDL_WINDOWPOS_CENTERED,
         sdl.SDL_WINDOWPOS_CENTERED,
-        2 * INTERNAL_WIDTH,
-        2 * INTERNAL_HEIGHT,
+        @floatToInt(c_int, ptr.output_scale_x * INTERNAL_WIDTH),
+        @floatToInt(c_int, ptr.output_scale_y * INTERNAL_HEIGHT),
         sdl.SDL_WINDOW_OPENGL,
     ) orelse {
         log.err("SDL_CreateWindow failed: {s}", .{sdl.SDL_GetError()});
@@ -125,6 +131,11 @@ pub fn create(allocator: Allocator) !*Game {
         std.process.exit(1);
     };
 
+    ptr.st_options = OptionsState.create(ptr) catch |err| {
+        log.err("Could not create OptionsState: {!}", .{err});
+        std.process.exit(1);
+    };
+
     // At this point, the game object should be fully constructed and in a valid state.
 
     return ptr;
@@ -133,6 +144,7 @@ pub fn create(allocator: Allocator) !*Game {
 pub fn destroy(self: *Game) void {
     self.st_play.destroy();
     self.st_menu.destroy();
+    self.st_options.destroy();
     self.texman.deinit();
     self.audio.destroy();
     sdl.SDL_GL_DeleteContext(self.context);
@@ -236,7 +248,10 @@ fn performLayout(self: *Game) void {
     var window_width: c_int = 0;
     var window_height: c_int = 0;
     sdl.SDL_GetWindowSize(self.window, &window_width, &window_height);
+    self.output_scale_x = @intToFloat(f32, window_width) / INTERNAL_WIDTH;
+    self.output_scale_y = @intToFloat(f32, window_height) / INTERNAL_HEIGHT;
     self.imm.setOutputDimensions(@intCast(u32, window_width), @intCast(u32, window_height));
+    log.debug("New scale {d}, {d}", .{ self.output_scale_x, self.output_scale_y });
 }
 
 fn initFramebuffer(self: *Game) void {
@@ -294,6 +309,7 @@ fn stateDispatchEvent(self: *Game, id: StateId, ev: sdl.SDL_Event) void {
     switch (id) {
         .menu => self.st_menu.handleEvent(ev),
         .play => self.st_play.handleEvent(ev),
+        .options => self.st_options.handleEvent(ev),
     }
 }
 
@@ -301,6 +317,7 @@ fn stateDispatchUpdate(self: *Game, id: StateId) void {
     switch (id) {
         .menu => self.st_menu.update(),
         .play => self.st_play.update(),
+        .options => self.st_options.update(),
     }
 }
 
@@ -308,6 +325,7 @@ fn stateDispatchRender(self: *Game, id: StateId, alpha: f64) void {
     switch (id) {
         .menu => self.st_menu.render(alpha),
         .play => self.st_play.render(alpha),
+        .options => self.st_options.render(alpha),
     }
 }
 
@@ -315,6 +333,7 @@ fn stateDispatchEnter(self: *Game, id: StateId, from: ?StateId) void {
     switch (id) {
         .menu => self.st_menu.enter(from),
         .play => self.st_play.enter(from),
+        .options => self.st_options.enter(from),
     }
 }
 
@@ -322,6 +341,7 @@ fn stateDispatchLeave(self: *Game, id: StateId, to: ?StateId) void {
     switch (id) {
         .menu => self.st_menu.leave(to),
         .play => self.st_play.leave(to),
+        .options => self.st_options.leave(to),
     }
 }
 
@@ -348,4 +368,25 @@ pub fn unproject(self: *Game, x: i32, y: i32) [2]i32 {
         @floatToInt(i32, @intToFloat(f64, x) / scale_x),
         @floatToInt(i32, @intToFloat(f64, y) / scale_y),
     };
+}
+
+pub fn setOutputScale(self: *Game, s: f32) void {
+    const window_width = @floatToInt(c_int, s * INTERNAL_WIDTH);
+    const window_height = @floatToInt(c_int, s * INTERNAL_HEIGHT);
+    sdl.SDL_SetWindowSize(self.window, window_width, window_height);
+    sdl.SDL_SetWindowPosition(self.window, sdl.SDL_WINDOWPOS_CENTERED, sdl.SDL_WINDOWPOS_CENTERED);
+    self.performLayout();
+}
+
+pub fn toggleFullscreen(self: *Game) void {
+    const fullscreen_arg: u32 = if (self.isFullscreen()) 0 else sdl.SDL_WINDOW_FULLSCREEN_DESKTOP;
+    if (sdl.SDL_SetWindowFullscreen(self.window, fullscreen_arg) != 0) {
+        log.err("SDL_SetWindowFullscreen failed: {s}", .{sdl.SDL_GetError()});
+    }
+    self.performLayout();
+}
+
+pub fn isFullscreen(self: *Game) bool {
+    const flags = sdl.SDL_GetWindowFlags(self.window);
+    return (flags & sdl.SDL_WINDOW_FULLSCREEN_DESKTOP) != 0;
 }

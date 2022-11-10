@@ -30,6 +30,10 @@ pub extern fn SDL_CreateWindow(title: [*:0]const u8, x: c_int, y: c_int, w: c_in
 // Can take a null window, but sets SDL last error
 pub extern fn SDL_DestroyWindow(window: ?*SDL_Window) void;
 pub extern fn SDL_GetWindowSize(window: *SDL_Window, w: ?*c_int, h: ?*c_int) void;
+pub extern fn SDL_SetWindowSize(window: *SDL_Window, w: c_int, h: c_int) void;
+pub extern fn SDL_SetWindowPosition(window: *SDL_Window, x: c_int, y: c_int) void;
+pub extern fn SDL_SetWindowFullscreen(window: *SDL_Window, flags: u32) c_int;
+pub extern fn SDL_GetWindowFlags(window: *SDL_Window) u32;
 
 pub extern fn SDL_GetError() [*:0]const u8;
 

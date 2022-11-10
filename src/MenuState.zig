@@ -56,7 +56,7 @@ fn createMenuButton(self: *MenuState, comptime text: []const u8, comptime cb: an
         // .down
         Rect.init(0, 32, 128, 32),
         // .disabled
-        Rect.init(0, 0, 128, 32),
+        Rect.init(0, 64, 128, 32),
     };
     btn.setCallback(self, cb);
     try self.ui_root.addChild(btn.control());
@@ -76,8 +76,6 @@ pub fn create(game: *Game) !*MenuState {
         .ui_tip = undefined,
     };
     self.r_font = BitmapFont.init(&self.r_batch);
-    self.ui_root.backend.coord_scale_x = 2;
-    self.ui_root.backend.coord_scale_y = 2;
 
     _ = try self.createMenuButton("New Game", onNewGameClick);
     _ = try self.createMenuButton("Options", onOptionsClick);
@@ -122,6 +120,7 @@ fn onNewGameClick(button: *ui.Button, self: *MenuState) void {
 fn onOptionsClick(button: *ui.Button, self: *MenuState) void {
     _ = button;
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
+    self.game.changeState(.options);
 }
 
 fn onQuitClick(button: *ui.Button, self: *MenuState) void {
@@ -152,8 +151,9 @@ pub fn destroy(self: *MenuState) void {
 }
 
 pub fn enter(self: *MenuState, from: ?Game.StateId) void {
-    _ = self;
     _ = from;
+    self.ui_root.backend.coord_scale_x = self.game.output_scale_x;
+    self.ui_root.backend.coord_scale_y = self.game.output_scale_y;
 }
 
 pub fn leave(self: *MenuState, to: ?Game.StateId) void {
@@ -202,7 +202,7 @@ pub fn handleEvent(self: *MenuState, ev: sdl.SDL_Event) void {
     _ = self.ui_root.backend.dispatchEvent(ev, &self.ui_root);
 }
 
-fn renderBackground(self: *MenuState, alpha: f64) void {
+pub fn renderBackground(self: *MenuState, alpha: f64) void {
     self.r_batch.begin(.{
         .texture = self.game.texman.getNamedTexture("special.png"),
     });

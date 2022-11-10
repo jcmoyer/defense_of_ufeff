@@ -180,8 +180,6 @@ pub fn create(game: *Game) !*PlayState {
         .button_generator = undefined,
     };
     self.r_font = BitmapFont.init(&self.r_batch);
-    self.ui_root.backend.coord_scale_x = 2;
-    self.ui_root.backend.coord_scale_y = 2;
 
     self.button_generator = ButtonTextureGenerator.init(&game.texman, &self.r_batch);
 
@@ -383,6 +381,8 @@ pub fn destroy(self: *PlayState) void {
 
 pub fn enter(self: *PlayState, from: ?Game.StateId) void {
     _ = from;
+    self.ui_root.backend.coord_scale_x = self.game.output_scale_x;
+    self.ui_root.backend.coord_scale_y = self.game.output_scale_y;
     self.sub = .none;
     self.loadWorld("map01");
 }
