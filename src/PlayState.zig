@@ -526,7 +526,7 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
                 const tile_coord = self.mouseToTile();
                 if (self.world.canBuildAt(tile_coord) and self.world.canAfford(spec)) {
                     self.game.audio.playSound("assets/sounds/build.ogg", .{}).release();
-                    _ = self.world.spawnTower(spec, tile_coord, self.game.frame_counter) catch unreachable;
+                    _ = self.world.spawnTower(spec, tile_coord) catch unreachable;
                     self.world.player_gold -= spec.gold_cost;
                     if (sdl.SDL_GetModState() & sdl.KMOD_SHIFT == 0) {
                         self.interact_state = .none;

@@ -1027,7 +1027,7 @@ pub const World = struct {
         self.player_gold += amt;
     }
 
-    pub fn spawnTower(self: *World, spec: *const TowerSpec, coord: TileCoord, frame: u64) !u32 {
+    pub fn spawnTower(self: *World, spec: *const TowerSpec, coord: TileCoord) !u32 {
         // if we're building over a wall, delete it first so we're not bloating the towers slotmap
         if (self.tower_map.get(coord)) |id| {
             const wall = self.towers.getPtr(id);
@@ -1039,7 +1039,6 @@ pub const World = struct {
             spec,
             @intCast(u32, coord.x * 16),
             @intCast(u32, coord.y * 16),
-            frame,
         );
         try self.tower_map.put(self.allocator, coord, id);
         self.invalidatePathCache();
@@ -1121,19 +1120,19 @@ pub const World = struct {
         std.log.debug("invalidatePathCache took {d}us", .{timer.read() / std.time.ns_per_us});
     }
 
-    fn spawnTowerWorld(self: *World, spec: *const TowerSpec, world_x: u32, world_y: u32, frame: u64) !u32 {
+    fn spawnTowerWorld(self: *World, spec: *const TowerSpec, world_x: u32, world_y: u32) !u32 {
         var id = try self.towers.put(self.allocator, Tower{
             .world = self,
             .spec = spec,
             .world_x = world_x,
             .world_y = world_y,
-            .cooldown = timing.FrameTimer.initSeconds(frame, 1),
+            .cooldown = timing.FrameTimer.initSeconds(self.world_frame, 1),
         });
-        self.towers.getPtr(id).spawn(frame);
+        self.towers.getPtr(id).spawn(self.world_frame);
         return id;
     }
 
-    pub fn spawnMonster(self: *World, spec: *const MonsterSpec, spawn_id: u32, frame: u64) !u32 {
+    pub fn spawnMonster(self: *World, spec: *const MonsterSpec, spawn_id: u32) !u32 {
         const pos = self.getSpawnPosition(spawn_id);
         self.getSpawnPtr(spawn_id).emit();
         var mon = Monster{
@@ -1145,7 +1144,7 @@ pub const World = struct {
         mon.setTilePosition(pos);
         mon.computePath();
         const id = try self.monsters.put(self.allocator, mon);
-        self.monsters.getPtr(id).spawn(frame);
+        self.monsters.getPtr(id).spawn(self.world_frame);
 
         self.playPositionalSound("assets/sounds/spawn.ogg", @intCast(i32, pos.worldX()), @intCast(i32, pos.worldY()));
         return id;
@@ -1207,7 +1206,7 @@ pub const World = struct {
                 if (self.waves.waves[wave_id].getReadyEvent(sp.id, self.world_frame)) |e| {
                     switch (e) {
                         .spawn => |spawn_event| {
-                            _ = self.spawnMonster(spawn_event.monster_spec, sp.id, self.world_frame) catch unreachable;
+                            _ = self.spawnMonster(spawn_event.monster_spec, sp.id) catch unreachable;
                         },
                     }
                 }
