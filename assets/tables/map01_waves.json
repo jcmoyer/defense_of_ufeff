@@ -1,0 +1,56 @@
+{
+    "waves": [
+        {
+            "spawn_points": [
+                {
+                    "spawn_point": "s_right",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_human",
+                            "repeat": 10
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_bottom",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 2,
+                            "name": "m_human",
+                            "repeat": 10
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "spawn_points": [
+                {
+                    "spawn_point": "s_right",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 2,
+                            "name": "m_human",
+                            "repeat": 10
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_bottom",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_human",
+                            "repeat": 20
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
