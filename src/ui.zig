@@ -1063,7 +1063,7 @@ fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRe
                         render_dest.centerOn(p[0], p[1]);
                     }
 
-                    opts.r_batch.drawQuad(render_src, render_dest);
+                    opts.r_batch.drawQuad(.{ .src = render_src.toRectf(), .dest = render_dest.toRectf() });
                     opts.r_batch.end();
                 },
                 .color => |c| {
@@ -1120,7 +1120,10 @@ fn drawTextureImpl(ptr: *anyopaque, texture: *const Texture, dest: Rect) void {
     const src = Rect.init(0, 0, @intCast(i32, texture.width), @intCast(i32, texture.height));
     var t_dest = dest;
     t_dest.translate(state.translate_x, state.translate_y);
-    state.opts.r_batch.drawQuad(src, t_dest);
+    state.opts.r_batch.drawQuad(.{
+        .src = src.toRectf(),
+        .dest = t_dest.toRectf(),
+    });
     state.opts.r_batch.end();
 }
 

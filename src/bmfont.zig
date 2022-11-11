@@ -219,7 +219,7 @@ pub const BitmapFont = struct {
                 src.w,
                 src.h,
             );
-            self.r_batch.drawQuadOptions(.{
+            self.r_batch.drawQuad(.{
                 .src = src.toRectf(),
                 .dest = dest.toRectf(),
                 .color = opts.color,

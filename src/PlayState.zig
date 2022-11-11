@@ -577,14 +577,15 @@ fn renderSpriteEffects(
     });
     for (self.world.sprite_effects.slice()) |t| {
         var animator = t.animator orelse continue;
-        self.r_batch.drawQuadRotated(
-            animator.getCurrentRect(),
-            t.world_x - @intToFloat(f32, cam.view.left()),
-            t.world_y - @intToFloat(f32, cam.view.top()),
-            16,
-            16,
-            t.angle,
-        );
+
+        var transform = zm.mul(zm.rotationZ(t.angle), zm.translation(t.offset_x, t.offset_y, 0));
+        transform = zm.mul(transform, zm.rotationZ(t.post_angle));
+        transform = zm.mul(transform, zm.translation(t.world_x - @intToFloat(f32, cam.view.left()), t.world_y - @intToFloat(f32, cam.view.top()), 0));
+
+        self.r_batch.drawQuadTransformed(.{
+            .src = animator.getCurrentRect().toRectf(),
+            .transform = transform,
+        });
     }
     self.r_batch.end();
 }
@@ -608,8 +609,6 @@ fn renderProjectiles(
                 animator.getCurrentRect(),
                 @intToFloat(f32, dest[0] - cam.view.left()),
                 @intToFloat(f32, dest[1] - cam.view.top()),
-                16,
-                16,
                 0,
             );
         } else {
@@ -617,8 +616,6 @@ fn renderProjectiles(
                 animator.getCurrentRect(),
                 @intToFloat(f32, dest[0] - cam.view.left()),
                 @intToFloat(f32, dest[1] - cam.view.top()),
-                16,
-                16,
                 t.angle,
             );
         }
@@ -674,10 +671,10 @@ fn renderTowers(
         .texture = t_special,
     });
     for (self.world.towers.slice()) |*t| {
-        self.r_batch.drawQuad(
-            Rect.init(0, 7 * 16, 16, 16),
-            Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - cam.view.top(), 16, 16),
-        );
+        self.r_batch.drawQuad(.{
+            .src = Rectf.init(0, 7 * 16, 16, 16),
+            .dest = Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - cam.view.top(), 16, 16).toRectf(),
+        });
     }
     self.r_batch.end();
 
@@ -688,10 +685,10 @@ fn renderTowers(
     for (self.world.towers.slice()) |*t| {
         if (t.animator) |animator| {
             // shift up on Y so the character is standing in the center of the tile
-            self.r_batch.drawQuad(
-                animator.getCurrentRect(),
-                Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - 4 - cam.view.top(), 16, 16),
-            );
+            self.r_batch.drawQuad(.{
+                .src = animator.getCurrentRect().toRectf(),
+                .dest = Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - 4 - cam.view.top(), 16, 16).toRectf(),
+            });
         }
     }
     self.r_batch.end();
@@ -732,7 +729,7 @@ fn renderGoal(
         16,
         16,
     );
-    self.r_batch.drawQuad(self.world.goal.animator.getCurrentRect(), dest);
+    self.r_batch.drawQuad(.{ .src = self.world.goal.animator.getCurrentRect().toRectf(), .dest = dest.toRectf() });
     self.r_batch.end();
 }
 
@@ -771,7 +768,7 @@ fn renderStolenHearts(
         if (m.carrying_life) {
             var src = self.heart_anim.getCurrentRect();
             var dest = Rect.init(w[0] - cam.view.left(), w[1] - cam.view.top(), 16, 16);
-            self.r_batch.drawQuad(src, dest);
+            self.r_batch.drawQuad(.{ .src = src.toRectf(), .dest = dest.toRectf() });
         }
     }
     self.r_batch.end();
@@ -847,10 +844,10 @@ fn renderTilemapLayer(
                     .w = 16,
                     .h = 16,
                 };
-                self.r_batch.drawQuad(
-                    src,
-                    dest,
-                );
+                self.r_batch.drawQuad(.{
+                    .src = src.toRectf(),
+                    .dest = dest.toRectf(),
+                });
             }
             tx += 1;
         }
@@ -1248,7 +1245,7 @@ fn renderMinimapLayer(
                 1.0,
                 1.0,
             );
-            self.r_batch.drawQuadOptions(.{
+            self.r_batch.drawQuad(.{
                 .src = src.toRectf(),
                 .dest = dest,
             });
@@ -1261,21 +1258,26 @@ fn renderFoam(
     self: *PlayState,
 ) void {
     const t_foam = self.game.texman.getNamedTexture("water_foam.png");
+    const l_rectf = self.foam_anim_l.getCurrentRect().toRectf();
+    const r_rectf = self.foam_anim_r.getCurrentRect().toRectf();
+    const u_rectf = self.foam_anim_u.getCurrentRect().toRectf();
+    const d_rectf = self.foam_anim_d.getCurrentRect().toRectf();
     self.r_batch.begin(.{
         .texture = t_foam,
     });
     for (self.foam_buf[0..self.n_water]) |f| {
+        const destf = f.dest.toRectf();
         if (f.left) {
-            self.r_batch.drawQuad(self.foam_anim_l.getCurrentRect(), f.dest);
+            self.r_batch.drawQuad(.{ .src = l_rectf, .dest = destf });
         }
         if (f.top) {
-            self.r_batch.drawQuad(self.foam_anim_u.getCurrentRect(), f.dest);
+            self.r_batch.drawQuad(.{ .src = u_rectf, .dest = destf });
         }
         if (f.bottom) {
-            self.r_batch.drawQuad(self.foam_anim_d.getCurrentRect(), f.dest);
+            self.r_batch.drawQuad(.{ .src = d_rectf, .dest = destf });
         }
         if (f.right) {
-            self.r_batch.drawQuad(self.foam_anim_r.getCurrentRect(), f.dest);
+            self.r_batch.drawQuad(.{ .src = r_rectf, .dest = destf });
         }
     }
     self.r_batch.end();
@@ -1380,7 +1382,10 @@ const ButtonTextureGenerator = struct {
         self.r_batch.begin(.{
             .texture = button_base,
         });
-        self.r_batch.drawQuad(Rect.init(0, 0, @intCast(i32, button_base.width), @intCast(i32, button_base.height)), Rect.init(0, 0, @intCast(i32, t.width), @intCast(i32, t.height)));
+        self.r_batch.drawQuad(.{
+            .src = Rect.init(0, 0, @intCast(i32, button_base.width), @intCast(i32, button_base.height)).toRectf(),
+            .dest = Rect.init(0, 0, @intCast(i32, t.width), @intCast(i32, t.height)).toRectf(),
+        });
         self.r_batch.end();
         self.r_batch.begin(.{
             .texture = badge,
@@ -1391,10 +1396,10 @@ const ButtonTextureGenerator = struct {
             const desired_center = button_frame_rect.centerPoint();
             var adjusted_dest = badge_rect;
             adjusted_dest.centerOn(desired_center[0], desired_center[1]);
-            self.r_batch.drawQuad(
-                badge_rect,
-                adjusted_dest,
-            );
+            self.r_batch.drawQuad(.{
+                .src = badge_rect.toRectf(),
+                .dest = adjusted_dest.toRectf(),
+            });
         }
         self.r_batch.end();
         return t;

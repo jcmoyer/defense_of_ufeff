@@ -220,7 +220,7 @@ pub fn renderBackground(self: *MenuState, alpha: f64) void {
     while (y < num_y) : (y += 1) {
         x = 0;
         while (x < num_x) : (x += 1) {
-            self.r_batch.drawQuadOptions(.{
+            self.r_batch.drawQuad(.{
                 .src = src,
                 .dest = Rectf.init(
                     @intToFloat(f32, x) * src.w - scroll_offset,

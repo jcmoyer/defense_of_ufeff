@@ -371,7 +371,7 @@ pub const t_wall = TowerSpec{
 pub const t_civilian = TowerSpec{
     .gold_cost = 5,
     .tooltip = "Hire Civilian\n$5\n\nWeak melee attack.\nBlocks monster movement.\nUpgrades into other units.",
-    .upgrades = [3]?*const TowerSpec{ &t_archer, null, null },
+    .upgrades = [3]?*const TowerSpec{ &t_soldier, &t_archer, null },
     .anim_set = anim.a_human1.animationSet(),
     .updateFn = civUpdate,
     .max_range = 24,
@@ -387,6 +387,33 @@ fn civUpdate(self: *Tower, frame: u64) void {
         const target = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         self.lookTowards(target[0], target[1]);
         self.cooldown.restart(frame);
+    }
+}
+
+pub const t_soldier = TowerSpec{
+    .gold_cost = 5,
+    .tooltip = "Train Swords\n$5\n\nMelee attack.\nBlocks monster movement.\nUpgrades into other units.",
+    .upgrades = [3]?*const TowerSpec{ null, null, null },
+    .anim_set = anim.a_human2.animationSet(),
+    .updateFn = soldierUpdate,
+    .max_range = 24,
+};
+
+fn soldierUpdate(self: *Tower, frame: u64) void {
+    if (self.cooldown.expired(frame)) {
+        self.killAssocEffect();
+        const m = self.pickMonsterGeneric() orelse return;
+        const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
+        const r = self.angleTo(p[0], p[1]);
+        self.setAssocEffectAimed(&se_sword, p[0], p[1], 10);
+
+        self.world.monsters.getPtr(m).hurtDirectionalGenericDamage(3, [2]f32{ std.math.cos(r), std.math.sin(r) });
+        self.lookTowards(p[0], p[1]);
+        self.cooldown.restart(frame);
+    } else {
+        if (self.assoc_effect) |eid| {
+            self.world.sprite_effects.getPtr(eid).post_angle += (1.0 / 8.0);
+        }
     }
 }
 
@@ -411,7 +438,7 @@ fn archerUpdate(self: *Tower, frame: u64) void {
 
         self.world.playPositionalSound("assets/sounds/bow.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
-        self.setAssocEffectAimed(&se_bow, target[0], target[1]);
+        self.setAssocEffectAimed(&se_bow, target[0], target[1], 6);
         var proj = self.fireProjectileTowards(&proj_arrow, target[0], target[1]);
         proj.damage = 2;
         self.lookTowards(target[0], target[1]);
@@ -440,7 +467,7 @@ fn gunnerUpdate(self: *Tower, frame: u64) void {
 
         self.world.playPositionalSound("assets/sounds/gun.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
-        self.setAssocEffectAimed(&se_gun, target[0], target[1]);
+        self.setAssocEffectAimed(&se_gun, target[0], target[1], 6);
         var proj = self.fireProjectileTowards(&proj_bullet, target[0], target[1]);
         proj.damage = 5;
         self.lookTowards(target[0], target[1]);
@@ -486,20 +513,16 @@ pub const Tower = struct {
         return Rect.init(@intCast(i32, self.world_x), @intCast(i32, self.world_y), 16, 16);
     }
 
-    pub fn setAssocEffectAimed(self: *Tower, se_spec: *const SpriteEffectSpec, world_x: i32, world_y: i32) void {
+    pub fn setAssocEffectAimed(self: *Tower, se_spec: *const SpriteEffectSpec, world_x: i32, world_y: i32, offset: f32) void {
         const r = self.angleTo(world_x, world_y);
-        const cos_r = std.math.cos(r);
-        const sin_r = std.math.sin(r);
-        const ex = @floatToInt(i32, (cos_r * 6) + @intToFloat(f32, self.world_x + 8));
-        const ey = @floatToInt(i32, (sin_r * 6) + @intToFloat(f32, self.world_y + 8));
+        const basis_x = self.world_x + 8;
+        const basis_y = self.world_y + 8;
 
         if (self.assoc_effect == null) {
-            self.assoc_effect = self.world.spawnSpriteEffect(se_spec, ex, ey) catch unreachable;
+            self.assoc_effect = self.world.spawnSpriteEffect(se_spec, @intCast(i32, basis_x), @intCast(i32, basis_y)) catch unreachable;
         }
 
-        self.world.sprite_effects.getPtr(self.assoc_effect.?).angle = r;
-        self.world.sprite_effects.getPtr(self.assoc_effect.?).world_x = @intToFloat(f32, ex);
-        self.world.sprite_effects.getPtr(self.assoc_effect.?).world_y = @intToFloat(f32, ey);
+        self.world.sprite_effects.getPtr(self.assoc_effect.?).setAngleOffset(r, offset);
     }
 
     pub fn killAssocEffect(self: *Tower) void {
@@ -626,6 +649,10 @@ const se_gun = SpriteEffectSpec{
     .anim_set = anim.a_gun.animationSet(),
 };
 
+const se_sword = SpriteEffectSpec{
+    .anim_set = anim.a_sword.animationSet(),
+};
+
 const se_hurt_generic = SpriteEffectSpec{
     .anim_set = anim.a_hurt_generic.animationSet(),
 };
@@ -641,9 +668,16 @@ pub const SpriteEffect = struct {
     world: *World,
     spec: *const SpriteEffectSpec,
     animator: ?anim.Animator = null,
+    /// Basis
     world_x: f32,
     world_y: f32,
+    /// Offset after pre-rotation
+    offset_x: f32 = 0,
+    offset_y: f32 = 0,
+    /// Pre-rotation
     angle: f32 = 0,
+    /// Post-rotation
+    post_angle: f32 = 0,
     dead: bool = false,
 
     fn spawn(self: *SpriteEffect, frame: u64) void {
@@ -665,6 +699,14 @@ pub const SpriteEffect = struct {
         if (self.spec.updateFn) |updateFn| {
             updateFn(self, frame);
         }
+    }
+
+    fn setAngleOffset(self: *SpriteEffect, angle: f32, distance: f32) void {
+        const cos_a = std.math.cos(angle);
+        const sin_a = std.math.sin(angle);
+        self.offset_x = cos_a * distance;
+        self.offset_y = sin_a * distance;
+        self.angle = angle;
     }
 };
 
