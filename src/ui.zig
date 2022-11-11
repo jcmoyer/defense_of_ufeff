@@ -845,14 +845,20 @@ pub const SDLBackend = struct {
 
     window: *sdl.SDL_Window,
 
+    client_rect: Rect,
     coord_scale_x: f32 = 1,
     coord_scale_y: f32 = 1,
 
     pub fn init(window: *sdl.SDL_Window) SDLBackend {
+        var width: c_int = 0;
+        var height: c_int = 0;
+        sdl.SDL_GetWindowSize(window, &width, &height);
+
         return SDLBackend{
             .c_arrow = sdl.SDL_CreateSystemCursor(.SDL_SYSTEM_CURSOR_ARROW),
             .c_hand = sdl.SDL_CreateSystemCursor(.SDL_SYSTEM_CURSOR_HAND),
             .window = window,
+            .client_rect = Rect.init(0, 0, width, height),
         };
     }
 
@@ -939,8 +945,8 @@ pub const SDLBackend = struct {
     /// `coord_scale_x` and `coord_scale_y`.
     pub fn clientToVirtual(self: SDLBackend, x: i32, y: i32) [2]i32 {
         return [2]i32{
-            @floatToInt(i32, @intToFloat(f64, x) / self.coord_scale_x),
-            @floatToInt(i32, @intToFloat(f64, y) / self.coord_scale_y),
+            @floatToInt(i32, (@intToFloat(f64, x - self.client_rect.x)) / self.coord_scale_x),
+            @floatToInt(i32, (@intToFloat(f64, y - self.client_rect.y)) / self.coord_scale_y),
         };
     }
 
@@ -952,14 +958,13 @@ pub const SDLBackend = struct {
     }
 
     fn clientRect(self: SDLBackend) Rect {
-        var x: c_int = 0;
-        var y: c_int = 0;
-        sdl.SDL_GetWindowSize(self.window, &x, &y);
-        return Rect.init(0, 0, x, y);
+        return self.client_rect;
     }
 
     fn virtualRect(self: SDLBackend) Rect {
         var r = self.clientRect();
+        r.x = 0;
+        r.y = 0;
         r.w = @floatToInt(i32, @intToFloat(f32, r.w) / self.coord_scale_x);
         r.h = @floatToInt(i32, @intToFloat(f32, r.h) / self.coord_scale_y);
         return r;

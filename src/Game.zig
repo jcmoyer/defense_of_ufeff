@@ -14,6 +14,7 @@ const MenuState = @import("MenuState.zig");
 const PlayState = @import("PlayState.zig");
 const OptionsState = @import("OptionsState.zig");
 const InputState = @import("input.zig").InputState;
+const Rect = @import("Rect.zig");
 
 /// Updates per second
 const UPDATE_RATE = 30;
@@ -44,6 +45,7 @@ st_options: *OptionsState,
 frame_counter: u64 = 0,
 output_scale_x: f32 = 2,
 output_scale_y: f32 = 2,
+output_rect: Rect = .{},
 
 input: InputState,
 
@@ -229,12 +231,18 @@ pub fn render(self: *Game, alpha: f64) void {
 
     self.endRenderToScene();
 
-    self.imm.setOutputDimensions(1, 1);
     self.imm.beginTextured(.{
         .texture = self.scene_color,
     });
-    self.imm.drawQuad(0, 0, 1, 1, 1, 1, 1);
-    gl.bindTexture(gl.TEXTURE_2D, 0);
+    self.imm.drawQuad(
+        self.output_rect.x,
+        self.output_rect.y,
+        @intCast(u32, self.output_rect.w),
+        @intCast(u32, self.output_rect.h),
+        1,
+        1,
+        1,
+    );
 
     sdl.SDL_GL_SwapWindow(self.window);
 }
@@ -248,9 +256,37 @@ fn performLayout(self: *Game) void {
     var window_width: c_int = 0;
     var window_height: c_int = 0;
     sdl.SDL_GetWindowSize(self.window, &window_width, &window_height);
-    self.output_scale_x = @intToFloat(f32, window_width) / INTERNAL_WIDTH;
-    self.output_scale_y = @intToFloat(f32, window_height) / INTERNAL_HEIGHT;
-    self.imm.setOutputDimensions(@intCast(u32, window_width), @intCast(u32, window_height));
+
+    const aspect_ratio = @intToFloat(f32, INTERNAL_WIDTH) / @intToFloat(f32, INTERNAL_HEIGHT);
+    if (self.isFullscreen()) {
+        var output_width: i32 = undefined;
+        var output_height: i32 = undefined;
+        if (aspect_ratio > 1) {
+            output_width = @intCast(i32, window_width);
+            output_height = @floatToInt(i32, @intToFloat(f32, output_width) / aspect_ratio);
+        } else {
+            output_height = @intCast(i32, window_height);
+            output_width = @floatToInt(f32, @intToFloat(f32, output_height) * aspect_ratio);
+        }
+        self.output_rect = .{
+            .x = @divFloor(window_width - output_width, 2),
+            .y = @divFloor(window_height - output_height, 2),
+            .w = output_width,
+            .h = output_height,
+        };
+    } else {
+        self.output_rect = .{
+            .x = 0,
+            .y = 0,
+            .w = window_width,
+            .h = window_height,
+        };
+    }
+    log.debug("Output rect: {any}", .{self.output_rect});
+
+    self.output_scale_x = @intToFloat(f32, self.output_rect.w) / INTERNAL_WIDTH;
+    self.output_scale_y = @intToFloat(f32, self.output_rect.h) / INTERNAL_HEIGHT;
+
     log.debug("New scale {d}, {d}", .{ self.output_scale_x, self.output_scale_y });
 }
 
@@ -356,17 +392,12 @@ pub fn changeState(self: *Game, to: StateId) void {
 }
 
 pub fn unproject(self: *Game, x: i32, y: i32) [2]i32 {
-    var w: c_int = 0;
-    var h: c_int = 0;
-
-    sdl.SDL_GetWindowSize(self.window, &w, &h);
-
-    const scale_x = @intToFloat(f64, w) / @intToFloat(f64, INTERNAL_WIDTH);
-    const scale_y = @intToFloat(f64, h) / @intToFloat(f64, INTERNAL_HEIGHT);
+    const scale_x = self.output_scale_x;
+    const scale_y = self.output_scale_y;
 
     return [2]i32{
-        @floatToInt(i32, @intToFloat(f64, x) / scale_x),
-        @floatToInt(i32, @intToFloat(f64, y) / scale_y),
+        @floatToInt(i32, @intToFloat(f64, x - self.output_rect.x) / scale_x),
+        @floatToInt(i32, @intToFloat(f64, y - self.output_rect.y) / scale_y),
     };
 }
 

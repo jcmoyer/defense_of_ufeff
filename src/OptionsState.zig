@@ -120,6 +120,7 @@ fn onFullscreenChange(button: *ui.Button, self: *OptionsState) void {
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.game.toggleFullscreen();
     button.text = if (self.game.isFullscreen()) "yes" else "no";
+    self.ui_root.backend.client_rect = self.game.output_rect;
     self.ui_root.backend.coord_scale_x = self.game.output_scale_x;
     self.ui_root.backend.coord_scale_y = self.game.output_scale_y;
 }
@@ -129,6 +130,7 @@ fn onScaleChange(button: *ui.Button, self: *OptionsState) void {
     self.scale_index = (self.scale_index + 1) % scales.len;
     const new_scale = scales[self.scale_index];
     self.game.setOutputScale(@intToFloat(f32, new_scale));
+    self.ui_root.backend.client_rect = self.game.output_rect;
     self.ui_root.backend.coord_scale_x = self.game.output_scale_x;
     self.ui_root.backend.coord_scale_y = self.game.output_scale_y;
     button.text = std.fmt.bufPrint(&self.scale_text, "{d}", .{new_scale}) catch |err| {
@@ -154,6 +156,7 @@ pub fn destroy(self: *OptionsState) void {
 
 pub fn enter(self: *OptionsState, from: ?Game.StateId) void {
     _ = from;
+    self.ui_root.backend.client_rect = self.game.output_rect;
     self.ui_root.backend.coord_scale_x = self.game.output_scale_x;
     self.ui_root.backend.coord_scale_y = self.game.output_scale_y;
 }

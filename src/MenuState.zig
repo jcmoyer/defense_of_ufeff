@@ -152,6 +152,7 @@ pub fn destroy(self: *MenuState) void {
 
 pub fn enter(self: *MenuState, from: ?Game.StateId) void {
     _ = from;
+    self.ui_root.backend.client_rect = self.game.output_rect;
     self.ui_root.backend.coord_scale_x = self.game.output_scale_x;
     self.ui_root.backend.coord_scale_y = self.game.output_scale_y;
 }

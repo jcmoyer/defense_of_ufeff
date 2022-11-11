@@ -381,6 +381,7 @@ pub fn destroy(self: *PlayState) void {
 
 pub fn enter(self: *PlayState, from: ?Game.StateId) void {
     _ = from;
+    self.ui_root.backend.client_rect = self.game.output_rect;
     self.ui_root.backend.coord_scale_x = self.game.output_scale_x;
     self.ui_root.backend.coord_scale_y = self.game.output_scale_y;
     self.sub = .none;
