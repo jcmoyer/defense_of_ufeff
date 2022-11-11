@@ -35,7 +35,7 @@ scale_index: usize = 1,
 scale_text: [1]u8 = undefined,
 
 const scales = [5]u8{ 1, 2, 3, 4, 5 };
-const option_width = 120;
+const option_width = 128;
 const option_height = 32;
 
 const OptionControls = struct {
