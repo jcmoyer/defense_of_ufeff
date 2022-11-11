@@ -253,7 +253,16 @@ fn makeStandardCharacter(comptime x0: i32, comptime y0: i32) [4]StaticAnimationD
     };
 }
 
-pub const a_chara = StaticAnimationSet(&makeStandardCharacter(0, 0)){};
+pub const a_human1 = StaticAnimationSet(&makeStandardCharacter(0, 0)){};
+pub const a_human2 = StaticAnimationSet(&makeStandardCharacter(0, 32)){};
+pub const a_human3 = StaticAnimationSet(&makeStandardCharacter(0, 64)){};
+pub const a_human4 = StaticAnimationSet(&makeStandardCharacter(0, 96)){};
+pub const a_cat1 = StaticAnimationSet(&makeStandardCharacter(0, 128)){};
+pub const a_cat2 = StaticAnimationSet(&makeStandardCharacter(128, 128)){};
+pub const a_slime = StaticAnimationSet(&makeStandardCharacter(0, 160)){};
+pub const a_skeleton = StaticAnimationSet(&makeStandardCharacter(0, 192)){};
+pub const a_ant = StaticAnimationSet(&makeStandardCharacter(0, 224)){};
+pub const a_mole = StaticAnimationSet(&makeStandardCharacter(128, 160)){};
 
 pub const a_proj_arrow = StaticAnimationSet(&[1]StaticAnimationDef{.{
     .name = "default",
@@ -267,7 +276,43 @@ pub const a_proj_arrow = StaticAnimationSet(&[1]StaticAnimationDef{.{
     },
 }}){};
 
-pub const a_proj_bow = StaticAnimationSet(&[1]StaticAnimationDef{.{
+pub const a_sword = StaticAnimationSet(&[1]StaticAnimationDef{.{
+    .name = "default",
+    .animation = Animation{
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(112, 0, 16, 16),
+                .time = 8,
+            },
+        },
+    },
+}}){};
+
+pub const a_staff = StaticAnimationSet(&[1]StaticAnimationDef{.{
+    .name = "default",
+    .animation = Animation{
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(128, 0, 16, 16),
+                .time = 8,
+            },
+        },
+    },
+}}){};
+
+pub const a_dagger = StaticAnimationSet(&[1]StaticAnimationDef{.{
+    .name = "default",
+    .animation = Animation{
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(144, 0, 16, 16),
+                .time = 8,
+            },
+        },
+    },
+}}){};
+
+pub const a_bow = StaticAnimationSet(&[1]StaticAnimationDef{.{
     .name = "default",
     .animation = Animation{
         .frames = &[_]Frame{

@@ -118,7 +118,7 @@ pub const MonsterSpec = struct {
 };
 
 pub const m_human = MonsterSpec{
-    .anim_set = anim.a_chara.animationSet(),
+    .anim_set = anim.a_human1.animationSet(),
     .max_hp = 5,
     .gold = 1,
 };
@@ -368,7 +368,7 @@ pub const t_soldier = TowerSpec{
     .gold_cost = 10,
     .tooltip = "Hire Soldier\n$10\n\nWeak melee attack.\nBlocks monster movement.\nUpgrades into other units.",
     .upgrades = [3]?*const TowerSpec{ &t_archer, null, null },
-    .anim_set = anim.a_chara.animationSet(),
+    .anim_set = anim.a_human1.animationSet(),
     .updateFn = soldierUpdate,
     .max_range = 24,
 };
@@ -390,7 +390,7 @@ pub const t_archer = TowerSpec{
     .gold_cost = 10,
     .tooltip = "Train Archery\n$10\n\nFires slow moving projectiles.",
 
-    .anim_set = anim.a_chara.animationSet(),
+    .anim_set = anim.a_human1.animationSet(),
     .updateFn = archerUpdate,
     .min_range = 50,
     .max_range = 100,
@@ -419,7 +419,7 @@ fn archerUpdate(self: *Tower, frame: u64) void {
 }
 
 pub const tspec_test_lv2 = TowerSpec{
-    .anim_set = anim.a_chara.animationSet(),
+    .anim_set = anim.a_human1.animationSet(),
     .updateFn = archerUpdate,
     .min_range = 50,
     .max_range = 100,
@@ -597,7 +597,7 @@ pub const Spawn = struct {
 };
 
 const se_bow = SpriteEffectSpec{
-    .anim_set = anim.a_proj_bow.animationSet(),
+    .anim_set = anim.a_bow.animationSet(),
 };
 
 const se_hurt_generic = SpriteEffectSpec{
@@ -1138,7 +1138,6 @@ pub const World = struct {
         var mon = Monster{
             .world = self,
             .spec = spec,
-            .animator = anim.a_chara.animationSet().createAnimator("down"),
             .spawn_id = spawn_id,
         };
         mon.setTilePosition(pos);
