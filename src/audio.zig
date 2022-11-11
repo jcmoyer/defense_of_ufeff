@@ -384,6 +384,7 @@ pub const AudioSystem = struct {
 
 const Rect = @import("Rect.zig");
 const mathutil = @import("mathutil.zig");
+const zm = @import("zmath");
 
 pub fn computePositionalOptions(view: Rect, audio_position: [2]i32) AudioOptions {
     const V2 = @Vector(2, f32);
@@ -393,11 +394,16 @@ pub fn computePositionalOptions(view: Rect, audio_position: [2]i32) AudioOptions
         V2{ @intToFloat(f32, view_center[0]), @intToFloat(f32, view_center[1]) },
         V2{ @intToFloat(f32, audio_position[0]), @intToFloat(f32, audio_position[1]) },
     );
-    var pan = 0.5 * (1.0 + std.math.cos(theta));
+
+    // cosine except shifted from -1..1 to 0..1
+    const cos_shift = 0.5 * (1.0 + std.math.cos(theta));
 
     const d_center = mathutil.dist(view.centerPoint(), audio_position);
     const d_edge = @intToFloat(f32, view.w);
-    const volume = std.math.clamp(0.9 - (d_center / d_edge), 0, 1);
+    // normalized distance to edge of view, 0 = right in center, 1 = at edge
+    const d_norm = std.math.clamp(d_center / d_edge, 0, 1);
+    const volume = std.math.clamp(0.9 - d_norm, 0, 1);
+    const pan = zm.lerpV(0.5, cos_shift, d_norm);
 
     return .{
         .initial_pan = pan,
