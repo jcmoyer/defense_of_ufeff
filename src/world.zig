@@ -45,6 +45,10 @@ pub const proj_arrow = ProjectileSpec{
     .rotation = .rotation_from_velocity,
 };
 
+pub const proj_bullet = ProjectileSpec{
+    .anim_set = anim.a_proj_bullet.animationSet(),
+};
+
 pub const Projectile = struct {
     id: u32 = undefined,
     world: *World,
@@ -364,16 +368,16 @@ pub const t_wall = TowerSpec{
     .tooltip = "Build Wall\n$1\n\nBlocks monster movement.\nCan be built over.",
 };
 
-pub const t_soldier = TowerSpec{
-    .gold_cost = 10,
-    .tooltip = "Hire Soldier\n$10\n\nWeak melee attack.\nBlocks monster movement.\nUpgrades into other units.",
+pub const t_civilian = TowerSpec{
+    .gold_cost = 5,
+    .tooltip = "Hire Civilian\n$5\n\nWeak melee attack.\nBlocks monster movement.\nUpgrades into other units.",
     .upgrades = [3]?*const TowerSpec{ &t_archer, null, null },
     .anim_set = anim.a_human1.animationSet(),
-    .updateFn = soldierUpdate,
+    .updateFn = civUpdate,
     .max_range = 24,
 };
 
-fn soldierUpdate(self: *Tower, frame: u64) void {
+fn civUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
         const m = self.pickMonsterGeneric() orelse return;
         const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
@@ -394,7 +398,7 @@ pub const t_archer = TowerSpec{
     .updateFn = archerUpdate,
     .min_range = 50,
     .max_range = 100,
-    .upgrades = [3]?*const TowerSpec{ &tspec_test_lv2, null, null },
+    .upgrades = [3]?*const TowerSpec{ &t_gunner, null, null },
 };
 
 fn archerUpdate(self: *Tower, frame: u64) void {
@@ -409,22 +413,40 @@ fn archerUpdate(self: *Tower, frame: u64) void {
 
         self.setAssocEffectAimed(&se_bow, target[0], target[1]);
         var proj = self.fireProjectileTowards(&proj_arrow, target[0], target[1]);
+        proj.damage = 2;
         self.lookTowards(target[0], target[1]);
         self.cooldown.restart(frame);
-
-        if (self.spec == &tspec_test_lv2) {
-            proj.damage = 3;
-        }
     }
 }
 
-pub const tspec_test_lv2 = TowerSpec{
+pub const t_gunner = TowerSpec{
+    .gold_cost = 10,
+    .tooltip = "Train Firearms\n$10\n\nFires slow moving projectiles.",
+
     .anim_set = anim.a_human1.animationSet(),
-    .updateFn = archerUpdate,
+    .updateFn = gunnerUpdate,
     .min_range = 50,
     .max_range = 100,
-    .gold_cost = 5,
+    .upgrades = [3]?*const TowerSpec{ null, null, null },
 };
+
+fn gunnerUpdate(self: *Tower, frame: u64) void {
+    if (self.cooldown.expired(frame)) {
+        const m = self.pickMonsterGeneric() orelse {
+            self.killAssocEffect();
+            return;
+        };
+        const target = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
+
+        self.world.playPositionalSound("assets/sounds/gun.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
+
+        self.setAssocEffectAimed(&se_gun, target[0], target[1]);
+        var proj = self.fireProjectileTowards(&proj_bullet, target[0], target[1]);
+        proj.damage = 5;
+        self.lookTowards(target[0], target[1]);
+        self.cooldown.restart(frame);
+    }
+}
 
 pub const Tower = struct {
     id: u32 = undefined,
@@ -598,6 +620,10 @@ pub const Spawn = struct {
 
 const se_bow = SpriteEffectSpec{
     .anim_set = anim.a_bow.animationSet(),
+};
+
+const se_gun = SpriteEffectSpec{
+    .anim_set = anim.a_gun.animationSet(),
 };
 
 const se_hurt_generic = SpriteEffectSpec{

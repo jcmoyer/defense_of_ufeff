@@ -276,6 +276,18 @@ pub const a_proj_arrow = StaticAnimationSet(&[1]StaticAnimationDef{.{
     },
 }}){};
 
+pub const a_proj_bullet = StaticAnimationSet(&[1]StaticAnimationDef{.{
+    .name = "default",
+    .animation = Animation{
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(128, 80, 16, 16),
+                .time = 8,
+            },
+        },
+    },
+}}){};
+
 pub const a_sword = StaticAnimationSet(&[1]StaticAnimationDef{.{
     .name = "default",
     .animation = Animation{
@@ -318,6 +330,18 @@ pub const a_bow = StaticAnimationSet(&[1]StaticAnimationDef{.{
         .frames = &[_]Frame{
             .{
                 .rect = Rect.init(7 * 16, 8 * 16, 16, 16),
+                .time = 8,
+            },
+        },
+    },
+}}){};
+
+pub const a_gun = StaticAnimationSet(&[1]StaticAnimationDef{.{
+    .name = "default",
+    .animation = Animation{
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(176, 112, 16, 16),
                 .time = 8,
             },
         },
