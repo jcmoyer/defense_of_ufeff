@@ -89,11 +89,11 @@ pub fn intersect(self: Rect, other: Rect, subrect: ?*Rect) bool {
 }
 
 pub fn contains(self: Rect, x: i32, y: i32) bool {
-    return x >= self.left() and x <= self.right() and y >= self.top() and y <= self.bottom();
+    return x >= self.left() and x < self.right() and y >= self.top() and y < self.bottom();
 }
 
 pub fn containsRect(self: Rect, r: Rect) bool {
-    return r.left() >= self.left() and r.right() <= self.right() and r.top() >= self.top() and r.bottom() <= self.bottom();
+    return r.left() >= self.left() and r.right() < self.right() and r.top() >= self.top() and r.bottom() < self.bottom();
 }
 
 pub fn clampPoint(self: Rect, x: i32, y: i32) [2]i32 {
