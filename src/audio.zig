@@ -120,8 +120,10 @@ const AudioDecodeThread = struct {
         var local_queue = std.ArrayListUnmanaged(DecodeRequest){};
         defer {
             for (local_queue.items) |*req| {
-                if (!req.shutdown)
+                if (!req.shutdown) {
+                    self.allocator.free(req.filename);
                     req.parameters.release();
+                }
             }
             local_queue.deinit(self.allocator);
         }
@@ -153,7 +155,7 @@ const AudioDecodeThread = struct {
                 };
                 self.system.tracks_m.lock();
                 defer self.system.tracks_m.unlock();
-                self.system.tracks.append(self.system.allocator, t) catch |err| {
+                self.system.tracks.append(self.allocator, t) catch |err| {
                     log.err("Failed to allocate space for track: {!}", .{err});
                     std.process.exit(1);
                 };
@@ -236,6 +238,9 @@ pub const AudioSystem = struct {
         self.sound_thread.deinit();
         self.music_thread.join();
         self.music_thread.deinit();
+        for (self.cache.keys()) |k| {
+            self.allocator.free(k);
+        }
         for (self.cache.values()) |val| {
             val.destroy(self.allocator);
         }
@@ -256,6 +261,7 @@ pub const AudioSystem = struct {
         };
         if (gop.found_existing) {
             self.cache_m.unlock();
+            self.allocator.free(filename);
             return gop.value_ptr.*;
         } else {
             var timer = std.time.Timer.start() catch |err| {
@@ -374,10 +380,14 @@ pub const AudioSystem = struct {
             log.err("Failed to create AudioParameters for music: {!}", .{err});
             std.process.exit(1);
         };
+        const dup_filename = self.allocator.dupeZ(u8, filename) catch |err| {
+            log.err("Failed to dupe filename for music: {!}", .{err});
+            std.process.exit(1);
+        };
         parameters.volume.storeUnchecked(opts.initial_volume);
         parameters.pan.storeUnchecked(opts.initial_pan);
         var req = DecodeRequest{
-            .filename = filename,
+            .filename = dup_filename,
             .loop = true,
             .parameters = parameters,
             .shutdown = false,
@@ -391,10 +401,14 @@ pub const AudioSystem = struct {
             log.err("Failed to create AudioParameters for sound: {!}", .{err});
             std.process.exit(1);
         };
+        const dup_filename = self.allocator.dupeZ(u8, filename) catch |err| {
+            log.err("Failed to dupe filename for sound: {!}", .{err});
+            std.process.exit(1);
+        };
         parameters.volume.storeUnchecked(opts.initial_volume);
         parameters.pan.storeUnchecked(opts.initial_pan);
         var req = DecodeRequest{
-            .filename = filename,
+            .filename = dup_filename,
             .loop = false,
             .parameters = parameters,
             .shutdown = false,
