@@ -541,7 +541,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
         s.emitter.render(&self.r_quad, @floatCast(f32, alpha));
     }
 
-    self.renderWipe();
+    self.renderWipe(alpha);
     self.renderFade();
 }
 
@@ -1340,14 +1340,17 @@ fn beginTransitionGameOver(self: *PlayState) void {
     self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
 }
 
-fn renderWipe(self: *PlayState) void {
+fn renderWipe(self: *PlayState, alpha: f64) void {
     if (self.sub != .wipe_fadein) {
         return;
     }
 
-    const right = @floatToInt(i32, zm.lerpV(-wipe_scanline_width, Game.INTERNAL_WIDTH, self.fade_timer.invProgressClamped(self.game.frame_counter)));
+    const t0 = self.fade_timer.invProgressClamped(std.math.max(self.game.frame_counter -| 1, self.fade_timer.frame_start));
+    const t1 = self.fade_timer.invProgressClamped(self.game.frame_counter);
+    const tx = zm.lerpV(t0, t1, @floatCast(f32, alpha));
 
-    const a = self.fade_timer.invProgressClamped(self.game.frame_counter);
+    const right = @floatToInt(i32, zm.lerpV(-wipe_scanline_width, Game.INTERNAL_WIDTH, tx));
+    const a = tx;
 
     self.game.imm.beginUntextured();
     self.game.imm.drawQuadRGBA(Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT), zm.f32x4(0, 0, 0, a));
