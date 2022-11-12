@@ -19,7 +19,7 @@ const Buffer = struct {
     }
 };
 
-const AudioParameters = struct {
+pub const AudioParameters = struct {
     allocator: Allocator,
     refcount: std.atomic.Atomic(u32) = .{ .value = 1 },
     volume: std.atomic.Atomic(f32) = .{ .value = 1 },
@@ -301,7 +301,7 @@ pub const AudioSystem = struct {
         // erase finished tracks
         var i: usize = self.tracks.items.len -% 1;
         while (i < self.tracks.items.len) {
-            if (self.tracks.items[i].done) {
+            if (self.tracks.items[i].done or self.tracks.items[i].parameters.done.load(.SeqCst)) {
                 var t = self.tracks.swapRemove(i);
                 t.deinit();
             } else {
