@@ -26,6 +26,7 @@ pub const AudioParameters = struct {
     pan: std.atomic.Atomic(f32) = .{ .value = 0.5 },
     done: std.atomic.Atomic(bool) = .{ .value = false },
     paused: std.atomic.Atomic(bool) = .{ .value = false },
+    loaded: std.atomic.Atomic(bool) = .{ .value = false },
 
     fn create(allocator: Allocator) !*AudioParameters {
         var ptr = try allocator.create(AudioParameters);
@@ -153,6 +154,7 @@ const AudioDecodeThread = struct {
                     .loop = req.loop,
                     .parameters = req.parameters,
                 };
+                req.parameters.loaded.store(true, .SeqCst);
                 self.system.tracks_m.lock();
                 defer self.system.tracks_m.unlock();
                 self.system.tracks.append(self.allocator, t) catch |err| {
