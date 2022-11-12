@@ -490,10 +490,13 @@ pub const Tower = struct {
     fn pickMonsterGeneric(self: *Tower) ?u32 {
         const p = self.getWorldCollisionRect().centerPoint();
         if (self.target_mobid) |id| {
-            const q = self.world.monsters.getPtr(id).getWorldCollisionRect().centerPoint();
-            const d = mu.dist(p, q);
-            if (d >= self.spec.min_range and d <= self.spec.max_range) {
-                return id;
+            const m = self.world.monsters.getPtr(id);
+            if (!m.dead) {
+                const q = m.getWorldCollisionRect().centerPoint();
+                const d = mu.dist(p, q);
+                if (d >= self.spec.min_range and d <= self.spec.max_range) {
+                    return id;
+                }
             }
         }
         self.target_mobid = self.world.pickClosestMonster(p[0], p[1], self.spec.min_range, self.spec.max_range);
