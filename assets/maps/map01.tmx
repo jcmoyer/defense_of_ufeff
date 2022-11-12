@@ -4,6 +4,7 @@
   <export target="map01.tmj" format="json"/>
  </editorsettings>
  <properties>
+  <property name="music" type="file" value="../music/Flight of the Fox.ogg"/>
   <property name="wave_file" type="file" value="../tables/map01_waves.json"/>
  </properties>
  <tileset firstgid="1" source="terrain.tsx"/>
