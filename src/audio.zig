@@ -64,11 +64,102 @@ const DecodeRequest = struct {
     filename: [:0]const u8,
     loop: bool,
     parameters: *AudioParameters,
+    shutdown: bool,
 };
 
 pub const AudioOptions = struct {
     initial_volume: f32 = 1,
     initial_pan: f32 = 0.5,
+};
+
+const AudioDecodeThread = struct {
+    thread: std.Thread,
+    queue_m: std.Thread.Mutex = .{},
+    queue: std.ArrayListUnmanaged(DecodeRequest) = .{},
+    cv: std.Thread.Condition = .{},
+    allocator: Allocator,
+    system: *AudioSystem,
+
+    fn spawn(self: *AudioDecodeThread, system: *AudioSystem) !void {
+        self.* = .{
+            .system = system,
+            .allocator = system.allocator,
+            .thread = undefined,
+        };
+        self.thread = try std.Thread.spawn(.{}, loop, .{self});
+    }
+
+    fn deinit(self: *AudioDecodeThread) void {
+        self.queue.deinit(self.allocator);
+    }
+
+    fn postRequest(self: *AudioDecodeThread, req: DecodeRequest) void {
+        self.queue_m.lock();
+        self.queue.append(self.allocator, req) catch |err| {
+            log.err("Failed to allocate decode queue space: {!}", .{err});
+            std.process.exit(1);
+        };
+        self.queue_m.unlock();
+        self.cv.signal();
+    }
+
+    fn postShutdown(self: *AudioDecodeThread) void {
+        self.postRequest(DecodeRequest{
+            .filename = "",
+            .loop = true,
+            .parameters = undefined,
+            .shutdown = true,
+        });
+    }
+
+    fn join(self: *AudioDecodeThread) void {
+        self.thread.join();
+    }
+
+    fn loop(self: *AudioDecodeThread) void {
+        var local_queue = std.ArrayListUnmanaged(DecodeRequest){};
+        defer {
+            for (local_queue.items) |*req| {
+                if (!req.shutdown)
+                    req.parameters.release();
+            }
+            local_queue.deinit(self.allocator);
+        }
+
+        while (true) {
+            self.queue_m.lock();
+            // go to sleep until there are items to process
+            while (self.queue.items.len == 0) {
+                self.cv.wait(&self.queue_m);
+            }
+            // we have the lock here, quickly take the queue and release
+            std.mem.swap(
+                std.ArrayListUnmanaged(DecodeRequest),
+                &local_queue,
+                &self.queue,
+            );
+            self.queue_m.unlock();
+
+            // now we can load the requests and put them into the tracklist
+            while (local_queue.popOrNull()) |req| {
+                // empty filename kills the thread
+                if (req.shutdown) {
+                    return;
+                }
+                const t = Track{
+                    .buffer = self.system.getOrLoad(req.filename),
+                    .loop = req.loop,
+                    .parameters = req.parameters,
+                };
+                self.system.tracks_m.lock();
+                defer self.system.tracks_m.unlock();
+                self.system.tracks.append(self.system.allocator, t) catch |err| {
+                    log.err("Failed to allocate space for track: {!}", .{err});
+                    std.process.exit(1);
+                };
+            }
+        }
+    }
 };
 
 pub const AudioSystem = struct {
@@ -85,10 +176,8 @@ pub const AudioSystem = struct {
     cache_m: std.Thread.Mutex = .{},
     cache: std.StringArrayHashMapUnmanaged(*Buffer) = .{},
 
-    decode_thread: std.Thread,
-    decode_queue_m: std.Thread.Mutex = .{},
-    decode_queue: std.ArrayList(DecodeRequest),
-    decode_cv: std.Thread.Condition = .{},
+    sound_thread: AudioDecodeThread,
+    music_thread: AudioDecodeThread,
 
     pub fn create(allocator: Allocator) *AudioSystem {
         const self = allocator.create(AudioSystem) catch |err| {
@@ -98,10 +187,10 @@ pub const AudioSystem = struct {
         instance = self;
         self.* = AudioSystem{
             .allocator = allocator,
-            .decode_queue = std.ArrayList(DecodeRequest).init(allocator),
             // Initialized below
             .spec = undefined,
-            .decode_thread = undefined,
+            .sound_thread = undefined,
+            .music_thread = undefined,
             .device = undefined,
         };
         self.tracks = std.ArrayListUnmanaged(Track).initCapacity(allocator, 1024) catch |err| {
@@ -126,8 +215,13 @@ pub const AudioSystem = struct {
         self.device = device;
         sdl.SDL_PauseAudioDevice(self.device, 0);
 
-        self.decode_thread = std.Thread.spawn(.{}, decodeThread, .{self}) catch |err| {
-            log.err("Failed to spawn audio decode thread: {!}", .{err});
+        AudioDecodeThread.spawn(&self.sound_thread, self) catch |err| {
+            log.err("Failed to spawn sound thread: {!}", .{err});
+            std.process.exit(1);
+        };
+
+        AudioDecodeThread.spawn(&self.music_thread, self) catch |err| {
+            log.err("Failed to spawn sound thread: {!}", .{err});
             std.process.exit(1);
         };
 
@@ -138,8 +232,10 @@ pub const AudioSystem = struct {
         sdl.SDL_CloseAudioDevice(self.device);
 
         self.postShutdown();
-        self.decode_thread.join();
-        self.decode_queue.deinit();
+        self.sound_thread.join();
+        self.sound_thread.deinit();
+        self.music_thread.join();
+        self.music_thread.deinit();
         for (self.cache.values()) |val| {
             val.destroy(self.allocator);
         }
@@ -150,51 +246,6 @@ pub const AudioSystem = struct {
         self.tracks.deinit(self.allocator);
 
         self.allocator.destroy(self);
-    }
-
-    fn decodeThread(self: *AudioSystem) void {
-        var local_queue = std.ArrayList(DecodeRequest).init(self.allocator);
-        defer {
-            for (local_queue.items) |*req| {
-                req.parameters.release();
-            }
-            local_queue.deinit();
-        }
-
-        while (true) {
-            self.decode_queue_m.lock();
-            // go to sleep until there are items to process
-            while (self.decode_queue.items.len == 0) {
-                self.decode_cv.wait(&self.decode_queue_m);
-            }
-            // we have the lock here, quickly take the queue and release
-            std.mem.swap(
-                std.ArrayList(DecodeRequest),
-                &local_queue,
-                &self.decode_queue,
-            );
-            self.decode_queue_m.unlock();
-
-            // now we can load the requests and put them into the tracklist
-            while (local_queue.popOrNull()) |req| {
-                // empty filename kills the thread
-                if (req.filename.len == 0) {
-                    req.parameters.release();
-                    return;
-                }
-                const t = Track{
-                    .buffer = self.getOrLoad(req.filename),
-                    .loop = req.loop,
-                    .parameters = req.parameters,
-                };
-                self.tracks_m.lock();
-                defer self.tracks_m.unlock();
-                self.tracks.append(self.allocator, t) catch |err| {
-                    log.err("Failed to allocate space for track: {!}", .{err});
-                    std.process.exit(1);
-                };
-            }
-        }
     }
 
     fn getOrLoad(self: *AudioSystem, filename: [:0]const u8) *Buffer {
@@ -329,14 +380,9 @@ pub const AudioSystem = struct {
             .filename = filename,
             .loop = true,
             .parameters = parameters,
+            .shutdown = false,
         };
-        self.decode_queue_m.lock();
-        self.decode_queue.append(req) catch |err| {
-            log.err("Failed to allocate decode queue space: {!}", .{err});
-            std.process.exit(1);
-        };
-        self.decode_queue_m.unlock();
-        self.decode_cv.signal();
+        self.music_thread.postRequest(req);
         return parameters.addRef();
     }
 
@@ -351,34 +397,15 @@ pub const AudioSystem = struct {
             .filename = filename,
             .loop = false,
             .parameters = parameters,
+            .shutdown = false,
         };
-        self.decode_queue_m.lock();
-        self.decode_queue.append(req) catch |err| {
-            log.err("Failed to allocate decode queue space: {!}", .{err});
-            std.process.exit(1);
-        };
-        self.decode_queue_m.unlock();
-        self.decode_cv.signal();
+        self.sound_thread.postRequest(req);
         return parameters.addRef();
     }
 
     fn postShutdown(self: *AudioSystem) void {
-        const parameters = AudioParameters.create(self.allocator) catch |err| {
-            log.err("Failed to create AudioParameters for shutdown: {!}", .{err});
-            std.process.exit(1);
-        };
-        var req = DecodeRequest{
-            .filename = "",
-            .loop = true,
-            .parameters = parameters,
-        };
-        self.decode_queue_m.lock();
-        self.decode_queue.append(req) catch |err| {
-            log.err("Failed to allocate decode queue space: {!}", .{err});
-            std.process.exit(1);
-        };
-        self.decode_queue_m.unlock();
-        self.decode_cv.signal();
+        self.music_thread.postShutdown();
+        self.sound_thread.postShutdown();
     }
 };
 
