@@ -939,6 +939,7 @@ pub const World = struct {
     next_wave: usize = 0,
     player_won: bool = false,
     music_filename: ?[:0]const u8 = null,
+    next_wave_timer: timing.FrameTimer = .{},
 
     pub fn init(allocator: Allocator) World {
         return .{
@@ -976,6 +977,10 @@ pub const World = struct {
         if (self.music_filename) |s| {
             self.allocator.free(s);
         }
+    }
+
+    pub fn setNextWaveTimer(self: *World, time_sec: f32) void {
+        self.next_wave_timer = timing.FrameTimer.initSeconds(self.world_frame, time_sec);
     }
 
     pub fn getPlayableRange(self: World) TileRange {
@@ -1381,7 +1386,7 @@ pub const World = struct {
         }
 
         if (self.active_waves.items.len == 0) {
-            if (!self.startNextWave()) {
+            if (self.next_wave_timer.expired(self.world_frame) and !self.startNextWave()) {
                 if (self.monsters.slice().len == 0) {
                     self.player_won = true;
                 }

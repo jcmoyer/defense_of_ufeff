@@ -16,6 +16,18 @@ pub const FrameTimer = struct {
         return self.frame_end - self.frame_start;
     }
 
+    pub fn durationSeconds(self: FrameTimer) f32 {
+        return @intToFloat(f32, self.durationFrames()) / 30.0;
+    }
+
+    pub fn remainingSeconds(self: FrameTimer, current_frame: u64) f32 {
+        return self.invProgressClamped(current_frame) * self.durationSeconds();
+    }
+
+    pub fn remainingSecondsUnbounded(self: FrameTimer, current_frame: u64) f32 {
+        return self.invProgress(current_frame) * self.durationSeconds();
+    }
+
     pub fn expired(self: FrameTimer, current_frame: u64) bool {
         return current_frame >= self.frame_end;
     }
@@ -32,6 +44,10 @@ pub const FrameTimer = struct {
 
     pub fn progressClamped(self: FrameTimer, current_frame: u64) f32 {
         return std.math.clamp(self.progress(current_frame), 0.0, 1.0);
+    }
+
+    pub fn invProgress(self: FrameTimer, current_frame: u64) f32 {
+        return 1 - self.progress(current_frame);
     }
 
     pub fn invProgressClamped(self: FrameTimer, current_frame: u64) f32 {

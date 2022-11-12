@@ -71,6 +71,19 @@ const Substate = enum {
     gameover_fadeout,
 };
 
+const NextWaveTimerState = enum {
+    middle_screen,
+    move_to_corner,
+    corner,
+};
+
+const NextWaveTimer = struct {
+    state: NextWaveTimerState = .middle_screen,
+    state_timer: FrameTimer = .{},
+    wave_timer_text_buf: [32]u8 = undefined,
+    wave_timer_text: []u8 = &[_]u8{},
+};
+
 const FingerRenderer = @import("FingerRenderer.zig");
 
 game: *Game,
@@ -112,6 +125,7 @@ ui_upgrade_buttons: [4]*ui.Button,
 ui_upgrade_states: [3]UpgradeButtonState,
 fast: bool = false,
 music_params: ?*audio.AudioParameters = null,
+wave_timer: NextWaveTimer = .{},
 
 paused: bool = false,
 
@@ -462,13 +476,23 @@ pub fn update(self: *PlayState) void {
 
     if (self.sub == .wipe_fadein and self.fade_timer.expired(self.game.frame_counter)) {
         self.sub = .none;
+        self.endWipe();
     }
 }
 
 fn updateUI(self: *PlayState) void {
     self.ui_gold.text = std.fmt.bufPrint(&self.gold_text, "${d}", .{self.world.player_gold}) catch unreachable;
     self.ui_lives.text = std.fmt.bufPrint(&self.lives_text, "\x03{d}", .{self.world.lives_at_goal}) catch unreachable;
+    self.wave_timer.wave_timer_text = std.fmt.bufPrint(&self.wave_timer.wave_timer_text_buf, "Next wave in 00:{d:0>2}", .{
+        @floatToInt(u32, self.world.next_wave_timer.remainingSeconds(self.world.world_frame)),
+    }) catch unreachable;
     self.updateUpgradeButtons();
+    if (self.wave_timer.state == .middle_screen and self.wave_timer.state_timer.expired(self.world.world_frame)) {
+        self.wave_timer.state = .move_to_corner;
+        self.wave_timer.state_timer = FrameTimer.initSeconds(self.world.world_frame, 2);
+    } else if (self.wave_timer.state == .move_to_corner and self.wave_timer.state_timer.expired(self.world.world_frame)) {
+        self.wave_timer.state = .corner;
+    }
 }
 
 pub fn render(self: *PlayState, alpha: f64) void {
@@ -495,6 +519,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.renderBlockedConstructionRects(cam_interp);
     self.renderGrid(cam_interp);
     self.renderSelection(cam_interp);
+    self.renderWaveTimer(alpha);
     if (!self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
         self.renderPlacementIndicator(cam_interp);
         self.renderDemolishIndicator(cam_interp);
@@ -1203,9 +1228,7 @@ fn loadWorld(self: *PlayState, mapid: []const u8) void {
     // should probably clean this up eventually
     self.world.view = self.camera.view;
 
-    if (self.world.startNextWave() == false) {
-        std.log.err("No waves in world `{s}`", .{mapid});
-    }
+    self.world.setNextWaveTimer(15);
 }
 
 fn createMinimap(self: *PlayState) !void {
@@ -1477,4 +1500,60 @@ fn beginWipe(self: *PlayState) void {
     for (self.wipe_scanlines) |*sc| {
         sc.* = r.intRangeLessThan(i32, 0, wipe_scanline_width);
     }
+}
+
+fn endWipe(self: *PlayState) void {
+    self.wave_timer.state_timer = FrameTimer.initSeconds(self.world.world_frame, 2);
+}
+
+fn renderWaveTimer(self: *PlayState, alpha: f64) void {
+    _ = alpha;
+    var rect = self.fontspec.measureText(self.wave_timer.wave_timer_text);
+    var box_rect = rect;
+    box_rect.inflate(4, 4);
+
+    box_rect.x = @divFloor(Game.INTERNAL_WIDTH - box_rect.w, 2);
+    box_rect.y = @divFloor(Game.INTERNAL_HEIGHT - box_rect.h, 2);
+
+    switch (self.wave_timer.state) {
+        .middle_screen => {},
+        .move_to_corner => {
+            const d = self.wave_timer.state_timer.progressClamped(self.world.world_frame);
+            box_rect.x = @floatToInt(i32, zm.lerpV(@intToFloat(f32, box_rect.x), 0.0, d));
+            box_rect.y = @floatToInt(i32, zm.lerpV(@intToFloat(f32, box_rect.y), 0.0, d));
+        },
+        .corner => {
+            box_rect.x = 0;
+            box_rect.y = 0;
+        },
+    }
+
+    rect.centerOn(box_rect.centerPoint()[0], box_rect.centerPoint()[1]);
+
+    var total_alpha: f32 = 1.0;
+    var text_alpha: u8 = 255;
+    const sec = self.world.next_wave_timer.remainingSecondsUnbounded(self.world.world_frame);
+    if (sec <= 5) {
+        const diff = 5.0 - sec;
+        text_alpha = @floatToInt(u8, (0.5 * (1.0 + std.math.cos(diff * 8.0))) * 255.0);
+    }
+    if (sec < 0) {
+        total_alpha = 1.0 - std.math.clamp(-sec, 0, 2.0) / 2.0;
+    }
+
+    self.r_quad.begin(.{});
+    self.r_quad.drawQuadRGBA(box_rect, 0, 0, 0, @floatToInt(u8, total_alpha * 128));
+    self.r_quad.end();
+
+    self.r_font.begin(.{
+        .texture = self.game.texman.getNamedTexture("CommonCase.png"),
+        .spec = &self.fontspec,
+    });
+    self.r_font.drawText(self.wave_timer.wave_timer_text, .{
+        .dest = box_rect,
+        .color = @Vector(4, u8){ 255, 255, 255, std.math.min(@floatToInt(u8, total_alpha * 255), text_alpha) },
+        .h_alignment = .center,
+        .v_alignment = .middle,
+    });
+    self.r_font.end();
 }
