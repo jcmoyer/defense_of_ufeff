@@ -935,6 +935,7 @@ pub const World = struct {
     world_frame: u64 = 0,
     next_wave: usize = 0,
     player_won: bool = false,
+    music_filename: ?[:0]const u8 = null,
 
     pub fn init(allocator: Allocator) World {
         return .{
@@ -969,6 +970,9 @@ pub const World = struct {
         self.spawn_map.deinit(self.allocator);
         self.waves.deinit(self.allocator);
         self.active_waves.deinit(self.allocator);
+        if (self.music_filename) |s| {
+            self.allocator.free(s);
+        }
     }
 
     pub fn getPlayableRange(self: World) TileRange {
@@ -1747,15 +1751,26 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !World {
         }
     }
 
+    const map_dirname = std.fs.path.dirname(filename) orelse "";
+
     if (doc.getProperty("wave_file")) |wave_file| {
         if (!wave_file.isFile()) {
             std.log.err("wave_file must have type `file`", .{});
             std.process.exit(1);
         }
-        const dirname_start = std.fs.path.dirname(filename) orelse "";
-        const wave_filename = try std.fs.path.resolve(arena_allocator, &[_][]const u8{ dirname_start, wave_file.value });
+        const wave_filename = try std.fs.path.resolve(arena_allocator, &[_][]const u8{ map_dirname, wave_file.value });
         std.log.debug("Load wave_file from `{s}`", .{wave_filename});
         world.waves = try loadWavesFromJson(allocator, wave_filename, &world);
+    }
+
+    if (doc.getProperty("music")) |music| {
+        if (!music.isFile()) {
+            std.log.err("music must have type `file`", .{});
+            std.process.exit(1);
+        }
+        const music_filename = try std.fs.path.resolve(arena_allocator, &[_][]const u8{ map_dirname, music.value });
+        std.log.debug("music_filename is `{s}`", .{music_filename});
+        world.music_filename = try allocator.dupeZ(u8, music_filename);
     }
 
     return world;

@@ -110,6 +110,7 @@ ui_upgrade_panel: *ui.Panel,
 ui_upgrade_buttons: [4]*ui.Button,
 ui_upgrade_states: [3]UpgradeButtonState,
 fast: bool = false,
+music_params: ?*audio.AudioParameters = null,
 
 paused: bool = false,
 
@@ -366,6 +367,9 @@ fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.Bitm
 }
 
 pub fn destroy(self: *PlayState) void {
+    if (self.music_params) |params| {
+        params.release();
+    }
     self.upgrade_texture_cache.deinit(self.game.allocator);
     self.button_generator.deinit();
     self.fontspec.deinit();
@@ -1134,6 +1138,10 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
 }
 
 fn loadWorld(self: *PlayState, mapid: []const u8) void {
+    if (self.music_params) |params| {
+        params.done.store(true, .SeqCst);
+        params.release();
+    }
     self.world.deinit();
 
     const filename = std.fmt.allocPrint(self.game.allocator, "assets/maps/{s}.tmj", .{mapid}) catch |err| {
@@ -1146,6 +1154,11 @@ fn loadWorld(self: *PlayState, mapid: []const u8) void {
         std.log.err("failed to load tilemap {!}", .{err});
         std.process.exit(1);
     };
+
+    // get this loading asap
+    if (self.world.music_filename) |music_filename| {
+        self.music_params = self.game.audio.playMusic(music_filename, .{});
+    }
 
     self.createMinimap() catch |err| {
         std.log.err("Failed to create minimap: {!}", .{err});
