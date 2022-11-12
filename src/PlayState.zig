@@ -67,6 +67,7 @@ const UpgradeButtonState = struct {
 
 const Substate = enum {
     none,
+    wipe_fadein,
     gameover_fadeout,
 };
 
@@ -125,9 +126,13 @@ t_resume: *Texture,
 t_demolish: *Texture,
 upgrade_texture_cache: std.AutoHashMapUnmanaged(*const wo.TowerSpec, *Texture) = .{},
 
+wipe_scanlines: [Game.INTERNAL_HEIGHT]i32 = undefined,
+
 deb_render_tile_collision: bool = false,
 
 rng: std.rand.DefaultPrng = std.rand.DefaultPrng.init(0),
+
+const wipe_scanline_width = Game.INTERNAL_WIDTH / 4;
 
 fn makeStandardButtonRects(x: i32, y: i32) [4]Rect {
     return [4]Rect{
@@ -388,7 +393,7 @@ pub fn enter(self: *PlayState, from: ?Game.StateId) void {
     self.ui_root.backend.client_rect = self.game.output_rect;
     self.ui_root.backend.coord_scale_x = self.game.output_scale_x;
     self.ui_root.backend.coord_scale_y = self.game.output_scale_y;
-    self.sub = .none;
+    self.beginWipe();
     self.loadWorld("map01");
 }
 
@@ -429,7 +434,7 @@ pub fn update(self: *PlayState) void {
     self.heart_anim.update();
 
     self.world.view = self.camera.view;
-    if (!self.paused) {
+    if (self.sub == .none and !self.paused) {
         self.world.update(arena);
         if (self.fast) {
             self.world.update(arena);
@@ -447,6 +452,16 @@ pub fn update(self: *PlayState) void {
 
     if (self.sub == .gameover_fadeout and self.fade_timer.expired(self.game.frame_counter)) {
         self.game.changeState(.menu);
+    }
+
+    if (self.music_params) |params| {
+        if (self.sub == .wipe_fadein and !params.loaded.load(.SeqCst)) {
+            self.beginWipe();
+        }
+    }
+
+    if (self.sub == .wipe_fadein and self.fade_timer.expired(self.game.frame_counter)) {
+        self.sub = .none;
     }
 }
 
@@ -501,12 +516,13 @@ pub fn render(self: *PlayState, alpha: f64) void {
         s.emitter.render(&self.r_quad, @floatCast(f32, alpha));
     }
 
+    self.renderWipe();
     self.renderFade();
 }
 
 pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
     // stop accepting input
-    if (self.sub == .gameover_fadeout) {
+    if (self.sub == .gameover_fadeout or self.sub == .wipe_fadein) {
         return;
     }
 
@@ -1301,6 +1317,39 @@ fn beginTransitionGameOver(self: *PlayState) void {
     self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
 }
 
+fn renderWipe(self: *PlayState) void {
+    if (self.sub != .wipe_fadein) {
+        return;
+    }
+
+    const right = @floatToInt(i32, zm.lerpV(-wipe_scanline_width, Game.INTERNAL_WIDTH, self.fade_timer.invProgressClamped(self.game.frame_counter)));
+
+    const a = self.fade_timer.invProgressClamped(self.game.frame_counter);
+
+    self.game.imm.beginUntextured();
+    self.game.imm.drawQuadRGBA(Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT), zm.f32x4(0, 0, 0, a));
+
+    self.r_quad.begin(.{});
+    for (self.wipe_scanlines) |*sc, i| {
+        const rect = Rect.init(0, @intCast(i32, i), right + sc.*, 1);
+        self.r_quad.drawQuadRGBA(rect, 0, 0, 0, 255);
+    }
+    self.r_quad.end();
+
+    self.r_font.begin(.{
+        .texture = self.game.texman.getNamedTexture("CommonCase.png"),
+        .spec = &self.fontspec,
+    });
+    const text_alpha = @floatToInt(u8, a * 255);
+    self.r_font.drawText("Loading...", .{
+        .dest = Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT),
+        .color = @Vector(4, u8){ 255, 255, 255, text_alpha },
+        .h_alignment = .center,
+        .v_alignment = .middle,
+    });
+    self.r_font.end();
+}
+
 fn renderFade(self: *PlayState) void {
     if (self.sub != .gameover_fadeout) {
         return;
@@ -1418,3 +1467,14 @@ const ButtonTextureGenerator = struct {
         return t;
     }
 };
+
+fn beginWipe(self: *PlayState) void {
+    self.sub = .wipe_fadein;
+    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
+
+    var rng = std.rand.DefaultPrng.init(@intCast(u64, std.time.milliTimestamp()));
+    var r = rng.random();
+    for (self.wipe_scanlines) |*sc| {
+        sc.* = r.intRangeLessThan(i32, 0, wipe_scanline_width);
+    }
+}
