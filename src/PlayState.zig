@@ -244,7 +244,7 @@ pub fn create(game: *Game) !*PlayState {
     try ui_panel.addChild(b_wall.control());
 
     var b_tower = try self.ui_root.createButton();
-    b_tower.tooltip_text = wo.t_civilian.tooltip;
+    b_tower.tooltip_text = wo.t_recruit.tooltip;
     b_tower.rect = Rect.init(48, 144, 32, 32);
     b_tower.texture_rects = makeStandardButtonRects(0, 0);
     b_tower.setTexture(self.t_soldier);
@@ -340,7 +340,7 @@ fn onTowerClick(button: *ui.Button, self: *PlayState) void {
     _ = button;
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.interact_state = .{ .build = InteractStateBuild{
-        .tower_spec = &wo.t_civilian,
+        .tower_spec = &wo.t_recruit,
     } };
 }
 

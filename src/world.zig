@@ -377,9 +377,9 @@ pub const t_wall = TowerSpec{
     .tooltip = "Build Wall\n$1\n\nBlocks monster movement.\nCan be built over.",
 };
 
-pub const t_civilian = TowerSpec{
+pub const t_recruit = TowerSpec{
     .gold_cost = 5,
-    .tooltip = "Hire Civilian\n$5\n\nWeak melee attack.\nBlocks monster movement.\nUpgrades into other units.",
+    .tooltip = "Train Recruit\n$5\n\nWeak melee attack.\nBlocks monster movement.\nUpgrades into other units.",
     .upgrades = [3]?*const TowerSpec{ &t_soldier, &t_archer, null },
     .anim_set = anim.a_human1.animationSet(),
     .updateFn = civUpdate,
@@ -401,7 +401,7 @@ fn civUpdate(self: *Tower, frame: u64) void {
 
 pub const t_soldier = TowerSpec{
     .gold_cost = 5,
-    .tooltip = "Train Swords\n$5\n\nMelee attack.\nBlocks monster movement.\nUpgrades into other units.",
+    .tooltip = "Upgrade to Soldier\n$5\n\nMelee attack.",
     .upgrades = [3]?*const TowerSpec{ null, null, null },
     .anim_set = anim.a_human2.animationSet(),
     .updateFn = soldierUpdate,
@@ -429,7 +429,7 @@ fn soldierUpdate(self: *Tower, frame: u64) void {
 
 pub const t_archer = TowerSpec{
     .gold_cost = 10,
-    .tooltip = "Train Archery\n$10\n\nFires slow moving projectiles.",
+    .tooltip = "Upgrade to Archer\n$10\n\nFires slow moving projectiles\nthat have a minimum range.",
 
     .anim_set = anim.a_human1.animationSet(),
     .updateFn = archerUpdate,
@@ -457,8 +457,8 @@ fn archerUpdate(self: *Tower, frame: u64) void {
 }
 
 pub const t_gunner = TowerSpec{
-    .gold_cost = 10,
-    .tooltip = "Train Firearms\n$10\n\nFires slow moving projectiles.",
+    .gold_cost = 15,
+    .tooltip = "Upgrade to Gunner\n$10\n\nHigh damage projectiles.\nHigh cooldown.",
 
     .anim_set = anim.a_human1.animationSet(),
     .updateFn = gunnerUpdate,
