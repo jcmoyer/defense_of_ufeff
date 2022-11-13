@@ -365,28 +365,32 @@ pub const TowerSpec = struct {
     anim_set: ?anim.AnimationSet = null,
     spawnFn: ?*const fn (*Tower, u64) void = null,
     updateFn: ?*const fn (*Tower, u64) void = null,
+    cooldown: f32,
     min_range: f32 = 0,
-    max_range: f32 = 0,
+    max_range: f32,
     gold_cost: u32 = 0,
     upgrades: [3]?*const TowerSpec = [3]?*const TowerSpec{ null, null, null },
     tooltip: ?[]const u8 = null,
 };
 
 pub const t_wall = TowerSpec{
+    .cooldown = 0,
+    .max_range = 0,
     .gold_cost = 1,
     .tooltip = "Build Wall\n$1\n\nBlocks monster movement.\nCan be built over.",
 };
 
 pub const t_recruit = TowerSpec{
+    .cooldown = 2,
     .gold_cost = 5,
     .tooltip = "Train Recruit\n$5\n\nWeak melee attack.\nBlocks monster movement.\nUpgrades into other units.",
-    .upgrades = [3]?*const TowerSpec{ &t_soldier, &t_archer, null },
+    .upgrades = [3]?*const TowerSpec{ &t_soldier, &t_rogue, &t_magician },
     .anim_set = anim.a_human1.animationSet(),
-    .updateFn = civUpdate,
+    .updateFn = recruitUpdate,
     .max_range = 24,
 };
 
-fn civUpdate(self: *Tower, frame: u64) void {
+fn recruitUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
         const m = self.pickMonsterGeneric() orelse return;
         const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
@@ -399,7 +403,37 @@ fn civUpdate(self: *Tower, frame: u64) void {
     }
 }
 
+pub const t_magician = TowerSpec{
+    .cooldown = 2,
+    .gold_cost = 5,
+    .tooltip = "Upgrade to Magician\n$5\n\nMelee attack.\nElemental specializations.",
+    .upgrades = [3]?*const TowerSpec{ null, null, null },
+    .anim_set = anim.a_human3.animationSet(),
+    .updateFn = magicianUpdate,
+    .max_range = 24,
+};
+
+fn magicianUpdate(self: *Tower, frame: u64) void {
+    if (self.cooldown.expired(frame)) {
+        const m = self.pickMonsterGeneric() orelse return;
+        const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
+        const r = self.angleTo(p[0], p[1]);
+        self.setAssocEffectAngle(&se_staff, r - std.math.pi / 2.0, 10, 0.3);
+
+        self.world.playPositionalSound("assets/sounds/slash.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
+
+        self.world.monsters.getPtr(m).hurtDirectionalGenericDamage(1, [2]f32{ std.math.cos(r), std.math.sin(r) });
+        self.lookTowards(p[0], p[1]);
+        self.cooldown.restart(frame);
+    } else {
+        if (self.assoc_effect) |eid| {
+            self.world.sprite_effects.getPtr(eid).post_angle -= (1.0 / 4.0);
+        }
+    }
+}
+
 pub const t_soldier = TowerSpec{
+    .cooldown = 2,
     .gold_cost = 5,
     .tooltip = "Upgrade to Soldier\n$5\n\nMelee attack.",
     .upgrades = [3]?*const TowerSpec{ null, null, null },
@@ -427,11 +461,43 @@ fn soldierUpdate(self: *Tower, frame: u64) void {
     }
 }
 
+pub const t_rogue = TowerSpec{
+    .cooldown = 1,
+    .gold_cost = 10,
+    .tooltip = "Upgrade to Rogue\n$5\n\nMelee attack.\nHas ranged specializations.",
+
+    .anim_set = anim.a_human4.animationSet(),
+    .updateFn = rogueUpdate,
+    .max_range = 24,
+    .upgrades = [3]?*const TowerSpec{ &t_archer, null, null },
+};
+
+fn rogueUpdate(self: *Tower, frame: u64) void {
+    if (self.cooldown.expired(frame)) {
+        const m = self.pickMonsterGeneric() orelse return;
+        const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
+        const r = self.angleTo(p[0], p[1]);
+        self.setAssocEffectAngle(&se_dagger, r, 10, 0.3);
+
+        self.world.playPositionalSound("assets/sounds/stab.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
+
+        self.world.monsters.getPtr(m).hurtDirectional(2, [2]f32{ std.math.cos(r), std.math.sin(r) });
+        self.lookTowards(p[0], p[1]);
+        self.cooldown.restart(frame);
+    } else {
+        if (self.assoc_effect) |eid| {
+            self.world.sprite_effects.getPtr(eid).offset_x *= 0.9;
+            self.world.sprite_effects.getPtr(eid).offset_y *= 0.9;
+        }
+    }
+}
+
 pub const t_archer = TowerSpec{
+    .cooldown = 1.5,
     .gold_cost = 10,
     .tooltip = "Upgrade to Archer\n$10\n\nFires slow moving projectiles\nthat have a minimum range.",
 
-    .anim_set = anim.a_human1.animationSet(),
+    .anim_set = anim.a_human4.animationSet(),
     .updateFn = archerUpdate,
     .min_range = 50,
     .max_range = 100,
@@ -457,10 +523,11 @@ fn archerUpdate(self: *Tower, frame: u64) void {
 }
 
 pub const t_gunner = TowerSpec{
+    .cooldown = 3,
     .gold_cost = 15,
     .tooltip = "Upgrade to Gunner\n$10\n\nHigh damage projectiles.\nHigh cooldown.",
 
-    .anim_set = anim.a_human1.animationSet(),
+    .anim_set = anim.a_human4.animationSet(),
     .updateFn = gunnerUpdate,
     .min_range = 50,
     .max_range = 100,
@@ -601,6 +668,7 @@ pub const Tower = struct {
             spawnFn(self, frame);
         }
         self.invested_gold += self.spec.gold_cost;
+        self.cooldown = timing.FrameTimer.initSeconds(frame, self.spec.cooldown);
     }
 
     fn update(self: *Tower, frame: u64) void {
@@ -669,6 +737,14 @@ const se_gun = SpriteEffectSpec{
 
 const se_sword = SpriteEffectSpec{
     .anim_set = anim.a_sword.animationSet(),
+};
+
+const se_staff = SpriteEffectSpec{
+    .anim_set = anim.a_staff.animationSet(),
+};
+
+const se_dagger = SpriteEffectSpec{
+    .anim_set = anim.a_dagger.animationSet(),
 };
 
 const se_hurt_generic = SpriteEffectSpec{
@@ -1294,7 +1370,6 @@ pub const World = struct {
             .spec = spec,
             .world_x = world_x,
             .world_y = world_y,
-            .cooldown = timing.FrameTimer.initSeconds(self.world_frame, 1),
         });
         self.towers.getPtr(id).spawn(self.world_frame);
         return id;
