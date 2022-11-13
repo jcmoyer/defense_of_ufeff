@@ -215,8 +215,10 @@ pub const Monster = struct {
             },
             .to_spawn => {
                 if (self.atEndOfPath()) {
+                    self.carrying_life = false;
                     self.world.recoverable_lives -= 1;
-                    self.dead = true;
+                    self.pathing_state = .to_goal;
+                    self.computePath();
                 } else {
                     self.beginPathingMove();
                 }
