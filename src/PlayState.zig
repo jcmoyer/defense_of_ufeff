@@ -82,6 +82,7 @@ const NextWaveTimer = struct {
     state_timer: FrameTimer = .{},
     wave_timer_text_buf: [32]u8 = undefined,
     wave_timer_text: []u8 = &[_]u8{},
+    text_measure: ?Rect = null,
 };
 
 const FingerRenderer = @import("FingerRenderer.zig");
@@ -1510,8 +1511,13 @@ fn endWipe(self: *PlayState) void {
 }
 
 fn renderWaveTimer(self: *PlayState, alpha: f64) void {
-    _ = alpha;
-    var rect = self.fontspec.measureText(self.wave_timer.wave_timer_text);
+    var rect: Rect = undefined;
+    if (self.wave_timer.text_measure) |m| {
+        rect = m;
+    } else {
+        rect = self.fontspec.measureText(self.wave_timer.wave_timer_text);
+        self.wave_timer.text_measure = rect;
+    }
     var box_rect = rect;
     box_rect.inflate(4, 4);
 
@@ -1521,9 +1527,12 @@ fn renderWaveTimer(self: *PlayState, alpha: f64) void {
     switch (self.wave_timer.state) {
         .middle_screen => {},
         .move_to_corner => {
-            const d = self.wave_timer.state_timer.progressClamped(self.world.world_frame);
-            box_rect.x = @floatToInt(i32, zm.lerpV(@intToFloat(f32, box_rect.x), 0.0, d));
-            box_rect.y = @floatToInt(i32, zm.lerpV(@intToFloat(f32, box_rect.y), 0.0, d));
+            const t0 = self.wave_timer.state_timer.invProgressClamped(std.math.max(self.world.world_frame -| 1, self.wave_timer.state_timer.frame_start));
+            const t1 = self.wave_timer.state_timer.invProgressClamped(self.world.world_frame);
+            const tx = zm.lerpV(t0, t1, @floatCast(f32, alpha));
+            const k = 1 - std.math.pow(f32, tx, 3);
+            box_rect.x = @floatToInt(i32, zm.lerpV(@intToFloat(f32, box_rect.x), 0.0, k));
+            box_rect.y = @floatToInt(i32, zm.lerpV(@intToFloat(f32, box_rect.y), 0.0, k));
         },
         .corner => {
             box_rect.x = 0;
@@ -1554,7 +1563,7 @@ fn renderWaveTimer(self: *PlayState, alpha: f64) void {
     });
     self.r_font.drawText(self.wave_timer.wave_timer_text, .{
         .dest = box_rect,
-        .color = @Vector(4, u8){ 255, 255, 255, std.math.min(@floatToInt(u8, total_alpha * 255), text_alpha) },
+        .color = @Vector(4, u8){ 255, 255, 255, @floatToInt(u8, total_alpha * @intToFloat(f32, text_alpha)) },
         .h_alignment = .center,
         .v_alignment = .middle,
     });
