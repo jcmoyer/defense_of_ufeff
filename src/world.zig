@@ -418,17 +418,13 @@ fn magicianUpdate(self: *Tower, frame: u64) void {
         const m = self.pickMonsterGeneric() orelse return;
         const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         const r = self.angleTo(p[0], p[1]);
-        self.setAssocEffectAngle(&se_staff, r - std.math.pi / 2.0, 10, 0.3);
+        self.swingEffect(&se_staff, r, 10, 0.3);
 
         self.world.playPositionalSound("assets/sounds/slash.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
         self.world.monsters.getPtr(m).hurtDirectionalGenericDamage(1, [2]f32{ std.math.cos(r), std.math.sin(r) });
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
-    } else {
-        if (self.assoc_effect) |eid| {
-            self.world.sprite_effects.getPtr(eid).post_angle -= (1.0 / 4.0);
-        }
     }
 }
 
@@ -447,17 +443,13 @@ fn soldierUpdate(self: *Tower, frame: u64) void {
         const m = self.pickMonsterGeneric() orelse return;
         const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         const r = self.angleTo(p[0], p[1]);
-        self.setAssocEffectAngle(&se_sword, r - std.math.pi / 2.0, 10, 0.3);
+        self.swingEffect(&se_sword, r, 10, 0.3);
 
         self.world.playPositionalSound("assets/sounds/slash.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
         self.world.monsters.getPtr(m).hurtDirectionalSlashDamage(3, [2]f32{ std.math.cos(r), std.math.sin(r) });
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
-    } else {
-        if (self.assoc_effect) |eid| {
-            self.world.sprite_effects.getPtr(eid).post_angle += (1.0 / 4.0);
-        }
     }
 }
 
@@ -477,18 +469,13 @@ fn rogueUpdate(self: *Tower, frame: u64) void {
         const m = self.pickMonsterGeneric() orelse return;
         const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         const r = self.angleTo(p[0], p[1]);
-        self.setAssocEffectAngle(&se_dagger, r, 10, 0.3);
+        self.stabEffect(&se_dagger, r, 10, 0.3);
 
         self.world.playPositionalSound("assets/sounds/stab.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
         self.world.monsters.getPtr(m).hurtDirectional(2, [2]f32{ std.math.cos(r), std.math.sin(r) });
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
-    } else {
-        if (self.assoc_effect) |eid| {
-            self.world.sprite_effects.getPtr(eid).offset_x *= 0.9;
-            self.world.sprite_effects.getPtr(eid).offset_y *= 0.9;
-        }
     }
 }
 
@@ -591,6 +578,24 @@ pub const Tower = struct {
 
     pub fn getWorldCollisionRect(self: Tower) Rect {
         return Rect.init(@intCast(i32, self.world_x), @intCast(i32, self.world_y), 16, 16);
+    }
+
+    pub fn swingEffect(self: *Tower, se_spec: *const SpriteEffectSpec, r: f32, offset: f32, effect_life_sec: f32) void {
+        if (std.math.cos(r) > 0) {
+            self.setAssocEffectAngle(se_spec, r - std.math.pi / 2.0, offset, effect_life_sec);
+            var effect = self.world.sprite_effects.getPtr(self.assoc_effect.?);
+            effect.angular_vel = 1.0 / 4.0;
+        } else {
+            self.setAssocEffectAngle(se_spec, r + std.math.pi / 2.0, offset, effect_life_sec);
+            var effect = self.world.sprite_effects.getPtr(self.assoc_effect.?);
+            effect.angular_vel = -1.0 / 4.0;
+        }
+    }
+
+    pub fn stabEffect(self: *Tower, se_spec: *const SpriteEffectSpec, r: f32, offset: f32, effect_life_sec: f32) void {
+        self.setAssocEffectAngle(se_spec, r, offset, effect_life_sec);
+        var effect = self.world.sprite_effects.getPtr(self.assoc_effect.?);
+        effect.offset_coef = 0.9;
     }
 
     pub fn setAssocEffectAngle(self: *Tower, se_spec: *const SpriteEffectSpec, r: f32, offset: f32, effect_life_sec: f32) void {
@@ -784,6 +789,8 @@ pub const SpriteEffect = struct {
     post_angle: f32 = 0,
     dead: bool = false,
     lifetime: ?timing.FrameTimer = null,
+    angular_vel: f32 = 0,
+    offset_coef: f32 = 1,
 
     fn spawn(self: *SpriteEffect, frame: u64) void {
         self.p_world_x = self.world_x;
@@ -804,6 +811,9 @@ pub const SpriteEffect = struct {
         self.p_offset_y = self.offset_y;
         self.p_angle = self.angle;
         self.p_post_angle = self.post_angle;
+        self.post_angle += self.angular_vel;
+        self.offset_x *= self.offset_coef;
+        self.offset_y *= self.offset_coef;
 
         if (self.animator) |*animator| {
             animator.update();
