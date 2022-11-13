@@ -38,6 +38,34 @@ pub const Background = union(enum) {
     color: ControlColor,
 };
 
+pub fn EventCallback(comptime ControlT: type) type {
+    return struct {
+        const Self = @This();
+
+        userdata: ?*anyopaque = null,
+        callback: ?*const fn (*ControlT, ?*anyopaque) void = null,
+
+        pub fn setCallback(self: *Self, userdata_ptr: anytype, comptime cb: *const fn (*ControlT, @TypeOf(userdata_ptr)) void) void {
+            const Ptr = @TypeOf(userdata_ptr);
+            const alignment = @typeInfo(Ptr).Pointer.alignment;
+            const Impl = struct {
+                fn callbackImpl(button: *ControlT, userdata: ?*anyopaque) void {
+                    var userdata_ptr_ = @ptrCast(Ptr, @alignCast(alignment, userdata));
+                    cb(button, userdata_ptr_);
+                }
+            };
+            self.userdata = userdata_ptr;
+            self.callback = Impl.callbackImpl;
+        }
+
+        pub fn invoke(self: *Self, control: *ControlT) void {
+            if (self.callback) |cb| {
+                cb(control, self.userdata);
+            }
+        }
+    };
+}
+
 pub const Panel = struct {
     root: *Root,
     children: std.ArrayListUnmanaged(Control),
@@ -93,8 +121,9 @@ pub const Button = struct {
     text: ?[]const u8,
     rect: Rect,
     background: Background = .none,
-    userdata: ?*anyopaque = null,
-    callback: ?*const fn (*Button, ?*anyopaque) void = null,
+    ev_click: EventCallback(Button) = .{},
+    ev_mouse_enter: EventCallback(Button) = .{},
+    ev_mouse_leave: EventCallback(Button) = .{},
     state: ButtonState = .normal,
     texture_rects: [4]Rect = .{
         // .normal
@@ -112,19 +141,6 @@ pub const Button = struct {
         self.root.allocator.destroy(self);
     }
 
-    pub fn setCallback(self: *Button, userdata_ptr: anytype, comptime cb: *const fn (*Button, @TypeOf(userdata_ptr)) void) void {
-        const Ptr = @TypeOf(userdata_ptr);
-        const alignment = @typeInfo(Ptr).Pointer.alignment;
-        const Impl = struct {
-            fn callbackImpl(button: *Button, userdata: ?*anyopaque) void {
-                var userdata_ptr_ = @ptrCast(Ptr, @alignCast(alignment, userdata));
-                cb(button, userdata_ptr_);
-            }
-        };
-        self.userdata = userdata_ptr;
-        self.callback = Impl.callbackImpl;
-    }
-
     pub fn handleMouseEnter(self: *Button) void {
         if (self.state != .disabled) {
             self.root.interaction_hint = .clickable;
@@ -132,6 +148,7 @@ pub const Button = struct {
         if (self.state == .normal) {
             self.state = .hover;
         }
+        self.ev_mouse_enter.invoke(self);
     }
 
     pub fn handleMouseLeave(self: *Button) void {
@@ -139,6 +156,7 @@ pub const Button = struct {
         if (self.state != .disabled) {
             self.state = .normal;
         }
+        self.ev_mouse_leave.invoke(self);
     }
 
     pub fn handleMouseDown(self: *Button, args: MouseEventArgs) void {
@@ -163,9 +181,7 @@ pub const Button = struct {
             return;
         }
         if (args.buttons.left) {
-            if (self.callback) |cb| {
-                cb(self, self.userdata);
-            }
+            self.ev_click.invoke(self);
         }
     }
 
@@ -729,13 +745,22 @@ pub const Root = struct {
     pub fn handleMouseMove(self: *Root, args: MouseEventArgs) bool {
         var handled: bool = false;
         if (self.findElementAt(args.x, args.y)) |result| {
+            // Mouse enter triggers on one of two conditions,
+            // 1) mousing from nothing onto a control
+            // 2) mousing from one control to a new one
+            var entering_new_control = false;
             if (self.hover) |h| {
                 if (result.control.instance != h.instance) {
                     h.handleMouseLeave();
+                    entering_new_control = true;
                 }
+            } else {
+                entering_new_control = true;
             }
             self.hover = result.control;
-            result.control.handleMouseEnter();
+            if (entering_new_control) {
+                result.control.handleMouseEnter();
+            }
             const local_args = MouseEventArgs{
                 .x = result.local_x,
                 .y = result.local_y,

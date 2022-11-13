@@ -68,7 +68,7 @@ fn addOption(self: *OptionsState, name: []const u8, cb: anytype, text: []const u
         // .disabled
         Rect.init(0, 64, 128, 32),
     };
-    button.setCallback(self, cb);
+    button.ev_click.setCallback(self, cb);
     try self.ui_root.addChild(button.control());
 
     self.next_option_y += option_height;
@@ -92,7 +92,7 @@ pub fn create(game: *Game) !*OptionsState {
     self.r_font = BitmapFont.init(&self.r_batch);
 
     var b_back = try self.ui_root.createButton();
-    b_back.setCallback(self, onBackClick);
+    b_back.ev_click.setCallback(self, onBackClick);
     b_back.rect = Rect.init(0, 0, 32, 32);
     b_back.rect.alignLeft(0);
     b_back.rect.alignBottom(Game.INTERNAL_HEIGHT);

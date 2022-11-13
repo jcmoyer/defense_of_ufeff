@@ -58,7 +58,7 @@ fn createMenuButton(self: *MenuState, comptime text: []const u8, comptime cb: an
         // .disabled
         Rect.init(0, 64, 128, 32),
     };
-    btn.setCallback(self, cb);
+    btn.ev_click.setCallback(self, cb);
     try self.ui_root.addChild(btn.control());
     return btn;
 }
@@ -94,8 +94,7 @@ pub fn create(game: *Game) !*MenuState {
         Rect.init(208, 48, 16, 16),
     };
     self.ui_tip.rect = Rect.init(0, 0, 16, 16);
-    self.ui_tip.callback = onButtonClick;
-    self.ui_tip.userdata = self;
+    self.ui_tip.ev_click.setCallback(self, onButtonClick);
     self.ui_tip.rect.alignRight(Game.INTERNAL_WIDTH);
     self.ui_tip.rect.alignBottom(Game.INTERNAL_HEIGHT);
     self.ui_tip.rect.translate(-8, -8);
@@ -128,11 +127,10 @@ fn onQuitClick(button: *ui.Button, self: *MenuState) void {
     self.game.quit();
 }
 
-fn onButtonClick(button: *ui.Button, userdata: ?*anyopaque) void {
+fn onButtonClick(button: *ui.Button, self: *MenuState) void {
     _ = button;
-    var data = @ptrCast(*MenuState, @alignCast(@alignOf(MenuState), userdata));
-    data.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
-    data.showRandomTip();
+    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
+    self.showRandomTip();
 }
 
 fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.BitmapFontSpec {

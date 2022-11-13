@@ -50,6 +50,7 @@ const InteractStateBuild = struct {
 
 const InteractStateSelect = struct {
     selected_tower: u32,
+    hovered_spec: ?*const wo.TowerSpec = null,
 };
 
 const InteractState = union(enum) {
@@ -240,7 +241,7 @@ pub fn create(game: *Game) !*PlayState {
     b_wall.rect = Rect.init(16, 144, 32, 32);
     b_wall.texture_rects = makeStandardButtonRects(0, 0);
     b_wall.setTexture(self.t_wall);
-    b_wall.setCallback(self, onWallClick);
+    b_wall.ev_click.setCallback(self, onWallClick);
     try ui_panel.addChild(b_wall.control());
 
     var b_tower = try self.ui_root.createButton();
@@ -248,7 +249,7 @@ pub fn create(game: *Game) !*PlayState {
     b_tower.rect = Rect.init(48, 144, 32, 32);
     b_tower.texture_rects = makeStandardButtonRects(0, 0);
     b_tower.setTexture(self.t_soldier);
-    b_tower.setCallback(self, onTowerClick);
+    b_tower.ev_click.setCallback(self, onTowerClick);
     try ui_panel.addChild(b_tower.control());
 
     self.ui_minimap = try self.ui_root.createMinimap();
@@ -276,21 +277,21 @@ pub fn create(game: *Game) !*PlayState {
     self.btn_pause_resume.texture_rects = makeStandardButtonRects(0, 0);
     self.btn_pause_resume.tooltip_text = "Pause";
     try ui_panel.addChild(self.btn_pause_resume.control());
-    self.btn_pause_resume.setCallback(self, onPauseClick);
+    self.btn_pause_resume.ev_click.setCallback(self, onPauseClick);
 
     self.btn_fastforward = try self.ui_root.createButton();
     self.btn_fastforward.setTexture(self.t_fast_off);
     self.btn_fastforward.rect = Rect.init(48, 208, 32, 32);
     self.btn_fastforward.texture_rects = makeStandardButtonRects(0, 0);
     self.btn_fastforward.tooltip_text = "Fast-forward";
-    self.btn_fastforward.setCallback(self, onFastForwardClick);
+    self.btn_fastforward.ev_click.setCallback(self, onFastForwardClick);
     try ui_panel.addChild(self.btn_fastforward.control());
 
     self.btn_demolish = try self.ui_root.createButton();
     self.btn_demolish.setTexture(self.t_demolish);
     self.btn_demolish.rect = Rect.init(16, 176, 32, 32);
     self.btn_demolish.tooltip_text = "Demolish\n\nReturns 50% of the total gold\ninvested into the tower.";
-    self.btn_demolish.setCallback(self, onDemolishClick);
+    self.btn_demolish.ev_click.setCallback(self, onDemolishClick);
     try ui_panel.addChild(self.btn_demolish.control());
 
     self.ui_upgrade_panel = try self.ui_root.createPanel();
@@ -308,11 +309,13 @@ pub fn create(game: *Game) !*PlayState {
         // only first 3 buttons are upgrades, 4th is demolish
         if (i < 3) {
             b.*.setTexture(button_base);
-            b.*.setCallback(&self.ui_upgrade_states[i], onUpgradeClick);
+            b.*.ev_click.setCallback(&self.ui_upgrade_states[i], onUpgradeClick);
+            b.*.ev_mouse_enter.setCallback(&self.ui_upgrade_states[i], onUpgradeMouseEnter);
+            b.*.ev_mouse_leave.setCallback(&self.ui_upgrade_states[i], onUpgradeMouseLeave);
         } else if (i == 3) {
             b.*.setTexture(self.t_demolish);
             b.*.tooltip_text = "Demolish\n\nReturns 50% of the total gold\ninvested into the tower.";
-            b.*.setCallback(self, onUpgradeDemolishClick);
+            b.*.ev_click.setCallback(self, onUpgradeDemolishClick);
         }
     }
 
@@ -374,6 +377,20 @@ fn onUpgradeClick(button: *ui.Button, upgrade: *UpgradeButtonState) void {
         upgrade.play_state.world.towers.getPtr(upgrade.tower_id).upgradeInto(upgrade.tower_spec);
         upgrade.play_state.updateUpgradeButtons();
     }
+}
+
+fn onUpgradeMouseEnter(button: *ui.Button, upgrade: *UpgradeButtonState) void {
+    if (button.state == .disabled) {
+        return;
+    }
+    upgrade.play_state.interact_state.select.hovered_spec = upgrade.tower_spec;
+}
+
+fn onUpgradeMouseLeave(button: *ui.Button, upgrade: *UpgradeButtonState) void {
+    if (button.state == .disabled) {
+        return;
+    }
+    upgrade.play_state.interact_state.select.hovered_spec = null;
 }
 
 fn onUpgradeDemolishClick(button: *ui.Button, self: *PlayState) void {
@@ -1093,7 +1110,7 @@ fn renderRangeIndicator(self: *PlayState, cam: Camera) void {
         return;
     }
     const selected_tower = self.world.towers.getPtr(self.interact_state.select.selected_tower);
-    const selected_spec = selected_tower.spec;
+    const selected_spec = if (self.interact_state.select.hovered_spec) |hovered| hovered else selected_tower.spec;
     const p = selected_tower.getWorldCollisionRect().centerPoint();
     self.renderRangeIndicatorForTower(cam, selected_spec, p[0], p[1]);
 }
