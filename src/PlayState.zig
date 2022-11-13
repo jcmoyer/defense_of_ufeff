@@ -509,9 +509,9 @@ pub fn render(self: *PlayState, alpha: f64) void {
     cam_interp.clampToBounds();
 
     self.renderTilemap(cam_interp);
+    self.renderGoal(cam_interp, alpha);
     self.renderMonsters(cam_interp, alpha);
     self.renderStolenHearts(cam_interp, alpha);
-    self.renderGoal(cam_interp, alpha);
     self.renderTowers(cam_interp);
     self.renderSpriteEffects(cam_interp, alpha);
     self.renderProjectiles(cam_interp, alpha);
