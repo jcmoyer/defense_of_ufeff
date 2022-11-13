@@ -13,6 +13,7 @@ const AudioSystem = @import("audio.zig").AudioSystem;
 const MenuState = @import("MenuState.zig");
 const PlayState = @import("PlayState.zig");
 const OptionsState = @import("OptionsState.zig");
+const ui = @import("ui.zig");
 const InputState = @import("input.zig").InputState;
 const Rect = @import("Rect.zig");
 
@@ -47,6 +48,8 @@ output_scale_x: f32 = 2,
 output_scale_y: f32 = 2,
 output_rect: Rect = .{},
 
+sdl_backend: ui.SDLBackend,
+
 input: InputState,
 
 pub const StateId = enum {
@@ -71,6 +74,7 @@ pub fn create(allocator: Allocator) !*Game {
         .st_menu = undefined,
         .st_play = undefined,
         .st_options = undefined,
+        .sdl_backend = undefined,
     };
 
     if (sdl.SDL_Init(sdl.SDL_INIT_EVERYTHING) != 0) {
@@ -116,6 +120,7 @@ pub fn create(allocator: Allocator) !*Game {
         std.process.exit(1);
     };
 
+    ptr.sdl_backend = ui.SDLBackend.init(ptr.window);
     ptr.input = InputState.init();
     ptr.texman = TextureManager.init(allocator);
     ptr.imm = ImmRenderer.create();
@@ -149,6 +154,7 @@ pub fn destroy(self: *Game) void {
     self.st_options.destroy();
     self.texman.deinit();
     self.audio.destroy();
+    self.sdl_backend.deinit();
     sdl.SDL_GL_DeleteContext(self.context);
     sdl.SDL_DestroyWindow(self.window);
     sdl.SDL_Quit();
@@ -214,6 +220,10 @@ pub fn handleEvent(self: *Game, ev: sdl.SDL_Event) void {
     } else if (ev.type == .SDL_MOUSEMOTION) {
         self.input.mouse.client_x = ev.motion.x;
         self.input.mouse.client_y = ev.motion.y;
+    } else if (ev.type == .SDL_KEYDOWN) {
+        if (ev.key.keysym.scancode == sdl.SDL_SCANCODE_RETURN and (sdl.SDL_GetModState() & sdl.KMOD_LALT) > 0) {
+            self.toggleFullscreen();
+        }
     }
 
     self.stateDispatchEvent(self.current_state.?, ev);
@@ -288,6 +298,10 @@ fn performLayout(self: *Game) void {
     self.output_scale_y = @intToFloat(f32, self.output_rect.h) / INTERNAL_HEIGHT;
 
     log.debug("New scale {d}, {d}", .{ self.output_scale_x, self.output_scale_y });
+
+    self.sdl_backend.client_rect = self.output_rect;
+    self.sdl_backend.coord_scale_x = self.output_scale_x;
+    self.sdl_backend.coord_scale_y = self.output_scale_y;
 }
 
 fn initFramebuffer(self: *Game) void {

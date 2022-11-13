@@ -189,7 +189,7 @@ pub fn create(game: *Game) !*PlayState {
         .fontspec_numbers = undefined,
         .r_finger = FingerRenderer.create(),
         .r_quad = QuadBatch.create(),
-        .ui_root = ui.Root.init(game.allocator, ui.SDLBackend.init(game.window)),
+        .ui_root = ui.Root.init(game.allocator, &game.sdl_backend),
         .t_minimap = game.texman.createInMemory(),
         // Created/destroyed in update()
         .frame_arena = undefined,
@@ -424,9 +424,6 @@ pub fn destroy(self: *PlayState) void {
 
 pub fn enter(self: *PlayState, from: ?Game.StateId) void {
     _ = from;
-    self.ui_root.backend.client_rect = self.game.output_rect;
-    self.ui_root.backend.coord_scale_x = self.game.output_scale_x;
-    self.ui_root.backend.coord_scale_y = self.game.output_scale_y;
     self.setInitialUIState();
     self.beginWipe();
     self.loadWorld("map01");

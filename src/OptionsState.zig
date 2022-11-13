@@ -30,7 +30,7 @@ ui_root: ui.Root,
 
 next_option_y: i32 = 50,
 
-fullscreen: bool = false,
+btn_fullscreen: *ui.Button,
 scale_index: usize = 1,
 scale_text: [1]u8 = undefined,
 
@@ -85,7 +85,9 @@ pub fn create(game: *Game) !*OptionsState {
         .r_batch = SpriteBatch.create(),
         .r_font = undefined,
         .fontspec = undefined,
-        .ui_root = ui.Root.init(game.allocator, ui.SDLBackend.init(game.window)),
+        .ui_root = ui.Root.init(game.allocator, &game.sdl_backend),
+        // Initialized below
+        .btn_fullscreen = undefined,
     };
     self.r_font = BitmapFont.init(&self.r_batch);
 
@@ -99,7 +101,8 @@ pub fn create(game: *Game) !*OptionsState {
     b_back.setTexture(self.game.texman.getNamedTexture("button_base.png"));
     try self.ui_root.addChild(b_back.control());
 
-    _ = try self.addOption("Fullscreen", onFullscreenChange, "no", null);
+    var fullscreen = try self.addOption("Fullscreen", onFullscreenChange, "no", "Alt+Enter anywhere");
+    self.btn_fullscreen = fullscreen.button;
     _ = try self.addOption("Scale", onScaleChange, "2", "Windowed only");
     var meme = try self.addOption("Jump", onScaleChange, "Alt", "Nice corndog");
     meme.button.state = .disabled;
@@ -117,9 +120,9 @@ fn onBackClick(button: *ui.Button, self: *OptionsState) void {
 }
 
 fn onFullscreenChange(button: *ui.Button, self: *OptionsState) void {
+    _ = button;
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.game.toggleFullscreen();
-    button.text = if (self.game.isFullscreen()) "yes" else "no";
     self.ui_root.backend.client_rect = self.game.output_rect;
     self.ui_root.backend.coord_scale_x = self.game.output_scale_x;
     self.ui_root.backend.coord_scale_y = self.game.output_scale_y;
@@ -155,10 +158,8 @@ pub fn destroy(self: *OptionsState) void {
 }
 
 pub fn enter(self: *OptionsState, from: ?Game.StateId) void {
+    _ = self;
     _ = from;
-    self.ui_root.backend.client_rect = self.game.output_rect;
-    self.ui_root.backend.coord_scale_x = self.game.output_scale_x;
-    self.ui_root.backend.coord_scale_y = self.game.output_scale_y;
 }
 
 pub fn leave(self: *OptionsState, to: ?Game.StateId) void {
@@ -169,6 +170,7 @@ pub fn leave(self: *OptionsState, to: ?Game.StateId) void {
 pub fn update(self: *OptionsState) void {
     // hehe
     self.game.st_menu.update();
+    self.btn_fullscreen.text = if (self.game.isFullscreen()) "yes" else "no";
 }
 
 pub fn render(self: *OptionsState, alpha: f64) void {

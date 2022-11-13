@@ -70,7 +70,7 @@ pub fn create(game: *Game) !*MenuState {
         .r_batch = SpriteBatch.create(),
         .r_font = undefined,
         .fontspec = undefined,
-        .ui_root = ui.Root.init(game.allocator, ui.SDLBackend.init(game.window)),
+        .ui_root = ui.Root.init(game.allocator, &game.sdl_backend),
         .rng = std.rand.DefaultPrng.init(@intCast(u64, std.time.milliTimestamp())),
         // Initialized below
         .ui_tip = undefined,
@@ -151,10 +151,8 @@ pub fn destroy(self: *MenuState) void {
 }
 
 pub fn enter(self: *MenuState, from: ?Game.StateId) void {
+    _ = self;
     _ = from;
-    self.ui_root.backend.client_rect = self.game.output_rect;
-    self.ui_root.backend.coord_scale_x = self.game.output_scale_x;
-    self.ui_root.backend.coord_scale_y = self.game.output_scale_y;
 }
 
 pub fn leave(self: *MenuState, to: ?Game.StateId) void {

@@ -651,9 +651,9 @@ pub const Root = struct {
     mouse_down_control: ?Control = null,
     tooltip_text: ?[]const u8 = null,
     interaction_hint: InteractionHint = .none,
-    backend: SDLBackend,
+    backend: *SDLBackend,
 
-    pub fn init(allocator: Allocator, backend: SDLBackend) Root {
+    pub fn init(allocator: Allocator, backend: *SDLBackend) Root {
         return .{
             .allocator = allocator,
             .children = .{},
@@ -866,7 +866,7 @@ pub const SDLBackend = struct {
         };
     }
 
-    fn deinit(self: *SDLBackend) void {
+    pub fn deinit(self: *SDLBackend) void {
         if (self.c_hand) |hand| {
             sdl.SDL_FreeCursor(hand);
         }
