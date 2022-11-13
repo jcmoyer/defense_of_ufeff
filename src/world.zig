@@ -344,6 +344,13 @@ pub const Monster = struct {
         self.world.sprite_effects.getPtr(se_id).world_y -= std.math.sin(self.world.sprite_effects.getPtr(se_id).angle) * 8.0;
     }
 
+    pub fn hurtDirectionalSlashDamage(self: *Monster, amt: u32, dir: [2]f32) void {
+        const p = self.getWorldCollisionRect().centerPoint();
+        self.world.playPositionalSound("assets/sounds/slash_hit.ogg", p[0], p[1]);
+        self.hurtDirectional(amt, dir);
+        _ = self.world.spawnSpriteEffect(&se_hurt_slash, p[0], p[1]) catch unreachable;
+    }
+
     pub fn kill(self: *Monster) void {
         self.dead = true;
         if (self.carrying_life) {
@@ -408,7 +415,9 @@ fn soldierUpdate(self: *Tower, frame: u64) void {
         const r = self.angleTo(p[0], p[1]);
         self.setAssocEffectAngle(&se_sword, r - std.math.pi / 2.0, 10, 0.3);
 
-        self.world.monsters.getPtr(m).hurtDirectionalGenericDamage(3, [2]f32{ std.math.cos(r), std.math.sin(r) });
+        self.world.playPositionalSound("assets/sounds/slash.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
+
+        self.world.monsters.getPtr(m).hurtDirectionalSlashDamage(3, [2]f32{ std.math.cos(r), std.math.sin(r) });
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
     } else {
@@ -663,6 +672,10 @@ const se_sword = SpriteEffectSpec{
 
 const se_hurt_generic = SpriteEffectSpec{
     .anim_set = anim.a_hurt_generic.animationSet(),
+};
+
+const se_hurt_slash = SpriteEffectSpec{
+    .anim_set = anim.a_hurt_slash.animationSet(),
 };
 
 pub const SpriteEffectSpec = struct {

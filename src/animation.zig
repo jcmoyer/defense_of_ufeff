@@ -369,6 +369,27 @@ pub const a_hurt_generic = StaticAnimationSet(&[1]StaticAnimationDef{.{
     },
 }}){};
 
+pub const a_hurt_slash = StaticAnimationSet(&[1]StaticAnimationDef{.{
+    .name = "default",
+    .animation = Animation{
+        .loop = false,
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(64, 128, 16, 16),
+                .time = 1,
+            },
+            .{
+                .rect = Rect.init(80, 128, 16, 16),
+                .time = 1,
+            },
+            .{
+                .rect = Rect.init(96, 128, 16, 16),
+                .time = 1,
+            },
+        },
+    },
+}}){};
+
 pub const a_goal = StaticAnimationSet(&[1]StaticAnimationDef{.{
     .name = "default",
     .animation = Animation{
