@@ -860,6 +860,21 @@ pub const WaveEventList = struct {
     fn remainingEventCount(self: WaveEventList) usize {
         return self.events.len - self.current_event;
     }
+
+    fn getDuration(self: WaveEventList) f32 {
+        var total: f32 = 0;
+        for (self.events) |e| {
+            switch (e) {
+                .spawn => |s| {
+                    total += @intToFloat(f32, s.repeat * s.time);
+                },
+                .wait => |w| {
+                    total += @intToFloat(f32, w.time);
+                },
+            }
+        }
+        return total;
+    }
 };
 
 pub const Wave = struct {
@@ -904,6 +919,14 @@ pub const WaveList = struct {
 
     fn startWave(self: WaveList, num: usize, frame: u64) void {
         self.waves[num].start(frame);
+    }
+
+    fn getWaveDuration(self: WaveList, num: usize) f32 {
+        var max: f32 = 0;
+        for (self.waves[num].spawn_events.values()) |list| {
+            max = std.math.max(max, list.getDuration());
+        }
+        return max;
     }
 
     fn deinit(self: *WaveList, allocator: Allocator) void {
@@ -1280,6 +1303,9 @@ pub const World = struct {
     pub fn startNextWave(self: *World) bool {
         if (self.next_wave < self.waves.waves.len) {
             self.startWave(self.next_wave);
+            if (self.next_wave + 1 < self.waves.waves.len) {
+                self.next_wave_timer = timing.FrameTimer.initSeconds(self.world_frame, self.waves.getWaveDuration(self.next_wave));
+            }
             self.next_wave += 1;
             return true;
         } else {

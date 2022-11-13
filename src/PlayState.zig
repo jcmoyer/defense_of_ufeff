@@ -80,9 +80,22 @@ const NextWaveTimerState = enum {
 const NextWaveTimer = struct {
     state: NextWaveTimerState = .middle_screen,
     state_timer: FrameTimer = .{},
-    wave_timer_text_buf: [32]u8 = undefined,
+    wave_timer_text_buf: [24]u8 = undefined,
     wave_timer_text: []u8 = &[_]u8{},
-    text_measure: ?Rect = null,
+    text_measure: Rect = Rect.init(0, 0, 0, 0),
+    fontspec: *const bmfont.BitmapFontSpec,
+
+    fn setTimerText(self: *NextWaveTimer, sec: f32) void {
+        const mod_sec = @floatToInt(u32, sec) % 60;
+        const min = @floatToInt(u32, sec) / 60;
+        std.debug.assert(mod_sec < 60);
+        std.debug.assert(min <= 99);
+
+        self.wave_timer_text = std.fmt.bufPrint(&self.wave_timer_text_buf, "Next wave in {d:0>2}:{d:0>2}", .{ min, mod_sec }) catch unreachable;
+        if (self.text_measure.w == 0) {
+            self.text_measure = self.fontspec.measureText(self.wave_timer_text);
+        }
+    }
 };
 
 const FingerRenderer = @import("FingerRenderer.zig");
@@ -126,7 +139,7 @@ ui_upgrade_buttons: [4]*ui.Button,
 ui_upgrade_states: [3]UpgradeButtonState,
 fast: bool = false,
 music_params: ?*audio.AudioParameters = null,
-wave_timer: NextWaveTimer = .{},
+wave_timer: NextWaveTimer,
 
 paused: bool = false,
 
@@ -199,6 +212,7 @@ pub fn create(game: *Game) !*PlayState {
         .t_resume = undefined,
         .t_demolish = undefined,
         .button_generator = undefined,
+        .wave_timer = undefined,
     };
     self.r_font = BitmapFont.init(&self.r_batch);
 
@@ -306,6 +320,11 @@ pub fn create(game: *Game) !*PlayState {
     // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
     self.fontspec = try loadFontSpec(self.game.allocator, "assets/tables/CommonCase.json");
     self.fontspec_numbers = try loadFontSpec(self.game.allocator, "assets/tables/floating_text.json");
+
+    self.wave_timer = .{
+        .fontspec = &self.fontspec,
+    };
+
     return self;
 }
 
@@ -408,6 +427,7 @@ pub fn enter(self: *PlayState, from: ?Game.StateId) void {
     self.ui_root.backend.client_rect = self.game.output_rect;
     self.ui_root.backend.coord_scale_x = self.game.output_scale_x;
     self.ui_root.backend.coord_scale_y = self.game.output_scale_y;
+    self.setInitialUIState();
     self.beginWipe();
     self.loadWorld("map01");
 }
@@ -484,9 +504,7 @@ pub fn update(self: *PlayState) void {
 fn updateUI(self: *PlayState) void {
     self.ui_gold.text = std.fmt.bufPrint(&self.gold_text, "${d}", .{self.world.player_gold}) catch unreachable;
     self.ui_lives.text = std.fmt.bufPrint(&self.lives_text, "\x03{d}", .{self.world.lives_at_goal}) catch unreachable;
-    self.wave_timer.wave_timer_text = std.fmt.bufPrint(&self.wave_timer.wave_timer_text_buf, "Next wave in 00:{d:0>2}", .{
-        @floatToInt(u32, self.world.next_wave_timer.remainingSeconds(self.world.world_frame)),
-    }) catch unreachable;
+    self.wave_timer.setTimerText(self.world.next_wave_timer.remainingSeconds(self.world.world_frame));
     self.updateUpgradeButtons();
     if (self.wave_timer.state == .middle_screen and self.wave_timer.state_timer.expired(self.world.world_frame)) {
         self.wave_timer.state = .move_to_corner;
@@ -1511,13 +1529,7 @@ fn endWipe(self: *PlayState) void {
 }
 
 fn renderWaveTimer(self: *PlayState, alpha: f64) void {
-    var rect: Rect = undefined;
-    if (self.wave_timer.text_measure) |m| {
-        rect = m;
-    } else {
-        rect = self.fontspec.measureText(self.wave_timer.wave_timer_text);
-        self.wave_timer.text_measure = rect;
-    }
+    var rect = self.wave_timer.text_measure;
     var box_rect = rect;
     box_rect.inflate(4, 4);
 
@@ -1568,4 +1580,14 @@ fn renderWaveTimer(self: *PlayState, alpha: f64) void {
         .v_alignment = .middle,
     });
     self.r_font.end();
+}
+
+fn setInitialUIState(self: *PlayState) void {
+    self.paused = false;
+    self.fast = false;
+    self.btn_pause_resume.setTexture(self.t_pause);
+    self.btn_fastforward.setTexture(self.t_fast_off);
+    self.wave_timer = .{
+        .fontspec = &self.fontspec,
+    };
 }
