@@ -267,14 +267,14 @@ pub const Minimap = struct {
     }
 
     fn handleMouseEvent(self: *Minimap, args: MouseEventArgs) void {
-        const cr = self.computeClickableRect();
-        const p = cr.clampPoint(args.x, args.y);
+        var cr = self.computeClickableRect();
+        const p = cr.clampPoint(args.x - cr.left(), args.y - cr.top());
         if (args.buttons.left) {
             const crf = cr.toRectf();
             const xf = @intToFloat(f32, p[0]);
             const yf = @intToFloat(f32, p[1]);
-            const percent_x = (xf - crf.left()) / crf.w;
-            const percent_y = (yf - crf.top()) / crf.h;
+            const percent_x = xf / crf.w;
+            const percent_y = yf / crf.h;
             if (self.pan_callback) |cb| {
                 cb(self, self.pan_userdata, percent_x, percent_y);
             }
@@ -328,7 +328,11 @@ pub const Minimap = struct {
     }
 
     fn computeClickableRect(self: *Minimap) Rect {
-        const rect = self.rect;
+        var rect = self.rect;
+        // remember rect is relative to parent, so we make it local space
+        rect.x = 0;
+        rect.y = 0;
+
         const background = self.getBackground();
         if (background != .texture) {
             return .{};
@@ -695,7 +699,7 @@ pub const Root = struct {
                 }
                 if (child.interactRect()) |rect| {
                     if (rect.contains(x, y)) {
-                        return self.findElementChild(child, x, y);
+                        return self.findElementChild(child, x - rect.x, y - rect.y);
                     }
                 }
             }
@@ -1024,6 +1028,12 @@ fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRe
     if (control.supportsCustomRender()) {
         // nasty temporary but we die of const poisoning otherwise
         var rs = renderstate;
+
+        if (control.interactRect()) |rect| {
+            rs.translate_x += rect.x;
+            rs.translate_y += rect.y;
+        }
+
         control.customRender(rs.createRenderContext());
     } else {
         if (control.interactRect()) |rect| {

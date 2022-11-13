@@ -391,8 +391,8 @@ fn onDemolishClick(button: *ui.Button, self: *PlayState) void {
 
 fn onMinimapPan(_: *ui.Minimap, self: *PlayState, x: f32, y: f32) void {
     self.camera.view.centerOn(
-        @floatToInt(i32, x * @intToFloat(f32, self.camera.bounds.w)),
-        @floatToInt(i32, y * @intToFloat(f32, self.camera.bounds.h)),
+        @floatToInt(i32, x * @intToFloat(f32, self.camera.bounds.w)) + self.camera.bounds.x,
+        @floatToInt(i32, y * @intToFloat(f32, self.camera.bounds.h)) + self.camera.bounds.y,
     );
     self.camera.clampToBounds();
 }
