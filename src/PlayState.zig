@@ -487,8 +487,11 @@ pub fn update(self: *PlayState) void {
     }
 
     if (self.music_params) |params| {
-        if (self.sub == .wipe_fadein and !params.loaded.load(.SeqCst)) {
-            self.beginWipe();
+        const builtin = @import("builtin");
+        if (builtin.mode == .Debug) {} else {
+            if (self.sub == .wipe_fadein and !params.loaded.load(.SeqCst)) {
+                self.beginWipe();
+            }
         }
     }
 

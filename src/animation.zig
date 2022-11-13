@@ -336,6 +336,30 @@ pub const a_bow = StaticAnimationSet(&[1]StaticAnimationDef{.{
     },
 }}){};
 
+pub const a_battleaxe = StaticAnimationSet(&[1]StaticAnimationDef{.{
+    .name = "default",
+    .animation = Animation{
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(8 * 16, 8 * 16, 16, 16),
+                .time = 8,
+            },
+        },
+    },
+}}){};
+
+pub const a_spear = StaticAnimationSet(&[1]StaticAnimationDef{.{
+    .name = "default",
+    .animation = Animation{
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(9 * 16, 8 * 16, 16, 16),
+                .time = 8,
+            },
+        },
+    },
+}}){};
+
 pub const a_gun = StaticAnimationSet(&[1]StaticAnimationDef{.{
     .name = "default",
     .animation = Animation{
