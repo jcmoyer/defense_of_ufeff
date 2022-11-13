@@ -543,6 +543,11 @@ pub fn render(self: *PlayState, alpha: f64) void {
         self.renderPlacementIndicator(cam_interp);
         self.renderDemolishIndicator(cam_interp);
     }
+
+    if (self.deb_render_tile_collision) {
+        self.debugRenderTileCollision(cam_interp);
+    }
+
     ui.renderUI(.{
         .r_batch = &self.r_batch,
         .r_font = &self.r_font,
@@ -550,10 +555,6 @@ pub fn render(self: *PlayState, alpha: f64) void {
         .font_texture = self.game.texman.getNamedTexture("CommonCase.png"),
         .font_spec = &self.fontspec,
     }, self.ui_root);
-
-    if (self.deb_render_tile_collision) {
-        self.debugRenderTileCollision(cam_interp);
-    }
 
     self.r_quad.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
     for (self.world.spawns.slice()) |*s| {
