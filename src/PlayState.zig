@@ -538,6 +538,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.renderBlockedConstructionRects(cam_interp);
     self.renderGrid(cam_interp);
     self.renderSelection(cam_interp);
+    self.renderRangeIndicator(cam_interp);
     self.renderWaveTimer(alpha);
     if (!self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
         self.renderPlacementIndicator(cam_interp);
@@ -1071,6 +1072,32 @@ fn mouseToTile(self: *PlayState) tilemap.TileCoord {
     return tilemap.TileCoord.initSignedWorld(p[0], p[1]);
 }
 
+fn renderRangeIndicatorForTower(self: *PlayState, cam: Camera, spec: *const wo.TowerSpec, world_x: i32, world_y: i32) void {
+    self.game.imm.beginUntextured();
+    self.game.imm.drawCircle(
+        32,
+        zm.f32x4(@intToFloat(f32, world_x - cam.view.left()), @intToFloat(f32, world_y - cam.view.top()), 0, 0),
+        spec.min_range,
+        zm.f32x4(1, 0, 0, 1),
+    );
+    self.game.imm.drawCircle(
+        32,
+        zm.f32x4(@intToFloat(f32, world_x - cam.view.left()), @intToFloat(f32, world_y - cam.view.top()), 0, 0),
+        spec.max_range,
+        zm.f32x4(0, 1, 0, 1),
+    );
+}
+
+fn renderRangeIndicator(self: *PlayState, cam: Camera) void {
+    if (self.interact_state != .select) {
+        return;
+    }
+    const selected_tower = self.world.towers.getPtr(self.interact_state.select.selected_tower);
+    const selected_spec = selected_tower.spec;
+    const p = selected_tower.getWorldCollisionRect().centerPoint();
+    self.renderRangeIndicatorForTower(cam, selected_spec, p[0], p[1]);
+}
+
 fn renderPlacementIndicator(self: *PlayState, cam: Camera) void {
     if (self.interact_state != .build) {
         return;
@@ -1087,18 +1114,9 @@ fn renderPlacementIndicator(self: *PlayState, cam: Camera) void {
     self.game.imm.beginUntextured();
     self.game.imm.drawQuadRGBA(dest, color);
 
-    self.game.imm.drawCircle(
-        32,
-        zm.f32x4(@intToFloat(f32, dest.x + 8), @intToFloat(f32, dest.y + 8), 0, 0),
-        self.interact_state.build.tower_spec.min_range,
-        zm.f32x4(1, 0, 0, 1),
-    );
-    self.game.imm.drawCircle(
-        32,
-        zm.f32x4(@intToFloat(f32, dest.x + 8), @intToFloat(f32, dest.y + 8), 0, 0),
-        self.interact_state.build.tower_spec.max_range,
-        zm.f32x4(0, 1, 0, 1),
-    );
+    const tower_center_x = @intCast(i32, tc.worldX() + 8);
+    const tower_center_y = @intCast(i32, tc.worldY() + 8);
+    self.renderRangeIndicatorForTower(cam, self.interact_state.build.tower_spec, tower_center_x, tower_center_y);
 }
 
 fn renderDemolishIndicator(self: *PlayState, cam: Camera) void {
