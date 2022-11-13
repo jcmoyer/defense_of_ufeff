@@ -403,18 +403,17 @@ pub const t_soldier = TowerSpec{
 
 fn soldierUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
-        self.killAssocEffect();
         const m = self.pickMonsterGeneric() orelse return;
         const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         const r = self.angleTo(p[0], p[1]);
-        self.setAssocEffectAimed(&se_sword, p[0], p[1], 10);
+        self.setAssocEffectAngle(&se_sword, r - std.math.pi / 2.0, 10, 0.3);
 
         self.world.monsters.getPtr(m).hurtDirectionalGenericDamage(3, [2]f32{ std.math.cos(r), std.math.sin(r) });
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
     } else {
         if (self.assoc_effect) |eid| {
-            self.world.sprite_effects.getPtr(eid).post_angle += (1.0 / 8.0);
+            self.world.sprite_effects.getPtr(eid).post_angle += (1.0 / 4.0);
         }
     }
 }
@@ -440,7 +439,7 @@ fn archerUpdate(self: *Tower, frame: u64) void {
 
         self.world.playPositionalSound("assets/sounds/bow.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
-        self.setAssocEffectAimed(&se_bow, target[0], target[1], 6);
+        self.setAssocEffectAimed(&se_bow, target[0], target[1], 6, 1);
         var proj = self.fireProjectileTowards(&proj_arrow, target[0], target[1]);
         proj.damage = 2;
         self.lookTowards(target[0], target[1]);
@@ -469,7 +468,7 @@ fn gunnerUpdate(self: *Tower, frame: u64) void {
 
         self.world.playPositionalSound("assets/sounds/gun.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
-        self.setAssocEffectAimed(&se_gun, target[0], target[1], 6);
+        self.setAssocEffectAimed(&se_gun, target[0], target[1], 6, 1);
         var proj = self.fireProjectileTowards(&proj_bullet, target[0], target[1]);
         proj.damage = 5;
         self.lookTowards(target[0], target[1]);
@@ -518,16 +517,20 @@ pub const Tower = struct {
         return Rect.init(@intCast(i32, self.world_x), @intCast(i32, self.world_y), 16, 16);
     }
 
-    pub fn setAssocEffectAimed(self: *Tower, se_spec: *const SpriteEffectSpec, world_x: i32, world_y: i32, offset: f32) void {
-        const r = self.angleTo(world_x, world_y);
+    pub fn setAssocEffectAngle(self: *Tower, se_spec: *const SpriteEffectSpec, r: f32, offset: f32, effect_life_sec: f32) void {
         const basis_x = self.world_x + 8;
         const basis_y = self.world_y + 8;
 
         if (self.assoc_effect == null) {
             self.assoc_effect = self.world.spawnSpriteEffect(se_spec, @intCast(i32, basis_x), @intCast(i32, basis_y)) catch unreachable;
         }
-
         self.world.sprite_effects.getPtr(self.assoc_effect.?).setAngleOffset(r, offset);
+        self.world.sprite_effects.getPtr(self.assoc_effect.?).lifetime = self.world.createTimerSeconds(effect_life_sec);
+    }
+
+    pub fn setAssocEffectAimed(self: *Tower, se_spec: *const SpriteEffectSpec, world_x: i32, world_y: i32, offset: f32, effect_life_sec: f32) void {
+        const r = self.angleTo(world_x, world_y);
+        self.setAssocEffectAngle(se_spec, r, offset, effect_life_sec);
     }
 
     pub fn killAssocEffect(self: *Tower) void {
@@ -684,6 +687,7 @@ pub const SpriteEffect = struct {
     /// Post-rotation
     post_angle: f32 = 0,
     dead: bool = false,
+    lifetime: ?timing.FrameTimer = null,
 
     fn spawn(self: *SpriteEffect, frame: u64) void {
         if (self.spec.anim_set) |as| {
@@ -698,6 +702,11 @@ pub const SpriteEffect = struct {
         if (self.animator) |*animator| {
             animator.update();
             if (animator.done) {
+                self.dead = true;
+            }
+        }
+        if (self.lifetime) |lifetime| {
+            if (lifetime.expired(frame)) {
                 self.dead = true;
             }
         }
@@ -1024,6 +1033,10 @@ pub const World = struct {
         }
     }
 
+    fn createTimerSeconds(self: *World, sec: f32) timing.FrameTimer {
+        return timing.FrameTimer.initSeconds(self.world_frame, sec);
+    }
+
     pub fn setNextWaveTimer(self: *World, time_sec: f32) void {
         self.next_wave_timer = timing.FrameTimer.initSeconds(self.world_frame, time_sec);
     }
@@ -1322,6 +1335,8 @@ pub const World = struct {
         var active_waves_pending_removal = std.ArrayListUnmanaged(usize){};
         // mob to list of towers attacking that mob
         var tower_mobs = std.AutoArrayHashMapUnmanaged(u32, std.ArrayListUnmanaged(u32)){};
+        // assoc sprite effect to tower id
+        var tower_effects = std.AutoArrayHashMapUnmanaged(u32, u32){};
         self.goal.update(self.world_frame);
 
         for (self.active_waves.items) |wave_id, active_wave_index| {
@@ -1355,6 +1370,9 @@ pub const World = struct {
                     gop.value_ptr.* = std.ArrayListUnmanaged(u32){};
                 }
                 gop.value_ptr.append(frame_arena, t.id) catch unreachable;
+            }
+            if (t.assoc_effect) |eid| {
+                tower_effects.putNoClobber(frame_arena, eid, t.id) catch unreachable;
             }
         }
         for (self.sprite_effects.slice()) |*e| {
@@ -1411,6 +1429,9 @@ pub const World = struct {
 
         for (effect_pending_removal.items) |id| {
             self.sprite_effects.erase(id);
+            if (tower_effects.get(id)) |tid| {
+                self.towers.getPtr(tid).assoc_effect = null;
+            }
         }
 
         for (text_pending_removal.items) |id| {
