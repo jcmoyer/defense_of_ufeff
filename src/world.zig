@@ -677,19 +677,28 @@ pub const SpriteEffect = struct {
     spec: *const SpriteEffectSpec,
     animator: ?anim.Animator = null,
     /// Basis
+    p_world_x: f32 = 0,
+    p_world_y: f32 = 0,
     world_x: f32,
     world_y: f32,
     /// Offset after pre-rotation
+    p_offset_x: f32 = 0,
+    p_offset_y: f32 = 0,
     offset_x: f32 = 0,
     offset_y: f32 = 0,
     /// Pre-rotation
+    p_angle: f32 = 0,
     angle: f32 = 0,
     /// Post-rotation
+    p_post_angle: f32 = 0,
     post_angle: f32 = 0,
     dead: bool = false,
     lifetime: ?timing.FrameTimer = null,
 
     fn spawn(self: *SpriteEffect, frame: u64) void {
+        self.p_world_x = self.world_x;
+        self.p_world_y = self.world_y;
+
         if (self.spec.anim_set) |as| {
             self.animator = as.createAnimator("default");
         }
@@ -699,6 +708,13 @@ pub const SpriteEffect = struct {
     }
 
     fn update(self: *SpriteEffect, frame: u64) void {
+        self.p_world_x = self.world_x;
+        self.p_world_y = self.world_y;
+        self.p_offset_x = self.offset_x;
+        self.p_offset_y = self.offset_y;
+        self.p_angle = self.angle;
+        self.p_post_angle = self.post_angle;
+
         if (self.animator) |*animator| {
             animator.update();
             if (animator.done) {

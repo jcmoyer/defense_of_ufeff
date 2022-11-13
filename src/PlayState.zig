@@ -632,7 +632,6 @@ fn renderSpriteEffects(
     cam: Camera,
     alpha: f64,
 ) void {
-    _ = alpha;
     const t_special = self.game.texman.getNamedTexture("special.png");
     self.r_batch.begin(.{
         .texture = t_special,
@@ -640,9 +639,23 @@ fn renderSpriteEffects(
     for (self.world.sprite_effects.slice()) |t| {
         var animator = t.animator orelse continue;
 
-        var transform = zm.mul(zm.rotationZ(t.angle), zm.translation(t.offset_x, t.offset_y, 0));
-        transform = zm.mul(transform, zm.rotationZ(t.post_angle));
-        transform = zm.mul(transform, zm.translation(t.world_x - @intToFloat(f32, cam.view.left()), t.world_y - @intToFloat(f32, cam.view.top()), 0));
+        const angle = zm.lerpV(t.p_angle, t.angle, @floatCast(f32, alpha));
+        const post_angle = zm.lerpV(t.p_post_angle, t.post_angle, @floatCast(f32, alpha));
+
+        const interp = zm.lerp(
+            zm.f32x4(t.p_offset_x, t.p_offset_y, t.p_world_x, t.p_world_y),
+            zm.f32x4(t.offset_x, t.offset_y, t.world_x, t.world_y),
+            @floatCast(f32, alpha),
+        );
+
+        const offset_x = interp[0];
+        const offset_y = interp[1];
+        const world_x = interp[2];
+        const world_y = interp[3];
+
+        var transform = zm.mul(zm.rotationZ(angle), zm.translation(offset_x, offset_y, 0));
+        transform = zm.mul(transform, zm.rotationZ(post_angle));
+        transform = zm.mul(transform, zm.translation(world_x - @intToFloat(f32, cam.view.left()), world_y - @intToFloat(f32, cam.view.top()), 0));
 
         self.r_batch.drawQuadTransformed(.{
             .src = animator.getCurrentRect().toRectf(),
