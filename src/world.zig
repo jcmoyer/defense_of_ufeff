@@ -794,8 +794,13 @@ const EventSpawn = struct {
     repeat: u32,
 };
 
+const EventWait = struct {
+    time: u32,
+};
+
 pub const WaveEvent = union(enum) {
     spawn: EventSpawn,
+    wait: EventWait,
 };
 
 pub const WaveEventList = struct {
@@ -811,8 +816,18 @@ pub const WaveEventList = struct {
         if (self.events.len == 0) {
             return;
         }
-        // TODO: .spawn may not be the only event type, move time out of union?
-        self.next_event_timer = timing.FrameTimer.initSeconds(frame, @intToFloat(f32, self.events[0].spawn.time));
+        self.setTimerFromEvent(frame, self.events[0]);
+    }
+
+    fn setTimerFromEvent(self: *WaveEventList, frame: u64, ev: WaveEvent) void {
+        switch (ev) {
+            .spawn => |s| {
+                self.next_event_timer = timing.FrameTimer.initSeconds(frame, @intToFloat(f32, s.time));
+            },
+            .wait => |w| {
+                self.next_event_timer = timing.FrameTimer.initSeconds(frame, @intToFloat(f32, w.time));
+            },
+        }
     }
 
     fn advance(self: *WaveEventList, frame: u64) void {
@@ -820,11 +835,16 @@ pub const WaveEventList = struct {
             .spawn => |*s| {
                 if (s.repeat > 0) {
                     s.repeat -= 1;
-                    self.next_event_timer.restart(frame);
                 } else {
                     self.current_event += 1;
                 }
             },
+            .wait => {
+                self.current_event += 1;
+            },
+        }
+        if (self.current_event < self.events.len) {
+            self.setTimerFromEvent(frame, self.events[self.current_event]);
         }
     }
 
@@ -1289,6 +1309,7 @@ pub const World = struct {
                         .spawn => |spawn_event| {
                             _ = self.spawnMonster(spawn_event.monster_spec, sp.id) catch unreachable;
                         },
+                        .wait => {},
                     }
                 }
             }
@@ -1657,11 +1678,23 @@ const JsonSpawnPoint = struct {
     spawn_point: []const u8,
     events: []JsonSpawnPointEvent,
 };
-const JsonSpawnPointEvent = struct {
+const JsonSpawnPointEventType = enum {
+    spawn,
+    wait,
+};
+const JsonSpawnPointEvent = union(JsonSpawnPointEventType) {
+    spawn: JsonSpawnPointSpawnEvent,
+    wait: JsonSpawnPointWaitEvent,
+};
+const JsonSpawnPointSpawnEvent = struct {
     type: []const u8,
     time: u32,
     name: []const u8,
     repeat: ?u32 = 1,
+};
+const JsonSpawnPointWaitEvent = struct {
+    type: []const u8,
+    time: u32,
 };
 
 pub fn loadWavesFromJson(allocator: Allocator, filename: []const u8, world: *World) !WaveList {
@@ -1689,15 +1722,19 @@ pub fn loadWavesFromJson(allocator: Allocator, filename: []const u8, world: *Wor
             const world_spawn_id = world.getSpawnId(doc_sp.spawn_point) orelse return error.InvalidSpawnPoint;
             var event_list = try allocator.alloc(WaveEvent, doc_sp.events.len);
             for (doc_sp.events) |doc_event, event_index| {
-                if (std.mem.eql(u8, "spawn", doc_event.type)) {
-                    event_list[event_index].spawn = EventSpawn{
-                        .monster_spec = nameToMonsterSpec(doc_event.name) orelse return error.InvalidMonsterName,
-                        .time = doc_event.time,
-                        .repeat = doc_event.repeat.?,
-                    };
-                } else {
-                    std.log.err("Unrecognized event type `{s}` in `{s}`", .{ doc_event.type, filename });
-                    std.process.exit(1);
+                switch (doc_event) {
+                    .spawn => |spawn| {
+                        event_list[event_index] = .{ .spawn = EventSpawn{
+                            .monster_spec = nameToMonsterSpec(spawn.name) orelse return error.InvalidMonsterName,
+                            .time = spawn.time,
+                            .repeat = spawn.repeat.?,
+                        } };
+                    },
+                    .wait => |wait| {
+                        event_list[event_index] = .{ .wait = EventWait{
+                            .time = wait.time,
+                        } };
+                    },
                 }
             }
 
