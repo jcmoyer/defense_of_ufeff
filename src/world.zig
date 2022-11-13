@@ -622,6 +622,7 @@ pub const Tower = struct {
             self.animator = as.createAnimator("down");
         }
         self.invested_gold += self.spec.gold_cost;
+        self.killAssocEffect();
     }
 };
 
