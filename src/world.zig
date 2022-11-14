@@ -565,7 +565,7 @@ pub const Tower = struct {
     world_x: u32,
     world_y: u32,
     target_mobid: ?MonsterId = null,
-    cooldown: timing.FrameTimer = .{},
+    cooldown: FrameTimer = .{},
     assoc_effect: ?SpriteEffectId = null,
     invested_gold: u32 = 0,
 
@@ -694,7 +694,7 @@ pub const Tower = struct {
             spawnFn(self, frame);
         }
         self.invested_gold += self.spec.gold_cost;
-        self.cooldown = timing.FrameTimer.initSeconds(frame, self.spec.cooldown);
+        self.cooldown = FrameTimer.initSeconds(frame, self.spec.cooldown);
     }
 
     fn update(self: *Tower, frame: u64) void {
@@ -726,7 +726,7 @@ pub const Spawn = struct {
     id: u32 = undefined,
     coord: TileCoord,
     emitter: particle.Emitter,
-    timer: timing.FrameTimer,
+    timer: FrameTimer,
     spawn_interval: f32,
 
     fn emit(self: *Spawn) void {
@@ -811,7 +811,7 @@ pub const SpriteEffect = struct {
     p_post_angle: f32 = 0,
     post_angle: f32 = 0,
     dead: bool = false,
-    lifetime: ?timing.FrameTimer = null,
+    lifetime: ?FrameTimer = null,
     angular_vel: f32 = 0,
     offset_coef: f32 = 1,
 
@@ -954,7 +954,7 @@ pub const WaveEvent = union(enum) {
 pub const WaveEventList = struct {
     current_event: usize,
     events: []WaveEvent,
-    next_event_timer: timing.FrameTimer,
+    next_event_timer: FrameTimer,
 
     fn deinit(self: *WaveEventList, allocator: Allocator) void {
         allocator.free(self.events);
@@ -970,10 +970,10 @@ pub const WaveEventList = struct {
     fn setTimerFromEvent(self: *WaveEventList, frame: u64, ev: WaveEvent) void {
         switch (ev) {
             .spawn => |s| {
-                self.next_event_timer = timing.FrameTimer.initSeconds(frame, @intToFloat(f32, s.time));
+                self.next_event_timer = FrameTimer.initSeconds(frame, @intToFloat(f32, s.time));
             },
             .wait => |w| {
-                self.next_event_timer = timing.FrameTimer.initSeconds(frame, @intToFloat(f32, w.time));
+                self.next_event_timer = FrameTimer.initSeconds(frame, @intToFloat(f32, w.time));
             },
         }
     }
@@ -1146,7 +1146,7 @@ pub const World = struct {
     next_wave: usize = 0,
     player_won: bool = false,
     music_filename: ?[:0]const u8 = null,
-    next_wave_timer: timing.FrameTimer = .{},
+    next_wave_timer: FrameTimer = .{},
 
     pub fn init(allocator: Allocator) World {
         return .{
@@ -1187,12 +1187,12 @@ pub const World = struct {
         }
     }
 
-    fn createTimerSeconds(self: *World, sec: f32) timing.FrameTimer {
-        return timing.FrameTimer.initSeconds(self.world_frame, sec);
+    fn createTimerSeconds(self: *World, sec: f32) FrameTimer {
+        return FrameTimer.initSeconds(self.world_frame, sec);
     }
 
     pub fn setNextWaveTimer(self: *World, time_sec: f32) void {
-        self.next_wave_timer = timing.FrameTimer.initSeconds(self.world_frame, time_sec);
+        self.next_wave_timer = FrameTimer.initSeconds(self.world_frame, time_sec);
     }
 
     pub fn getPlayableRange(self: World) TileRange {
@@ -1224,7 +1224,7 @@ pub const World = struct {
     fn createSpawn(self: *World, name: []const u8, coord: TileCoord) !void {
         const s_id = try self.spawns.put(self.allocator, Spawn{
             .coord = coord,
-            .timer = timing.FrameTimer.initSeconds(0, 1),
+            .timer = FrameTimer.initSeconds(0, 1),
             .spawn_interval = 1,
             .emitter = try particle.Emitter.initCapacity(self.allocator, 16),
         });
@@ -1474,7 +1474,7 @@ pub const World = struct {
         if (self.next_wave < self.waves.waves.len) {
             self.startWave(self.next_wave);
             if (self.next_wave + 1 < self.waves.waves.len) {
-                self.next_wave_timer = timing.FrameTimer.initSeconds(self.world_frame, self.waves.getWaveDuration(self.next_wave));
+                self.next_wave_timer = FrameTimer.initSeconds(self.world_frame, self.waves.getWaveDuration(self.next_wave));
             }
             self.next_wave += 1;
             return true;
