@@ -688,6 +688,7 @@ pub const Tower = struct {
         effect.lifetime.?.frame_start = effect.delay.frame_end;
         effect.lifetime.?.frame_end = effect.delay.frame_end + life_frames;
         effect.offset_coef = 0.9;
+        effect.activate_sound = .stab;
     }
 
     pub fn setAssocEffectAngle(self: *Tower, se_spec: *const SpriteEffectSpec, r: f32, offset: f32, effect_life_sec: f32) void {
@@ -862,6 +863,11 @@ pub const SpriteEffectSpec = struct {
 
 pub const SpriteEffectId = GenHandle(SpriteEffect);
 
+const SoundId = enum {
+    none,
+    stab,
+};
+
 pub const SpriteEffect = struct {
     id: SpriteEffectId = undefined,
     world: *World,
@@ -884,11 +890,13 @@ pub const SpriteEffect = struct {
     p_post_angle: f32 = 0,
     post_angle: f32 = 0,
     dead: bool = false,
+    activated: bool = false,
     /// For delayed effects, a timer that must expire before the effect plays.
     delay: FrameTimer = .{},
     lifetime: ?FrameTimer = null,
     angular_vel: f32 = 0,
     offset_coef: f32 = 1,
+    activate_sound: SoundId = .none,
 
     fn spawn(self: *SpriteEffect, frame: u64) void {
         self.p_world_x = self.world_x;
@@ -905,6 +913,10 @@ pub const SpriteEffect = struct {
     fn update(self: *SpriteEffect, frame: u64) void {
         if (!self.delay.expired(frame)) {
             return;
+        }
+        if (!self.activated) {
+            self.world.playPositionalSoundId(self.activate_sound, @floatToInt(i32, self.world_x), @floatToInt(i32, self.world_y));
+            self.activated = true;
         }
         self.p_world_x = self.world_x;
         self.p_world_y = self.world_y;
@@ -1760,6 +1772,13 @@ pub const World = struct {
         const sound_position = [2]i32{ world_x, world_y };
         var params = audio.AudioSystem.instance.playSound(sound, audio.computePositionalOptions(self.view, sound_position));
         defer params.release();
+    }
+
+    fn playPositionalSoundId(self: World, sound: SoundId, world_x: i32, world_y: i32) void {
+        switch (sound) {
+            .none => {},
+            .stab => self.playPositionalSound("assets/sounds/stab.ogg", world_x, world_y),
+        }
     }
 };
 
