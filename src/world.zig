@@ -5,6 +5,7 @@ const anim = @import("animation.zig");
 const Direction = @import("direction.zig").Direction;
 const zm = @import("zmath");
 const timing = @import("timing.zig");
+const FrameTimer = timing.FrameTimer;
 const particle = @import("particle.zig");
 const audio = @import("audio.zig");
 const Rect = @import("Rect.zig");
@@ -355,6 +356,17 @@ pub const Monster = struct {
         _ = self.world.spawnSpriteEffect(&se_hurt_slash, p[0], p[1]) catch unreachable;
     }
 
+    pub fn hurtDirectionalSlashDamageDelayed(self: *Monster, amt: u32, dir: [2]f32, frame_count: u32) void {
+        var dd = self.world.createDelayedDamage();
+        dd.* = DelayedDamage{
+            .monster = self.id,
+            .amount = amt,
+            .direction = dir,
+            .damage_type = .slash,
+            .timer = FrameTimer.initFrames(self.world.world_frame, frame_count),
+        };
+    }
+
     pub fn kill(self: *Monster) void {
         self.dead = true;
         if (self.carrying_life) {
@@ -451,7 +463,7 @@ fn soldierUpdate(self: *Tower, frame: u64) void {
 
         self.world.playPositionalSound("assets/sounds/slash.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
-        self.world.monsters.getPtr(m).hurtDirectionalSlashDamage(3, [2]f32{ std.math.cos(r), std.math.sin(r) });
+        self.world.monsters.getPtr(m).hurtDirectionalSlashDamageDelayed(3, [2]f32{ std.math.cos(r), std.math.sin(r) }, 2);
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
     }
@@ -1091,6 +1103,19 @@ pub const TileRange = struct {
     }
 };
 
+const DamageType = enum {
+    generic,
+    slash,
+};
+
+const DelayedDamage = struct {
+    monster: MonsterId,
+    amount: u32,
+    direction: [2]f32,
+    damage_type: DamageType,
+    timer: FrameTimer,
+};
+
 pub const World = struct {
     allocator: Allocator,
     map: Tilemap = .{},
@@ -1106,6 +1131,7 @@ pub const World = struct {
     pending_projectiles: std.ArrayListUnmanaged(Projectile) = .{},
     sprite_effects: IntrusiveGenSlotMap(SpriteEffect) = .{},
     floating_text: IntrusiveSlotMap(FloatingText) = .{},
+    delayed_damage: std.ArrayListUnmanaged(DelayedDamage) = .{},
     waves: WaveList = .{},
     active_waves: std.ArrayListUnmanaged(usize) = .{},
     pathfinder: PathfindingState,
@@ -1149,6 +1175,7 @@ pub const World = struct {
         self.pending_projectiles.deinit(self.allocator);
         self.sprite_effects.deinit(self.allocator);
         self.tower_map.deinit(self.allocator);
+        self.delayed_damage.deinit(self.allocator);
         for (self.spawn_map.keys()) |k| {
             self.allocator.free(k);
         }
@@ -1254,6 +1281,10 @@ pub const World = struct {
         }
 
         return true;
+    }
+
+    fn createDelayedDamage(self: *World) *DelayedDamage {
+        return self.delayed_damage.addOne(self.allocator) catch unreachable;
     }
 
     pub fn spawnFloatingText(self: *World, text: []const u8, world_x: i32, world_y: i32) !u32 {
@@ -1475,6 +1506,20 @@ pub const World = struct {
                         .wait => {},
                     }
                 }
+            }
+        }
+
+        var damage_id: usize = self.delayed_damage.items.len -% 1;
+        while (damage_id < self.delayed_damage.items.len) : (damage_id -%= 1) {
+            const dd = self.delayed_damage.items[damage_id];
+            if (dd.timer.expired(self.world_frame)) {
+                if (self.monsters.getPtrWeak(dd.monster)) |m| {
+                    switch (dd.damage_type) {
+                        .generic => m.hurtDirectionalGenericDamage(dd.amount, dd.direction),
+                        .slash => m.hurtDirectionalSlashDamage(dd.amount, dd.direction),
+                    }
+                }
+                _ = self.delayed_damage.swapRemove(damage_id);
             }
         }
 

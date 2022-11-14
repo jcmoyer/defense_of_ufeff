@@ -12,6 +12,13 @@ pub const FrameTimer = struct {
         };
     }
 
+    pub fn initFrames(current_frame: u64, frame_count: u64) FrameTimer {
+        return FrameTimer{
+            .frame_start = current_frame,
+            .frame_end = current_frame + frame_count,
+        };
+    }
+
     pub fn durationFrames(self: FrameTimer) u64 {
         return self.frame_end - self.frame_start;
     }

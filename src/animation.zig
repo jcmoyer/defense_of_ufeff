@@ -404,11 +404,11 @@ pub const a_hurt_slash = StaticAnimationSet(&[1]StaticAnimationDef{.{
             },
             .{
                 .rect = Rect.init(80, 128, 16, 16),
-                .time = 1,
+                .time = 2,
             },
             .{
                 .rect = Rect.init(96, 128, 16, 16),
-                .time = 1,
+                .time = 3,
             },
         },
     },
