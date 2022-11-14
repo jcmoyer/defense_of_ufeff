@@ -781,11 +781,16 @@ fn renderTowers(
     // render tower bases
     self.r_batch.begin(.{
         .texture = t_special,
+        .flash_r = 0,
+        .flash_g = 255,
+        .flash_b = 0,
     });
     for (self.world.towers.slice()) |*t| {
         self.r_batch.drawQuad(.{
             .src = Rectf.init(0, 7 * 16, 16, 16),
             .dest = Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - cam.view.top(), 16, 16).toRectf(),
+            .flash = highlight_tower == t.id,
+            .flash_mag = highlight_mag,
         });
     }
     self.r_batch.end();
