@@ -130,6 +130,24 @@ pub const m_human = MonsterSpec{
     .gold = 1,
 };
 
+pub const m_slime = MonsterSpec{
+    .anim_set = anim.a_slime.animationSet(),
+    .max_hp = 5,
+    .gold = 1,
+};
+
+pub const m_skeleton = MonsterSpec{
+    .anim_set = anim.a_skeleton.animationSet(),
+    .max_hp = 10,
+    .gold = 3,
+};
+
+pub const m_mole = MonsterSpec{
+    .anim_set = anim.a_mole.animationSet(),
+    .max_hp = 20,
+    .gold = 5,
+};
+
 pub const MonsterId = GenHandle(Monster);
 
 pub const Monster = struct {
@@ -2234,6 +2252,15 @@ const TiledMapProperty = struct {
 fn nameToMonsterSpec(name: []const u8) ?*const MonsterSpec {
     if (std.mem.eql(u8, "m_human", name)) {
         return &m_human;
+    }
+    if (std.mem.eql(u8, "m_slime", name)) {
+        return &m_slime;
+    }
+    if (std.mem.eql(u8, "m_skeleton", name)) {
+        return &m_skeleton;
+    }
+    if (std.mem.eql(u8, "m_mole", name)) {
+        return &m_mole;
     }
     return null;
 }
