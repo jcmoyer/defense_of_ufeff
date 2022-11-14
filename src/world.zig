@@ -356,13 +356,13 @@ pub const Monster = struct {
         _ = self.world.spawnSpriteEffect(&se_hurt_slash, p[0], p[1]) catch unreachable;
     }
 
-    pub fn hurtDirectionalSlashDamageDelayed(self: *Monster, amt: u32, dir: [2]f32, frame_count: u32) void {
+    pub fn hurtDirectionalDelayed(self: *Monster, amt: u32, dir: [2]f32, dtype: DamageType, frame_count: u32) void {
         var dd = self.world.createDelayedDamage();
         dd.* = DelayedDamage{
             .monster = self.id,
             .amount = amt,
             .direction = dir,
-            .damage_type = .slash,
+            .damage_type = dtype,
             .timer = FrameTimer.initFrames(self.world.world_frame, frame_count),
         };
     }
@@ -438,7 +438,7 @@ fn magicianUpdate(self: *Tower, frame: u64) void {
 
         self.world.playPositionalSound("assets/sounds/slash.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
-        self.world.monsters.getPtr(m).hurtDirectionalGenericDamage(1, [2]f32{ std.math.cos(r), std.math.sin(r) });
+        self.world.monsters.getPtr(m).hurtDirectionalDelayed(1, [2]f32{ std.math.cos(r), std.math.sin(r) }, .generic, 3);
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
     }
@@ -463,7 +463,7 @@ fn soldierUpdate(self: *Tower, frame: u64) void {
 
         self.world.playPositionalSound("assets/sounds/slash.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
-        self.world.monsters.getPtr(m).hurtDirectionalSlashDamageDelayed(3, [2]f32{ std.math.cos(r), std.math.sin(r) }, 2);
+        self.world.monsters.getPtr(m).hurtDirectionalDelayed(3, [2]f32{ std.math.cos(r), std.math.sin(r) }, .slash, 2);
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
     }
