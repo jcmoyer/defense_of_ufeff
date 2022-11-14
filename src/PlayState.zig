@@ -603,6 +603,15 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
         }
     }
 
+    if (ev.type == .SDL_MOUSEMOTION) {
+        const tile_coord = self.mouseToTile();
+        if (self.world.getTowerAt(tile_coord) != null) {
+            self.game.sdl_backend.setCursorForHint(.clickable);
+        } else {
+            self.game.sdl_backend.setCursorForHint(.none);
+        }
+    }
+
     if (ev.type == .SDL_MOUSEBUTTONDOWN) {
         if (ev.button.button == sdl.SDL_BUTTON_LEFT) {
             if (self.interact_state == .build) {

@@ -900,7 +900,7 @@ pub const SDLBackend = struct {
         }
     }
 
-    fn setCursorForHint(self: SDLBackend, hint: InteractionHint) void {
+    pub fn setCursorForHint(self: SDLBackend, hint: InteractionHint) void {
         switch (hint) {
             .none => sdl.SDL_SetCursor(self.c_arrow),
             .clickable => sdl.SDL_SetCursor(self.c_hand),
