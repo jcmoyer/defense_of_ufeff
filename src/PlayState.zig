@@ -554,7 +554,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.renderFloatingText(cam_interp, alpha);
     self.renderBlockedConstructionRects(cam_interp);
     self.renderGrid(cam_interp);
-    self.renderSelection(cam_interp);
+    // self.renderSelection(cam_interp);
     self.renderRangeIndicator(cam_interp);
     self.renderWaveTimer(alpha);
     if (!self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
@@ -762,6 +762,12 @@ fn renderTowers(
     const t_special = self.game.texman.getNamedTexture("special.png");
     const t_characters = self.game.texman.getNamedTexture("characters.png");
 
+    var highlight_tower: ?u32 = null;
+    var highlight_mag: f32 = 0.5 * (1.0 + std.math.sin(@intToFloat(f32, self.game.frame_counter) / 15.0));
+    if (self.interact_state == .select) {
+        highlight_tower = self.interact_state.select.selected_tower;
+    }
+
     // render tower bases
     self.r_batch.begin(.{
         .texture = t_special,
@@ -777,6 +783,9 @@ fn renderTowers(
     // render tower characters
     self.r_batch.begin(.{
         .texture = t_characters,
+        .flash_r = 0,
+        .flash_g = 255,
+        .flash_b = 0,
     });
     for (self.world.towers.slice()) |*t| {
         if (t.animator) |animator| {
@@ -784,6 +793,8 @@ fn renderTowers(
             self.r_batch.drawQuad(.{
                 .src = animator.getCurrentRect().toRectf(),
                 .dest = Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - 4 - cam.view.top(), 16, 16).toRectf(),
+                .flash = highlight_tower == t.id,
+                .flash_mag = highlight_mag,
             });
         }
     }

@@ -23,10 +23,14 @@ const Vertex = extern struct {
 const Uniforms = struct {
     uTransform: gl.GLint = -1,
     uSampler: gl.GLint = -1,
+    uFlashRGB: gl.GLint = -1,
 };
 
 pub const SpriteBatchParams = struct {
     texture: *const Texture,
+    flash_r: u8 = 255,
+    flash_g: u8 = 255,
+    flash_b: u8 = 255,
 };
 
 const quad_count = 1024;
@@ -146,6 +150,12 @@ pub fn begin(self: *SpriteBatch, params: SpriteBatchParams) void {
     gl.bindVertexArray(self.vao);
     gl.uniformMatrix4fv(self.uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
     gl.uniform1i(self.uniforms.uSampler, 0);
+    gl.uniform3f(
+        self.uniforms.uFlashRGB,
+        @intToFloat(f32, params.flash_r) / 255.0,
+        @intToFloat(f32, params.flash_g) / 255.0,
+        @intToFloat(f32, params.flash_r) / 255.0,
+    );
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, params.texture.handle);
 
@@ -186,6 +196,7 @@ pub const DrawQuadOptions = struct {
     dest: Rectf,
     color: @Vector(4, u8) = @splat(4, @as(u8, 255)),
     flash: bool = false,
+    flash_mag: f32 = 1,
 };
 
 /// Simple quad routine, no transforms
@@ -210,7 +221,7 @@ pub fn drawQuad(self: *SpriteBatch, opts: DrawQuadOptions) void {
     p2 = zm.f32x4(right, top, uv_right, uv_top);
     p3 = zm.f32x4(right, bottom, uv_right, uv_bottom);
 
-    const f_val: u8 = if (opts.flash) 255 else 0;
+    const f_val: u8 = if (opts.flash) @floatToInt(u8, opts.flash_mag * 255) else 0;
 
     self.vertices[self.vertex_head + 0] = .{
         .xyuv = p0,

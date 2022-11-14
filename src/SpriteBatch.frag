@@ -5,6 +5,7 @@ in vec4 fColor;
 in float fFlash;
 
 uniform sampler2D uSampler;
+uniform vec3 uFlashRGB;
 
 out vec4 FragColor;
 
@@ -12,7 +13,7 @@ void main() {
     vec4 base_color = texture(uSampler, vec2(fTex.x, fTex.y));
     FragColor = mix(
         base_color * fColor,
-        vec4(1, 1, 1, base_color.a),
+        vec4(uFlashRGB, base_color.a),
         fFlash
     );
 }
