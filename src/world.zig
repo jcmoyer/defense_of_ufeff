@@ -11,6 +11,8 @@ const Rect = @import("Rect.zig");
 const mu = @import("mathutil.zig");
 const SlotMap = @import("slotmap.zig").SlotMap;
 const IntrusiveSlotMap = @import("slotmap.zig").IntrusiveSlotMap;
+const IntrusiveGenSlotMap = @import("slotmap.zig").IntrusiveGenSlotMap;
+const GenHandle = @import("slotmap.zig").GenHandle;
 
 const Tile = tmod.Tile;
 const TileBank = tmod.TileBank;
@@ -127,13 +129,15 @@ pub const m_human = MonsterSpec{
     .gold = 1,
 };
 
+pub const MonsterId = GenHandle(Monster);
+
 pub const Monster = struct {
     const PathingState = enum {
         to_goal,
         to_spawn,
     };
 
-    id: u32 = undefined,
+    id: MonsterId = undefined,
     spawn_id: u32,
     world: *World,
     spec: *const MonsterSpec,
@@ -539,27 +543,30 @@ fn gunnerUpdate(self: *Tower, frame: u64) void {
     }
 }
 
+pub const TowerId = GenHandle(Tower);
+
 pub const Tower = struct {
-    id: u32 = undefined,
+    id: TowerId = undefined,
     world: *World,
     spec: *const TowerSpec,
     animator: ?anim.Animator = null,
     world_x: u32,
     world_y: u32,
-    target_mobid: ?u32 = null,
+    target_mobid: ?MonsterId = null,
     cooldown: timing.FrameTimer = .{},
-    assoc_effect: ?u32 = null,
+    assoc_effect: ?SpriteEffectId = null,
     invested_gold: u32 = 0,
 
-    fn pickMonsterGeneric(self: *Tower) ?u32 {
+    fn pickMonsterGeneric(self: *Tower) ?MonsterId {
         const p = self.getWorldCollisionRect().centerPoint();
         if (self.target_mobid) |id| {
-            const m = self.world.monsters.getPtr(id);
-            if (!m.dead) {
-                const q = m.getWorldCollisionRect().centerPoint();
-                const d = mu.dist(p, q);
-                if (d >= self.spec.min_range and d <= self.spec.max_range) {
-                    return id;
+            if (self.world.monsters.getPtrWeak(id)) |m| {
+                if (!m.dead) {
+                    const q = m.getWorldCollisionRect().centerPoint();
+                    const d = mu.dist(p, q);
+                    if (d >= self.spec.min_range and d <= self.spec.max_range) {
+                        return id;
+                    }
                 }
             }
         }
@@ -602,7 +609,7 @@ pub const Tower = struct {
         const basis_x = self.world_x + 8;
         const basis_y = self.world_y + 8;
 
-        if (self.assoc_effect == null) {
+        if (self.assoc_effect == null or self.world.sprite_effects.getPtrWeak(self.assoc_effect.?) == null) {
             self.assoc_effect = self.world.spawnSpriteEffect(se_spec, @intCast(i32, basis_x), @intCast(i32, basis_y)) catch unreachable;
         }
         self.world.sprite_effects.getPtr(self.assoc_effect.?).setAngleOffset(r, offset);
@@ -616,7 +623,9 @@ pub const Tower = struct {
 
     pub fn killAssocEffect(self: *Tower) void {
         if (self.assoc_effect) |eid| {
-            self.world.sprite_effects.getPtr(eid).dead = true;
+            if (self.world.sprite_effects.getPtrWeak(eid)) |se| {
+                se.dead = true;
+            }
             self.assoc_effect = null;
         }
     }
@@ -766,8 +775,10 @@ pub const SpriteEffectSpec = struct {
     updateFn: ?*const fn (*SpriteEffect, u64) void = null,
 };
 
+pub const SpriteEffectId = GenHandle(SpriteEffect);
+
 pub const SpriteEffect = struct {
-    id: u32 = undefined,
+    id: SpriteEffectId = undefined,
     world: *World,
     spec: *const SpriteEffectSpec,
     animator: ?anim.Animator = null,
@@ -1085,15 +1096,15 @@ pub const World = struct {
     map: Tilemap = .{},
     scratch_map: Tilemap = .{},
     scratch_cache: PathfindingCache,
-    monsters: IntrusiveSlotMap(Monster) = .{},
-    towers: IntrusiveSlotMap(Tower) = .{},
+    monsters: IntrusiveGenSlotMap(Monster) = .{},
+    towers: IntrusiveGenSlotMap(Tower) = .{},
     /// Tile coordinates for tower -> slot map handle
-    tower_map: std.AutoHashMapUnmanaged(TileCoord, u32) = .{},
+    tower_map: std.AutoHashMapUnmanaged(TileCoord, TowerId) = .{},
     spawns: IntrusiveSlotMap(Spawn) = .{},
     spawn_map: std.StringArrayHashMapUnmanaged(u32) = .{},
     projectiles: IntrusiveSlotMap(Projectile) = .{},
     pending_projectiles: std.ArrayListUnmanaged(Projectile) = .{},
-    sprite_effects: IntrusiveSlotMap(SpriteEffect) = .{},
+    sprite_effects: IntrusiveGenSlotMap(SpriteEffect) = .{},
     floating_text: IntrusiveSlotMap(FloatingText) = .{},
     waves: WaveList = .{},
     active_waves: std.ArrayListUnmanaged(usize) = .{},
@@ -1281,7 +1292,7 @@ pub const World = struct {
         self.player_gold += amt;
     }
 
-    pub fn spawnTower(self: *World, spec: *const TowerSpec, coord: TileCoord) !u32 {
+    pub fn spawnTower(self: *World, spec: *const TowerSpec, coord: TileCoord) !TowerId {
         // if we're building over a wall, delete it first so we're not bloating the towers slotmap
         if (self.tower_map.get(coord)) |id| {
             const wall = self.towers.getPtr(id);
@@ -1299,7 +1310,7 @@ pub const World = struct {
         return id;
     }
 
-    pub fn sellTower(self: *World, id: u32) void {
+    pub fn sellTower(self: *World, id: TowerId) void {
         const tower = self.towers.getPtr(id);
         const gold = std.math.max(1, tower.invested_gold / 2);
         const p = tower.getWorldCollisionRect().centerPoint();
@@ -1314,7 +1325,7 @@ pub const World = struct {
         self.invalidatePathCache();
     }
 
-    pub fn spawnSpriteEffect(self: *World, spec: *const SpriteEffectSpec, world_x: i32, world_y: i32) !u32 {
+    pub fn spawnSpriteEffect(self: *World, spec: *const SpriteEffectSpec, world_x: i32, world_y: i32) !SpriteEffectId {
         const id = try self.sprite_effects.put(self.allocator, SpriteEffect{
             .world = self,
             .spec = spec,
@@ -1341,11 +1352,11 @@ pub const World = struct {
         return ptr;
     }
 
-    pub fn pickClosestMonster(self: World, world_x: i32, world_y: i32, range_min: f32, range_max: f32) ?u32 {
+    pub fn pickClosestMonster(self: World, world_x: i32, world_y: i32, range_min: f32, range_max: f32) ?MonsterId {
         if (self.monsters.slice().len == 0) {
             return null;
         }
-        var closest: ?u32 = null;
+        var closest: ?MonsterId = null;
         var best_dist = std.math.inf_f32;
         const fx = @intToFloat(f32, world_x);
         const fy = @intToFloat(f32, world_y);
@@ -1374,7 +1385,7 @@ pub const World = struct {
         std.log.debug("invalidatePathCache took {d}us", .{timer.read() / std.time.ns_per_us});
     }
 
-    fn spawnTowerWorld(self: *World, spec: *const TowerSpec, world_x: u32, world_y: u32) !u32 {
+    fn spawnTowerWorld(self: *World, spec: *const TowerSpec, world_x: u32, world_y: u32) !TowerId {
         var id = try self.towers.put(self.allocator, Tower{
             .world = self,
             .spec = spec,
@@ -1385,7 +1396,7 @@ pub const World = struct {
         return id;
     }
 
-    pub fn spawnMonster(self: *World, spec: *const MonsterSpec, spawn_id: u32) !u32 {
+    pub fn spawnMonster(self: *World, spec: *const MonsterSpec, spawn_id: u32) !MonsterId {
         const pos = self.getSpawnPosition(spawn_id);
         self.getSpawnPtr(spawn_id).emit();
         var mon = Monster{
@@ -1402,7 +1413,7 @@ pub const World = struct {
         return id;
     }
 
-    pub fn getTowerAt(self: *World, coord: TileCoord) ?u32 {
+    pub fn getTowerAt(self: *World, coord: TileCoord) ?TowerId {
         if (self.tower_map.get(coord)) |id| {
             return id;
         } else {
@@ -1444,14 +1455,10 @@ pub const World = struct {
     pub fn update(self: *World, frame_arena: Allocator) void {
         var new_projectile_ids = std.ArrayListUnmanaged(u32){};
         var proj_pending_removal = std.ArrayListUnmanaged(u32){};
-        var mon_pending_removal = std.ArrayListUnmanaged(u32){};
-        var effect_pending_removal = std.ArrayListUnmanaged(u32){};
+        var mon_pending_removal = std.ArrayListUnmanaged(MonsterId){};
+        var effect_pending_removal = std.ArrayListUnmanaged(SpriteEffectId){};
         var text_pending_removal = std.ArrayListUnmanaged(u32){};
         var active_waves_pending_removal = std.ArrayListUnmanaged(usize){};
-        // mob to list of towers attacking that mob
-        var tower_mobs = std.AutoArrayHashMapUnmanaged(u32, std.ArrayListUnmanaged(u32)){};
-        // assoc sprite effect to tower id
-        var tower_effects = std.AutoArrayHashMapUnmanaged(u32, u32){};
         self.goal.update(self.world_frame);
 
         for (self.active_waves.items) |wave_id, active_wave_index| {
@@ -1479,16 +1486,6 @@ pub const World = struct {
         }
         for (self.towers.slice()) |*t| {
             t.update(self.world_frame);
-            if (t.target_mobid) |mobid| {
-                var gop = tower_mobs.getOrPut(frame_arena, mobid) catch unreachable;
-                if (!gop.found_existing) {
-                    gop.value_ptr.* = std.ArrayListUnmanaged(u32){};
-                }
-                gop.value_ptr.append(frame_arena, t.id) catch unreachable;
-            }
-            if (t.assoc_effect) |eid| {
-                tower_effects.putNoClobber(frame_arena, eid, t.id) catch unreachable;
-            }
         }
         for (self.sprite_effects.slice()) |*e| {
             e.update(self.world_frame);
@@ -1535,18 +1532,10 @@ pub const World = struct {
 
         for (mon_pending_removal.items) |id| {
             self.monsters.erase(id);
-            if (tower_mobs.get(id)) |list| {
-                for (list.items) |tower_id| {
-                    self.towers.getPtr(tower_id).target_mobid = null;
-                }
-            }
         }
 
         for (effect_pending_removal.items) |id| {
             self.sprite_effects.erase(id);
-            if (tower_effects.get(id)) |tid| {
-                self.towers.getPtr(tid).assoc_effect = null;
-            }
         }
 
         for (text_pending_removal.items) |id| {

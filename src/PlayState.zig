@@ -22,6 +22,7 @@ const sdl = @import("sdl.zig");
 const ui = @import("ui.zig");
 const Texture = @import("texture.zig").Texture;
 const FrameTimer = @import("timing.zig").FrameTimer;
+const GenHandle = @import("slotmap.zig").GenHandle;
 
 const DEFAULT_CAMERA = Camera{
     .view = Rect.init(0, 0, Game.INTERNAL_WIDTH - gui_panel_width, Game.INTERNAL_HEIGHT),
@@ -49,7 +50,7 @@ const InteractStateBuild = struct {
 };
 
 const InteractStateSelect = struct {
-    selected_tower: u32,
+    selected_tower: wo.TowerId,
     hovered_spec: ?*const wo.TowerSpec = null,
 };
 
@@ -62,7 +63,7 @@ const InteractState = union(enum) {
 
 const UpgradeButtonState = struct {
     play_state: *PlayState,
-    tower_id: u32,
+    tower_id: wo.TowerId,
     tower_spec: *const wo.TowerSpec,
 };
 
@@ -639,7 +640,7 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
                 const tile_coord = self.mouseToTile();
                 if (self.world.getTowerAt(tile_coord)) |id| {
                     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
-                    std.log.debug("Selected {d}", .{id});
+                    std.log.debug("Selected {any}", .{id});
                     self.interact_state = .{
                         .select = InteractStateSelect{
                             .selected_tower = id,
@@ -772,7 +773,7 @@ fn renderTowers(
     const t_special = self.game.texman.getNamedTexture("special.png");
     const t_characters = self.game.texman.getNamedTexture("characters.png");
 
-    var highlight_tower: ?u32 = null;
+    var highlight_tower: ?wo.TowerId = null;
     var highlight_mag: f32 = 0.5 * (1.0 + std.math.sin(@intToFloat(f32, self.game.frame_counter) / 15.0));
     if (self.interact_state == .select) {
         highlight_tower = self.interact_state.select.selected_tower;
@@ -789,7 +790,7 @@ fn renderTowers(
         self.r_batch.drawQuad(.{
             .src = Rectf.init(0, 7 * 16, 16, 16),
             .dest = Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - cam.view.top(), 16, 16).toRectf(),
-            .flash = highlight_tower == t.id,
+            .flash = t.id.eql(highlight_tower),
             .flash_mag = highlight_mag,
         });
     }
@@ -808,7 +809,7 @@ fn renderTowers(
             self.r_batch.drawQuad(.{
                 .src = animator.getCurrentRect().toRectf(),
                 .dest = Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - 4 - cam.view.top(), 16, 16).toRectf(),
-                .flash = highlight_tower == t.id,
+                .flash = t.id.eql(highlight_tower),
                 .flash_mag = highlight_mag,
             });
         }
