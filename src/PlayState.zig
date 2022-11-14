@@ -629,6 +629,7 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
             } else {
                 const tile_coord = self.mouseToTile();
                 if (self.world.getTowerAt(tile_coord)) |id| {
+                    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
                     std.log.debug("Selected {d}", .{id});
                     self.interact_state = .{
                         .select = InteractStateSelect{
