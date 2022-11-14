@@ -515,7 +515,7 @@ fn rogueUpdate(self: *Tower, frame: u64) void {
 }
 
 pub const t_ninja = TowerSpec{
-    .cooldown = 1,
+    .cooldown = 0.75,
     .gold_cost = 25,
     .tooltip = "Upgrade to Ninja\n$5\n\nMelee multi-hit attack.\nExcels at single target.",
 
@@ -532,6 +532,14 @@ fn ninjaUpdate(self: *Tower, frame: u64) void {
         const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         const r = self.angleTo(p[0], p[1]);
         self.stabEffect(&se_dagger, r, 10, 0.3);
+
+        var random = self.world.rng.random();
+        const random_angle = std.math.pi / 8.0;
+
+        self.stabEffectDelayed(&se_dagger, r + random.float(f32) * random_angle, 9, 0.25, 5);
+        self.stabEffectDelayed(&se_dagger, r + random.float(f32) * random_angle, 8, 0.20, 10);
+        self.stabEffectDelayed(&se_dagger, r + random.float(f32) * random_angle, 7, 0.15, 15);
+        self.stabEffectDelayed(&se_dagger, r + random.float(f32) * random_angle, 6, 0.10, 20);
 
         self.world.playPositionalSound("assets/sounds/stab.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
@@ -665,6 +673,20 @@ pub const Tower = struct {
     pub fn stabEffect(self: *Tower, se_spec: *const SpriteEffectSpec, r: f32, offset: f32, effect_life_sec: f32) void {
         self.setAssocEffectAngle(se_spec, r, offset, effect_life_sec);
         var effect = self.world.sprite_effects.getPtr(self.assoc_effect.?);
+        effect.offset_coef = 0.9;
+    }
+
+    pub fn stabEffectDelayed(self: *Tower, se_spec: *const SpriteEffectSpec, r: f32, offset: f32, effect_life_sec: f32, frame_count: u32) void {
+        const basis_x = self.world_x + 8;
+        const basis_y = self.world_y + 8;
+        const eid = self.world.spawnSpriteEffect(se_spec, @intCast(i32, basis_x), @intCast(i32, basis_y)) catch unreachable;
+        var effect = self.world.sprite_effects.getPtr(eid);
+        effect.delay = FrameTimer.initFrames(self.world.world_frame, frame_count);
+        effect.setAngleOffset(r, offset);
+        effect.lifetime = self.world.createTimerSeconds(effect_life_sec);
+        const life_frames = effect.lifetime.?.durationFrames();
+        effect.lifetime.?.frame_start = effect.delay.frame_end;
+        effect.lifetime.?.frame_end = effect.delay.frame_end + life_frames;
         effect.offset_coef = 0.9;
     }
 
@@ -862,6 +884,8 @@ pub const SpriteEffect = struct {
     p_post_angle: f32 = 0,
     post_angle: f32 = 0,
     dead: bool = false,
+    /// For delayed effects, a timer that must expire before the effect plays.
+    delay: FrameTimer = .{},
     lifetime: ?FrameTimer = null,
     angular_vel: f32 = 0,
     offset_coef: f32 = 1,
@@ -879,6 +903,9 @@ pub const SpriteEffect = struct {
     }
 
     fn update(self: *SpriteEffect, frame: u64) void {
+        if (!self.delay.expired(frame)) {
+            return;
+        }
         self.p_world_x = self.world_x;
         self.p_world_y = self.world_y;
         self.p_offset_x = self.offset_x;
@@ -1167,6 +1194,19 @@ const DelayedDamage = struct {
     timer: FrameTimer,
 };
 
+const EffectType = enum {
+    swing,
+    stab,
+};
+
+const DelayedEffect = struct {
+    tower: TowerId,
+    amount: u32,
+    direction: [2]f32,
+    damage_type: DamageType,
+    timer: FrameTimer,
+};
+
 pub const World = struct {
     allocator: Allocator,
     map: Tilemap = .{},
@@ -1198,6 +1238,7 @@ pub const World = struct {
     player_won: bool = false,
     music_filename: ?[:0]const u8 = null,
     next_wave_timer: FrameTimer = .{},
+    rng: std.rand.DefaultPrng,
 
     pub fn init(allocator: Allocator) World {
         return .{
@@ -1206,6 +1247,7 @@ pub const World = struct {
             .path_cache = PathfindingCache.init(allocator),
             .scratch_cache = PathfindingCache.init(allocator),
             .goal = undefined,
+            .rng = std.rand.DefaultPrng.init(@intCast(u64, std.time.milliTimestamp())),
         };
     }
 
