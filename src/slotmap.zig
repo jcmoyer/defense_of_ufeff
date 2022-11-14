@@ -445,7 +445,7 @@ pub fn IntrusiveGenSlotMap(comptime T: type) type {
 
 test "IntrusiveGenSlotMap" {
     const Obj = struct {
-        id: GenHandle = undefined,
+        id: GenHandle(struct {}) = undefined,
         value: []const u8,
     };
 
