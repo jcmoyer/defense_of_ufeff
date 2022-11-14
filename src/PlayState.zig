@@ -222,13 +222,14 @@ pub fn create(game: *Game) !*PlayState {
 
     var button_base = self.game.texman.getNamedTexture("button_base.png");
     var button_badges = self.game.texman.getNamedTexture("button_badges.png");
-    self.t_demolish = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(0, 0, 32, 32));
-    self.t_fast_off = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(32, 0, 32, 32));
-    self.t_pause = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(64, 0, 32, 32));
-    self.t_resume = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(96, 0, 32, 32));
-    self.t_wall = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(128, 0, 32, 32));
-    self.t_soldier = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(160, 0, 32, 32));
-    self.t_fast_on = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(192, 0, 32, 32));
+    const white = .{ 255, 255, 255, 255 };
+    self.t_demolish = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(0, 0, 32, 32), white);
+    self.t_fast_off = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(32, 0, 32, 32), white);
+    self.t_pause = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(64, 0, 32, 32), white);
+    self.t_resume = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(96, 0, 32, 32), white);
+    self.t_wall = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(128, 0, 32, 32), white);
+    self.t_soldier = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(160, 0, 32, 32), white);
+    self.t_fast_on = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(192, 0, 32, 32), white);
 
     const t_panel = self.game.texman.getNamedTexture("ui_panel.png");
     var ui_panel = try self.ui_root.createPanel();
@@ -811,6 +812,7 @@ fn renderTowers(
                 .dest = Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - 4 - cam.view.top(), 16, 16).toRectf(),
                 .flash = t.id.eql(highlight_tower),
                 .flash_mag = highlight_mag,
+                .color = t.spec.tint_rgba,
             });
         }
     }
@@ -1517,7 +1519,7 @@ fn getCachedUpgradeButtonTexture(self: *PlayState, spec: *const wo.TowerSpec) *c
         const base_texture = self.game.texman.getNamedTexture("button_base.png");
         const spec_texture = self.game.texman.getNamedTexture("characters.png");
         const spec_rect = spec.anim_set.?.createAnimator("down").getCurrentRect();
-        gop.value_ptr.* = self.button_generator.createButtonWithBadge(base_texture, spec_texture, spec_rect);
+        gop.value_ptr.* = self.button_generator.createButtonWithBadge(base_texture, spec_texture, spec_rect, spec.tint_rgba);
     }
     return gop.value_ptr.*;
 }
@@ -1542,7 +1544,7 @@ const ButtonTextureGenerator = struct {
         gl.deleteFramebuffers(1, &self.fbo);
     }
 
-    fn createButtonWithBadge(self: *ButtonTextureGenerator, button_base: *const Texture, badge: *const Texture, badge_rect: Rect) *Texture {
+    fn createButtonWithBadge(self: *ButtonTextureGenerator, button_base: *const Texture, badge: *const Texture, badge_rect: Rect, badge_color: [4]u8) *Texture {
         var t = self.texman.createInMemory();
         t.width = button_base.width;
         t.height = button_base.height;
@@ -1582,6 +1584,7 @@ const ButtonTextureGenerator = struct {
             self.r_batch.drawQuad(.{
                 .src = badge_rect.toRectf(),
                 .dest = adjusted_dest.toRectf(),
+                .color = badge_color,
             });
         }
         self.r_batch.end();

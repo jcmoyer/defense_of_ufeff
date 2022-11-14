@@ -405,6 +405,7 @@ pub const TowerSpec = struct {
     gold_cost: u32 = 0,
     upgrades: [3]?*const TowerSpec = [3]?*const TowerSpec{ null, null, null },
     tooltip: ?[]const u8 = null,
+    tint_rgba: [4]u8 = .{ 255, 255, 255, 255 },
 };
 
 pub const t_wall = TowerSpec{
@@ -495,7 +496,7 @@ pub const t_rogue = TowerSpec{
     .anim_set = anim.a_human4.animationSet(),
     .updateFn = rogueUpdate,
     .max_range = 24,
-    .upgrades = [3]?*const TowerSpec{ &t_archer, null, null },
+    .upgrades = [3]?*const TowerSpec{ &t_archer, &t_ninja, null },
 };
 
 fn rogueUpdate(self: *Tower, frame: u64) void {
@@ -508,6 +509,38 @@ fn rogueUpdate(self: *Tower, frame: u64) void {
         self.world.playPositionalSound("assets/sounds/stab.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
         self.world.monsters.getPtr(m).hurtDirectional(2, [2]f32{ std.math.cos(r), std.math.sin(r) });
+        self.lookTowards(p[0], p[1]);
+        self.cooldown.restart(frame);
+    }
+}
+
+pub const t_ninja = TowerSpec{
+    .cooldown = 1,
+    .gold_cost = 25,
+    .tooltip = "Upgrade to Ninja\n$5\n\nMelee multi-hit attack.\nExcels at single target.",
+
+    .anim_set = anim.a_human4.animationSet(),
+    .updateFn = ninjaUpdate,
+    .max_range = 24,
+    .upgrades = [3]?*const TowerSpec{ null, null, null },
+    .tint_rgba = .{ 128, 128, 128, 255 },
+};
+
+fn ninjaUpdate(self: *Tower, frame: u64) void {
+    if (self.cooldown.expired(frame)) {
+        const m = self.pickMonsterGeneric() orelse return;
+        const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
+        const r = self.angleTo(p[0], p[1]);
+        self.stabEffect(&se_dagger, r, 10, 0.3);
+
+        self.world.playPositionalSound("assets/sounds/stab.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
+
+        self.world.monsters.getPtr(m).hurtDirectional(2, [2]f32{ std.math.cos(r), std.math.sin(r) });
+        self.world.monsters.getPtr(m).hurtDirectionalDelayed(2, [2]f32{ std.math.cos(r), std.math.sin(r) }, .generic, 5);
+        self.world.monsters.getPtr(m).hurtDirectionalDelayed(2, [2]f32{ std.math.cos(r), std.math.sin(r) }, .generic, 10);
+        self.world.monsters.getPtr(m).hurtDirectionalDelayed(2, [2]f32{ std.math.cos(r), std.math.sin(r) }, .generic, 15);
+        self.world.monsters.getPtr(m).hurtDirectionalDelayed(2, [2]f32{ std.math.cos(r), std.math.sin(r) }, .generic, 20);
+
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
     }

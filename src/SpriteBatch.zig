@@ -194,7 +194,7 @@ fn flush(self: *SpriteBatch, remap: bool) void {
 pub const DrawQuadOptions = struct {
     src: Rectf,
     dest: Rectf,
-    color: @Vector(4, u8) = @splat(4, @as(u8, 255)),
+    color: [4]u8 = @splat(4, @as(u8, 255)),
     flash: bool = false,
     flash_mag: f32 = 1,
 };
