@@ -23,8 +23,6 @@ const ui = @import("ui.zig");
 const Texture = @import("texture.zig").Texture;
 
 game: *Game,
-r_batch: SpriteBatch,
-r_font: BitmapFont,
 fontspec: bmfont.BitmapFontSpec,
 ui_root: ui.Root,
 ui_tip: *ui.Button,
@@ -67,15 +65,12 @@ pub fn create(game: *Game) !*MenuState {
     var self = try game.allocator.create(MenuState);
     self.* = .{
         .game = game,
-        .r_batch = SpriteBatch.create(),
-        .r_font = undefined,
         .fontspec = undefined,
         .ui_root = ui.Root.init(game.allocator, &game.sdl_backend),
         .rng = std.rand.DefaultPrng.init(@intCast(u64, std.time.milliTimestamp())),
         // Initialized below
         .ui_tip = undefined,
     };
-    self.r_font = BitmapFont.init(&self.r_batch);
 
     _ = try self.createMenuButton("New Game", onNewGameClick);
     _ = try self.createMenuButton("Options", onOptionsClick);
@@ -143,7 +138,6 @@ fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.Bitm
 
 pub fn destroy(self: *MenuState) void {
     self.fontspec.deinit();
-    self.r_batch.destroy();
     self.ui_root.deinit();
     self.game.allocator.destroy(self);
 }
@@ -168,14 +162,14 @@ pub fn update(self: *MenuState) void {
 }
 
 pub fn render(self: *MenuState, alpha: f64) void {
-    self.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
+    self.game.renderers.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
 
     gl.clearColor(0x64.0 / 255.0, 0x95.0 / 255.0, 0xED.0 / 255.0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     self.renderBackground(alpha);
 
-    self.r_font.begin(.{
+    self.game.renderers.r_font.begin(.{
         .texture = self.game.texman.getNamedTexture("CommonCase.png"),
         .spec = &self.fontspec,
     });
@@ -183,13 +177,13 @@ pub fn render(self: *MenuState, alpha: f64) void {
     var measured = self.fontspec.measureText(tips[self.tip_index]);
     measured.centerOn(Game.INTERNAL_WIDTH / 2, @floatToInt(i32, 0.8 * Game.INTERNAL_HEIGHT));
 
-    self.r_font.drawText(tips[self.tip_index], .{ .dest = Rect.init(0, 200, 512, 50), .h_alignment = .center });
-    self.r_font.end();
+    self.game.renderers.r_font.drawText(tips[self.tip_index], .{ .dest = Rect.init(0, 200, 512, 50), .h_alignment = .center });
+    self.game.renderers.r_font.end();
 
     ui.renderUI(.{
-        .r_batch = &self.r_batch,
-        .r_font = &self.r_font,
-        .r_imm = &self.game.imm,
+        .r_batch = &self.game.renderers.r_batch,
+        .r_font = &self.game.renderers.r_font,
+        .r_imm = &self.game.renderers.r_imm,
         .font_texture = self.game.texman.getNamedTexture("CommonCase.png"),
         .font_spec = &self.fontspec,
     }, self.ui_root);
@@ -200,7 +194,7 @@ pub fn handleEvent(self: *MenuState, ev: sdl.SDL_Event) void {
 }
 
 pub fn renderBackground(self: *MenuState, alpha: f64) void {
-    self.r_batch.begin(.{
+    self.game.renderers.r_batch.begin(.{
         .texture = self.game.texman.getNamedTexture("special.png"),
     });
 
@@ -216,7 +210,7 @@ pub fn renderBackground(self: *MenuState, alpha: f64) void {
     while (y < num_y) : (y += 1) {
         x = 0;
         while (x < num_x) : (x += 1) {
-            self.r_batch.drawQuad(.{
+            self.game.renderers.r_batch.drawQuad(.{
                 .src = src,
                 .dest = Rectf.init(
                     @intToFloat(f32, x) * src.w - scroll_offset,
@@ -228,5 +222,5 @@ pub fn renderBackground(self: *MenuState, alpha: f64) void {
             });
         }
     }
-    self.r_batch.end();
+    self.game.renderers.r_batch.end();
 }

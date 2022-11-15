@@ -16,6 +16,7 @@ const OptionsState = @import("OptionsState.zig");
 const ui = @import("ui.zig");
 const InputState = @import("input.zig").InputState;
 const Rect = @import("Rect.zig");
+const RenderServices = @import("render.zig").RenderServices;
 
 /// Updates per second
 const UPDATE_RATE = 30;
@@ -29,9 +30,9 @@ window: *sdl.SDL_Window,
 context: sdl.SDL_GLContext,
 running: bool = false,
 
-imm: ImmRenderer,
 texman: TextureManager,
 audio: *AudioSystem,
+renderers: RenderServices,
 
 scene_framebuf: gl.GLuint = 0,
 scene_renderbuf: gl.GLuint = 0,
@@ -67,7 +68,6 @@ pub fn create(allocator: Allocator) !*Game {
         .texman = undefined,
         .window = undefined,
         .context = undefined,
-        .imm = undefined,
         .audio = undefined,
         .scene_color = undefined,
         .input = undefined,
@@ -75,6 +75,7 @@ pub fn create(allocator: Allocator) !*Game {
         .st_play = undefined,
         .st_options = undefined,
         .sdl_backend = undefined,
+        .renderers = undefined,
     };
 
     if (sdl.SDL_Init(sdl.SDL_INIT_EVERYTHING) != 0) {
@@ -123,7 +124,7 @@ pub fn create(allocator: Allocator) !*Game {
     ptr.sdl_backend = ui.SDLBackend.init(ptr.window);
     ptr.input = InputState.init();
     ptr.texman = TextureManager.init(allocator);
-    ptr.imm = ImmRenderer.create();
+    ptr.renderers.init(&ptr.texman);
     ptr.audio = AudioSystem.create(allocator);
 
     ptr.init();
@@ -152,6 +153,7 @@ pub fn destroy(self: *Game) void {
     self.st_play.destroy();
     self.st_menu.destroy();
     self.st_options.destroy();
+    self.renderers.deinit();
     self.texman.deinit();
     self.audio.destroy();
     self.sdl_backend.deinit();
@@ -241,10 +243,10 @@ pub fn render(self: *Game, alpha: f64) void {
 
     self.endRenderToScene();
 
-    self.imm.beginTextured(.{
+    self.renderers.r_imm.beginTextured(.{
         .texture = self.scene_color,
     });
-    self.imm.drawQuad(
+    self.renderers.r_imm.drawQuad(
         self.output_rect.x,
         self.output_rect.y,
         @intCast(u32, self.output_rect.w),
@@ -341,7 +343,7 @@ fn initFramebuffer(self: *Game) void {
 fn beginRenderToScene(self: *Game) void {
     gl.viewport(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
     gl.bindFramebuffer(gl.FRAMEBUFFER, self.scene_framebuf);
-    self.imm.setOutputDimensions(INTERNAL_WIDTH, INTERNAL_HEIGHT);
+    self.renderers.r_imm.setOutputDimensions(INTERNAL_WIDTH, INTERNAL_HEIGHT);
 }
 
 /// After this call, `self.scene_color` is the texture containing color information.
@@ -351,7 +353,7 @@ fn endRenderToScene(self: *Game) void {
     var window_width: c_int = 0;
     var window_height: c_int = 0;
     sdl.SDL_GetWindowSize(self.window, &window_width, &window_height);
-    self.imm.setOutputDimensions(@intCast(u32, window_width), @intCast(u32, window_height));
+    self.renderers.r_imm.setOutputDimensions(@intCast(u32, window_width), @intCast(u32, window_height));
     gl.viewport(0, 0, window_width, window_height);
 }
 

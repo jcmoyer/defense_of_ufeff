@@ -23,8 +23,6 @@ const ui = @import("ui.zig");
 const Texture = @import("texture.zig").Texture;
 
 game: *Game,
-r_batch: SpriteBatch,
-r_font: BitmapFont,
 fontspec: bmfont.BitmapFontSpec,
 ui_root: ui.Root,
 
@@ -82,14 +80,11 @@ pub fn create(game: *Game) !*OptionsState {
     var self = try game.allocator.create(OptionsState);
     self.* = .{
         .game = game,
-        .r_batch = SpriteBatch.create(),
-        .r_font = undefined,
         .fontspec = undefined,
         .ui_root = ui.Root.init(game.allocator, &game.sdl_backend),
         // Initialized below
         .btn_fullscreen = undefined,
     };
-    self.r_font = BitmapFont.init(&self.r_batch);
 
     var b_back = try self.ui_root.createButton();
     b_back.ev_click.setCallback(self, onBackClick);
@@ -152,7 +147,6 @@ fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.Bitm
 
 pub fn destroy(self: *OptionsState) void {
     self.fontspec.deinit();
-    self.r_batch.destroy();
     self.ui_root.deinit();
     self.game.allocator.destroy(self);
 }
@@ -174,21 +168,21 @@ pub fn update(self: *OptionsState) void {
 }
 
 pub fn render(self: *OptionsState, alpha: f64) void {
-    self.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
+    self.game.renderers.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
 
     self.game.st_menu.renderBackground(alpha);
 
-    self.r_font.begin(.{
+    self.game.renderers.r_font.begin(.{
         .texture = self.game.texman.getNamedTexture("CommonCase.png"),
         .spec = &self.fontspec,
     });
-    self.r_font.drawText("Options", .{ .dest = Rect.init(0, 0, Game.INTERNAL_WIDTH, 50), .h_alignment = .center });
-    self.r_font.end();
+    self.game.renderers.r_font.drawText("Options", .{ .dest = Rect.init(0, 0, Game.INTERNAL_WIDTH, 50), .h_alignment = .center });
+    self.game.renderers.r_font.end();
 
     ui.renderUI(.{
-        .r_batch = &self.r_batch,
-        .r_font = &self.r_font,
-        .r_imm = &self.game.imm,
+        .r_batch = &self.game.renderers.r_batch,
+        .r_font = &self.game.renderers.r_font,
+        .r_imm = &self.game.renderers.r_imm,
         .font_texture = self.game.texman.getNamedTexture("CommonCase.png"),
         .font_spec = &self.fontspec,
     }, self.ui_root);

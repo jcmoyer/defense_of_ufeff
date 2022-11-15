@@ -20,6 +20,7 @@ const TileBank = tmod.TileBank;
 const Tilemap = tmod.Tilemap;
 const TileLayer = tmod.TileLayer;
 const TileCoord = tmod.TileCoord;
+const TileRange = tmod.TileRange;
 
 const AudioSystem = @import("audio.zig").AudioSystem;
 
@@ -1175,21 +1176,6 @@ pub const WaveList = struct {
             wave.deinit(allocator);
         }
         allocator.free(self.waves);
-    }
-};
-
-pub const TileRange = struct {
-    /// Indices inclusive
-    min: TileCoord,
-    /// Indices inclusive
-    max: TileCoord,
-
-    pub fn getWidth(self: TileRange) usize {
-        return self.max.x - self.min.x;
-    }
-
-    pub fn getHeight(self: TileRange) usize {
-        return self.max.y - self.min.y;
     }
 };
 

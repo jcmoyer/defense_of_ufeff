@@ -72,6 +72,21 @@ pub const TileCoord = struct {
     }
 };
 
+pub const TileRange = struct {
+    /// Indices inclusive
+    min: TileCoord,
+    /// Indices inclusive
+    max: TileCoord,
+
+    pub fn getWidth(self: TileRange) usize {
+        return self.max.x - self.min.x;
+    }
+
+    pub fn getHeight(self: TileRange) usize {
+        return self.max.y - self.min.y;
+    }
+};
+
 /// Flags used to determine collision when entering a tile.
 pub const CollisionFlags = packed struct {
     from_right: bool = false,
