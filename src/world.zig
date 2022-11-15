@@ -1621,7 +1621,7 @@ pub const World = struct {
         for (self.monsters.slice()) |*m| {
             m.update(self.world_frame);
             if (m.dead) {
-                mon_pending_removal.append(frame_arena, m.id) catch unreachable;
+                self.monsters.erase(m.id);
             }
         }
 
@@ -1636,6 +1636,9 @@ pub const World = struct {
                     switch (dd.damage_type) {
                         .generic => m.hurtDirectionalGenericDamage(dd.amount, dd.direction),
                         .slash => m.hurtDirectionalSlashDamage(dd.amount, dd.direction),
+                    }
+                    if (m.dead) {
+                        self.monsters.erase(m.id);
                     }
                 }
                 _ = self.delayed_damage.swapRemove(damage_id);
