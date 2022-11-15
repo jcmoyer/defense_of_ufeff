@@ -346,7 +346,7 @@ pub const Monster = struct {
 
     pub fn hurtDirectional(self: *Monster, amt: u32, dir: [2]f32) void {
         std.debug.assert(self.dead == false);
-        self.flash_frames = 1;
+        self.flash_frames +|= 1;
         self.hp -|= amt;
         if (self.hp == 0) {
             self.kill();
@@ -1618,6 +1618,16 @@ pub const World = struct {
             }
         }
 
+        for (self.monsters.slice()) |*m| {
+            m.update(self.world_frame);
+            if (m.dead) {
+                mon_pending_removal.append(frame_arena, m.id) catch unreachable;
+            }
+        }
+
+        // we process delayed damage here so that it applies flash frames, but
+        // before processing towers because if a monster dies to delayed damage,
+        // we don't want towers to target it this frame
         var damage_id: usize = self.delayed_damage.items.len -% 1;
         while (damage_id < self.delayed_damage.items.len) : (damage_id -%= 1) {
             const dd = self.delayed_damage.items[damage_id];
@@ -1632,12 +1642,6 @@ pub const World = struct {
             }
         }
 
-        for (self.monsters.slice()) |*m| {
-            m.update(self.world_frame);
-            if (m.dead) {
-                mon_pending_removal.append(frame_arena, m.id) catch unreachable;
-            }
-        }
         for (self.towers.slice()) |*t| {
             t.update(self.world_frame);
         }
