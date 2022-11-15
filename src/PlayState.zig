@@ -636,8 +636,10 @@ fn renderSpriteEffects(
     });
     for (self.world.sprite_effects.slice()) |t| {
         var animator = t.animator orelse continue;
-        if (!t.delay.expired(self.world.world_frame)) {
-            continue;
+        if (t.delay) |delay| {
+            if (!delay.expired(self.world.world_frame)) {
+                continue;
+            }
         }
 
         const angle = zm.lerpV(t.p_angle, t.angle, @floatCast(f32, alpha));

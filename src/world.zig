@@ -682,12 +682,13 @@ pub const Tower = struct {
         const basis_y = self.world_y + 8;
         const eid = self.world.spawnSpriteEffect(se_spec, @intCast(i32, basis_x), @intCast(i32, basis_y)) catch unreachable;
         var effect = self.world.sprite_effects.getPtr(eid);
-        effect.delay = FrameTimer.initFrames(self.world.world_frame, frame_count);
+        const delay = FrameTimer.initFrames(self.world.world_frame, frame_count);
+        effect.delay = delay;
         effect.setAngleOffset(r, offset);
         effect.lifetime = self.world.createTimerSeconds(effect_life_sec);
         const life_frames = effect.lifetime.?.durationFrames();
-        effect.lifetime.?.frame_start = effect.delay.frame_end;
-        effect.lifetime.?.frame_end = effect.delay.frame_end + life_frames;
+        effect.lifetime.?.frame_start = delay.frame_end;
+        effect.lifetime.?.frame_end = delay.frame_end + life_frames;
         effect.offset_coef = 0.9;
         effect.activate_sound = .stab;
     }
@@ -893,7 +894,7 @@ pub const SpriteEffect = struct {
     dead: bool = false,
     activated: bool = false,
     /// For delayed effects, a timer that must expire before the effect plays.
-    delay: FrameTimer = .{},
+    delay: ?FrameTimer = null,
     lifetime: ?FrameTimer = null,
     angular_vel: f32 = 0,
     offset_coef: f32 = 1,
@@ -912,8 +913,10 @@ pub const SpriteEffect = struct {
     }
 
     fn update(self: *SpriteEffect, frame: u64) void {
-        if (!self.delay.expired(frame)) {
-            return;
+        if (self.delay) |delay| {
+            if (!delay.expired(frame)) {
+                return;
+            }
         }
         if (!self.activated) {
             self.world.playPositionalSoundId(self.activate_sound, @floatToInt(i32, self.world_x), @floatToInt(i32, self.world_y));
