@@ -72,7 +72,7 @@ pub fn create(game: *Game) !*MenuState {
         .ui_tip = undefined,
     };
 
-    _ = try self.createMenuButton("New Game", onNewGameClick);
+    _ = try self.createMenuButton("Play Game", onPlayGameClick);
     _ = try self.createMenuButton("Options", onOptionsClick);
     _ = try self.createMenuButton("Quit", onQuitClick);
 
@@ -105,10 +105,10 @@ fn showRandomTip(self: *MenuState) void {
     self.tip_index = self.rng.random().intRangeLessThan(usize, 0, tips.len);
 }
 
-fn onNewGameClick(button: *ui.Button, self: *MenuState) void {
+fn onPlayGameClick(button: *ui.Button, self: *MenuState) void {
     _ = button;
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
-    self.game.changeState(.play);
+    self.game.changeState(.levelselect);
 }
 
 fn onOptionsClick(button: *ui.Button, self: *MenuState) void {

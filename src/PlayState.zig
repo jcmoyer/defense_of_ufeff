@@ -89,8 +89,6 @@ const NextWaveTimer = struct {
     }
 };
 
-const FingerRenderer = @import("FingerRenderer.zig");
-
 game: *Game,
 camera: Camera = DEFAULT_CAMERA,
 prev_camera: Camera = DEFAULT_CAMERA,
@@ -99,7 +97,6 @@ heart_anim: anim.Animator = anim.a_goal_heart.animationSet().createAnimator("def
 world: wo.World,
 fontspec: bmfont.BitmapFontSpec,
 fontspec_numbers: bmfont.BitmapFontSpec,
-r_finger: FingerRenderer,
 frame_arena: std.heap.ArenaAllocator,
 ui_root: ui.Root,
 ui_buttons: [8]*ui.Button,
@@ -159,7 +156,6 @@ pub fn create(game: *Game) !*PlayState {
         .world = wo.World.init(game.allocator),
         .fontspec = undefined,
         .fontspec_numbers = undefined,
-        .r_finger = FingerRenderer.create(),
         .ui_root = ui.Root.init(game.allocator, &game.sdl_backend),
         .t_minimap = game.texman.createInMemory(),
         // Created/destroyed in update()

@@ -1231,6 +1231,7 @@ pub const World = struct {
     goal: Goal,
     view: Rect = .{},
     play_area: ?Rect = null,
+    custom_rects: std.StringArrayHashMapUnmanaged(Rect) = .{},
     lives_at_goal: u32 = 30,
     recoverable_lives: u32 = 30,
     player_gold: u32 = 50,
@@ -1270,6 +1271,10 @@ pub const World = struct {
         self.sprite_effects.deinit(self.allocator);
         self.tower_map.deinit(self.allocator);
         self.delayed_damage.deinit(self.allocator);
+        for (self.custom_rects.keys()) |k| {
+            self.allocator.free(k);
+        }
+        self.custom_rects.clearAndFree(self.allocator);
         for (self.spawn_map.keys()) |k| {
             self.allocator.free(k);
         }
@@ -1279,6 +1284,16 @@ pub const World = struct {
         if (self.music_filename) |s| {
             self.allocator.free(s);
         }
+    }
+
+    fn addCustomRect(self: *World, name: []const u8, rect: Rect) !void {
+        const name_dup = try self.allocator.dupe(u8, name);
+        errdefer self.allocator.free(name_dup);
+        try self.custom_rects.put(self.allocator, name_dup, rect);
+    }
+
+    pub fn getCustomRectByName(self: *World, name: []const u8) ?Rect {
+        return self.custom_rects.get(name);
     }
 
     fn createTimerSeconds(self: *World, sec: f32) FrameTimer {
@@ -2179,6 +2194,8 @@ fn loadObjectGroup(layer: TiledObjectGroup, ctx: LoadContext) !void {
             ctx.world.setGoal(TileCoord.initSignedWorld(obj.x, obj.y));
         } else if (std.mem.eql(u8, obj.class, "play_area")) {
             ctx.world.play_area = Rect.init(obj.x, obj.y, obj.width, obj.height);
+        } else if (std.mem.eql(u8, obj.class, "custom_rect")) {
+            try ctx.world.addCustomRect(obj.name, Rect.init(obj.x, obj.y, obj.width, obj.height));
         }
     }
 }

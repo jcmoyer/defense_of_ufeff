@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.9" tiledversion="1.9.2" orientation="orthogonal" renderorder="right-down" width="32" height="16" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="4">
+ <editorsettings>
+  <export target="level_select.tmj" format="json"/>
+ </editorsettings>
+ <tileset firstgid="1" source="terrain.tsx"/>
+ <tileset firstgid="1025" source="special.tsx"/>
+ <layer id="1" name="base" width="32" height="16">
+  <data encoding="base64" compression="zlib">
+   eJzTZ2Bg0IdiAyCWxoF9gNiLCT9eCVQjSSLWHyT2+wNxAB77lwNxDx43dALl1Miwn5C9MCwJdQMfEPMDsQAQdyNhcuyWJMJeZPtBWA+IfVkgGOSOAjLtJcV+ZPV+aPFFid2E7Melx5cK9uKzn1pmk2o/Pe1Ft38g7IbZX8Qycu0H2T2Q9o/igcUAuptApA==
+  </data>
+ </layer>
+ <layer id="2" name="detail" width="32" height="16">
+  <data encoding="base64" compression="zlib">
+   eJy1lE0OwiAQhRvC2uoBegPjQjfuTZe60F09gYtu/EuKSc8uJEx4GSmFFid5KZnCfG+gpZdFctR6zcGqjlzfjMzrE33UEWwfk3L4bj1hD4aiksPjBlRlZIYC+12Ioii1lsL5mBK3hDOnvg37CSqt/hlDbFSuwL3Ecw6x5/BN7Y4x6Yl9b7V2GfnE7dj30wGfPGx0/bPWJQPf1FSMQUzch1a4OSc9vms9rKbylfzlI9Pn1QT/51+at/Lwr55ayMK6Ia7PA0UrnId9oP+PdFJQQ0VyqWf00LCc8fC2fOSNKcaDqU+9+u44zB8T+Vy8Lt7pyK08PmjOHD73wPfa54Xnvu9KUjk=
+  </data>
+ </layer>
+ <objectgroup id="3" name="objects">
+  <object id="1" name="map01" class="custom_rect" x="16" y="176" width="16" height="16"/>
+  <object id="2" name="map02" class="custom_rect" x="208" y="64" width="16" height="16"/>
+  <object id="3" name="map03" class="custom_rect" x="448" y="112" width="16" height="16"/>
+ </objectgroup>
+</map>
