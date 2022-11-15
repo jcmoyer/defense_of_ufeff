@@ -34,6 +34,7 @@ const ProgressionState = extern struct {
 const Substate = enum {
     none,
     fadein,
+    fadeout,
 };
 
 const Finger = struct {
@@ -145,7 +146,13 @@ fn createButtonForRect(self: *LevelSelectState, rect: Rect, mapid: u32) !*ui.But
     if (mapid > self.prog_state.num_complete) {
         btn.state = .disabled;
     }
+    btn.ev_click.setCallback(self, onLevelButtonClick);
     return btn;
+}
+
+fn onLevelButtonClick(button: *ui.Button, self: *LevelSelectState) void {
+    _ = button;
+    self.beginFadeOut();
 }
 
 fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.BitmapFontSpec {
@@ -170,7 +177,9 @@ pub fn destroy(self: *LevelSelectState) void {
 }
 
 pub fn enter(self: *LevelSelectState, from: ?Game.StateId) void {
-    if (self.music_params == null) {
+    if (self.music_params) |params| {
+        params.paused.store(false, .SeqCst);
+    } else {
         self.music_params = self.game.audio.playMusic("assets/music/Daybreak.ogg", .{});
     }
     self.beginFadeIn();
@@ -178,17 +187,25 @@ pub fn enter(self: *LevelSelectState, from: ?Game.StateId) void {
 }
 
 pub fn leave(self: *LevelSelectState, to: ?Game.StateId) void {
-    _ = self;
     _ = to;
+    if (self.music_params) |params| {
+        params.paused.store(true, .SeqCst);
+    }
 }
 
 pub fn update(self: *LevelSelectState) void {
     if (self.music_params) |params| {
         const t = self.fade_timer.progressClamped(self.game.frame_counter);
-        params.volume.store(t, .SeqCst);
+        if (self.sub == .fadein or self.sub == .none) {
+            params.volume.store(t, .SeqCst);
+        } else if (self.sub == .fadeout) {
+            params.volume.store(1 - t, .SeqCst);
+        }
     }
     if (self.sub == .fadein and self.fade_timer.expired(self.game.frame_counter)) {
         self.sub = .none;
+    } else if (self.sub == .fadeout and self.fade_timer.expired(self.game.frame_counter)) {
+        self.endFadeOut();
     }
 
     self.r_world.updateAnimations();
@@ -230,12 +247,26 @@ fn beginFadeIn(self: *LevelSelectState) void {
     self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
 }
 
+fn beginFadeOut(self: *LevelSelectState) void {
+    self.sub = .fadeout;
+    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
+}
+
+fn endFadeOut(self: *LevelSelectState) void {
+    std.debug.assert(self.sub == .fadeout);
+    self.sub = .none;
+    self.game.st_play.loadWorld("map01");
+    self.game.changeState(.play);
+}
+
 fn renderFade(self: *LevelSelectState) void {
-    if (self.sub != .fadein) {
+    if (self.sub != .fadein and self.sub != .fadeout) {
         return;
     }
 
-    const a = self.fade_timer.invProgressClamped(self.game.frame_counter);
+    const t_out = self.fade_timer.progressClamped(self.game.frame_counter);
+    const t_in = 1 - t_out;
+    const a = if (self.sub == .fadein) t_in else t_out;
 
     self.game.renderers.r_imm.beginUntextured();
     self.game.renderers.r_imm.drawQuadRGBA(Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT), zm.f32x4(0, 0, 0, a));

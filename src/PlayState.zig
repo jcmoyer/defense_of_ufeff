@@ -410,7 +410,7 @@ pub fn enter(self: *PlayState, from: ?Game.StateId) void {
     _ = from;
     self.setInitialUIState();
     self.beginWipe();
-    self.loadWorld("map01");
+    // self.loadWorld("map01");
 }
 
 pub fn leave(self: *PlayState, to: ?Game.StateId) void {
@@ -1111,7 +1111,7 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
     }
 }
 
-fn loadWorld(self: *PlayState, mapid: []const u8) void {
+pub fn loadWorld(self: *PlayState, mapid: []const u8) void {
     if (self.music_params) |params| {
         params.done.store(true, .SeqCst);
         params.release();
