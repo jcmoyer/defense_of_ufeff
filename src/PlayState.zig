@@ -25,6 +25,7 @@ const Texture = @import("texture.zig").Texture;
 const FrameTimer = @import("timing.zig").FrameTimer;
 const GenHandle = @import("slotmap.zig").GenHandle;
 const WorldRenderer = @import("WorldRenderer.zig");
+const mathutil = @import("mathutil.zig");
 
 const DEFAULT_CAMERA = Camera{
     .view = Rect.init(0, 0, Game.INTERNAL_WIDTH - gui_panel_width, Game.INTERNAL_HEIGHT),
@@ -1394,10 +1395,11 @@ const ButtonTextureGenerator = struct {
             const desired_center = button_frame_rect.centerPoint();
             var adjusted_dest = badge_rect;
             adjusted_dest.centerOn(desired_center[0], desired_center[1]);
+            const color_mul = if (i == 3) [4]u8{ 128, 128, 128, 255 } else [4]u8{ 255, 255, 255, 255 };
             self.r_batch.drawQuad(.{
                 .src = badge_rect.toRectf(),
                 .dest = adjusted_dest.toRectf(),
-                .color = badge_color,
+                .color = mathutil.colorMulU8(4, badge_color, color_mul),
             });
         }
         self.r_batch.end();

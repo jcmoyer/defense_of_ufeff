@@ -28,3 +28,12 @@ pub fn angleBetween(v0: anytype, v1: anytype) f32 {
     const d = v1 - v0;
     return std.math.atan2(f32, d[1], d[0]);
 }
+
+pub fn colorMulU8(comptime N: usize, a: [N]u8, b: [N]u8) [N]u8 {
+    var result: [N]u8 = undefined;
+    for (a) |a_i, i| {
+        const b_i = b[i];
+        result[i] = @intCast(u8, (@as(u16, a_i) * @as(u16, b_i) + 255) >> 8);
+    }
+    return result;
+}
