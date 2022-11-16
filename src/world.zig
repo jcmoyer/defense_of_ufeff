@@ -479,7 +479,8 @@ fn pyroUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
         const m = self.pickMonsterGeneric() orelse return;
         const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
-        // const r = self.angleTo(p[0], p[1]);
+        const r = self.angleTo(p[0], p[1]);
+        self.stabEffect(&se_staff, r, 10, 5, 1);
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
         _ = self.world.spawnField(.{
@@ -537,7 +538,7 @@ fn rogueUpdate(self: *Tower, frame: u64) void {
         const m = self.pickMonsterGeneric() orelse return;
         const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         const r = self.angleTo(p[0], p[1]);
-        self.stabEffect(&se_dagger, r, 10, 0.3);
+        self.stabEffect(&se_dagger, r, 10, 0.3, 0.9);
 
         self.world.playPositionalSound("assets/sounds/stab.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
@@ -564,7 +565,7 @@ fn ninjaUpdate(self: *Tower, frame: u64) void {
         const m = self.pickMonsterGeneric() orelse return;
         const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         const r = self.angleTo(p[0], p[1]);
-        self.stabEffect(&se_dagger, r, 10, 0.3);
+        self.stabEffect(&se_dagger, r, 10, 0.3, 0.9);
 
         var random = self.world.rng.random();
         const random_angle = std.math.pi / 8.0;
@@ -703,10 +704,10 @@ pub const Tower = struct {
         }
     }
 
-    pub fn stabEffect(self: *Tower, se_spec: *const SpriteEffectSpec, r: f32, offset: f32, effect_life_sec: f32) void {
+    pub fn stabEffect(self: *Tower, se_spec: *const SpriteEffectSpec, r: f32, offset: f32, effect_life_sec: f32, offset_mul: f32) void {
         self.setAssocEffectAngle(se_spec, r, offset, effect_life_sec);
         var effect = self.world.sprite_effects.getPtr(self.assoc_effect.?);
-        effect.offset_coef = 0.9;
+        effect.offset_coef = offset_mul;
     }
 
     pub fn stabEffectDelayed(self: *Tower, se_spec: *const SpriteEffectSpec, r: f32, offset: f32, effect_life_sec: f32, frame_count: u32) void {
@@ -1252,8 +1253,10 @@ const Field = struct {
     tickFn: *const fn (*Field) void,
     life_timer: FrameTimer,
     tick_timer: FrameTimer,
+    emitter: particle.CircleEmitter,
 
     fn update(self: *Field) void {
+        self.emitter.emit(.fire, self.world.world_frame);
         if (self.tick_timer.expired(self.world.world_frame)) {
             self.tickFn(self);
             self.tick_timer.restart(self.world.world_frame);
@@ -1298,6 +1301,7 @@ pub const World = struct {
     music_filename: ?[:0]const u8 = null,
     next_wave_timer: FrameTimer = .{},
     rng: std.rand.DefaultPrng,
+    particle_sys: *particle.ParticleSystem = undefined,
 
     pub fn init(allocator: Allocator) World {
         return .{
@@ -1315,6 +1319,7 @@ pub const World = struct {
         for (self.spawns.slice()) |*s| {
             s.emitter.deinit(self.allocator);
         }
+        self.fields.deinit(self.allocator);
         self.spawns.deinit(self.allocator);
         self.monsters.deinit(self.allocator);
         self.towers.deinit(self.allocator);
@@ -1623,6 +1628,7 @@ pub const World = struct {
             .life_timer = FrameTimer.initSeconds(self.world_frame, opts.duration_sec),
             .tick_timer = FrameTimer.initSeconds(self.world_frame, opts.tick_rate_sec),
             .tickFn = opts.tickFn,
+            .emitter = .{ .parent = self.particle_sys, .pos = opts.position, .radius = opts.radius },
         });
     }
 

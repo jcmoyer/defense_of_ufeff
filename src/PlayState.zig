@@ -134,7 +134,9 @@ t_resume: *Texture,
 t_demolish: *Texture,
 upgrade_texture_cache: std.AutoHashMapUnmanaged(*const wo.TowerSpec, *Texture) = .{},
 
-tooltip_cache: std.AutoHashMapUnmanaged(*const wo.TowerSpec, []const u8) = .{},
+particle_sys: particle.ParticleSystem,
+
+tooltip_cache: std.AutoArrayHashMapUnmanaged(*const wo.TowerSpec, []const u8) = .{},
 
 wipe_scanlines: [Game.INTERNAL_HEIGHT]i32 = undefined,
 
@@ -185,7 +187,11 @@ pub fn create(game: *Game) !*PlayState {
         .button_generator = undefined,
         .wave_timer = undefined,
         .r_world = undefined,
+        .particle_sys = undefined,
     };
+
+    self.particle_sys = try particle.ParticleSystem.initCapacity(game.allocator, 1024);
+    errdefer self.particle_sys.deinit();
 
     self.r_world = try WorldRenderer.create(game.allocator, &game.renderers);
     errdefer self.r_world.destroy(game.allocator);
@@ -400,8 +406,12 @@ pub fn destroy(self: *PlayState) void {
     if (self.music_params) |params| {
         params.release();
     }
+    self.particle_sys.deinit();
     self.r_world.destroy(self.game.allocator);
     self.upgrade_texture_cache.deinit(self.game.allocator);
+    for (self.tooltip_cache.values()) |str| {
+        self.game.allocator.free(str);
+    }
     self.tooltip_cache.deinit(self.game.allocator);
     self.button_generator.deinit();
     self.fontspec.deinit();
@@ -449,6 +459,7 @@ pub fn update(self: *PlayState) void {
     self.ui_minimap.bounds = self.camera.bounds;
 
     self.heart_anim.update();
+    self.particle_sys.update(self.world.world_frame);
 
     self.world.view = self.camera.view;
     if (self.sub == .none and !self.paused) {
@@ -635,10 +646,26 @@ fn renderFields(
     _ = alpha;
     const viewf = cam.view.toRectf();
 
-    self.game.renderers.r_imm.beginUntextured();
-    for (self.world.fields.slice()) |f| {
-        self.game.renderers.r_imm.drawCircle(16, .{ f.world_x - viewf.left(), f.world_y - viewf.top(), 0, 1 }, f.radius, .{ 1, 1, 1, 1 });
+    self.game.renderers.r_batch.begin(.{
+        .texture = self.game.texman.getNamedTexture("special.png"),
+    });
+
+    const pos = self.particle_sys.particles.items(.pos);
+
+    var i: usize = 0;
+
+    while (i < self.particle_sys.num_alive) : (i += 1) {
+        const s = self.particle_sys.particles.items(.scale)[i];
+        const c = self.particle_sys.particles.items(.rgba)[i];
+        var rf = Rectf.init(0, 0, 16, 16);
+        rf.centerOn(pos[i][0], pos[i][1]);
+        self.game.renderers.r_batch.drawQuadTransformed(.{
+            .src = Rect.init(11 * 16, 0, 16, 16).toRectf(),
+            .color = c,
+            .transform = zm.mul(zm.scaling(s, s, 1), zm.translation(pos[i][0] - viewf.left(), pos[i][1] - viewf.top(), 0)),
+        });
     }
+    self.game.renderers.r_batch.end();
 }
 
 fn renderSpriteEffects(
@@ -1137,6 +1164,7 @@ pub fn loadWorld(self: *PlayState, mapid: []const u8) void {
         params.release();
     }
     self.world.deinit();
+    self.particle_sys.clear();
 
     const filename = std.fmt.allocPrint(self.game.allocator, "assets/maps/{s}.tmj", .{mapid}) catch |err| {
         std.log.err("Failed to allocate world path: {!}", .{err});
@@ -1180,6 +1208,7 @@ pub fn loadWorld(self: *PlayState, mapid: []const u8) void {
     // must be set before calling spawnMonster since it's used for audio parameters...
     // should probably clean this up eventually
     self.world.view = self.camera.view;
+    self.world.particle_sys = &self.particle_sys;
 
     self.world.setNextWaveTimer(15);
 }
