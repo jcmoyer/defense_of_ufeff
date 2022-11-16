@@ -206,7 +206,7 @@ fn updateButtonStates(self: *LevelSelectState) void {
 fn onLevelButtonClick(button: *ui.Button, state: *MapButtonState) void {
     _ = button;
     state.state.prog_state.last_map_entered = state.mapid;
-    state.state.game.st_play.loadWorld("map01");
+    state.state.game.st_play.loadWorld(state.mapname);
     state.state.beginFadeOut();
 }
 
