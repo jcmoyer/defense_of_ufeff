@@ -59,7 +59,8 @@ const UpgradeButtonState = struct {
 const Substate = enum {
     none,
     wipe_fadein,
-    gameover_fadeout,
+    gamelose_fadeout,
+    gamewin_fadeout,
 };
 
 const NextWaveTimerState = enum {
@@ -459,11 +460,11 @@ pub fn update(self: *PlayState) void {
     }
 
     if (self.sub == .none and self.world.player_won) {
-        self.beginTransitionGameOver();
+        self.beginTransitionGameWin();
     }
 
-    if (self.sub == .gameover_fadeout and self.fade_timer.expired(self.game.frame_counter)) {
-        self.game.changeState(.menu);
+    if ((self.sub == .gamelose_fadeout or self.sub == .gamewin_fadeout) and self.fade_timer.expired(self.game.frame_counter)) {
+        self.game.changeState(.levelselect);
     }
 
     if (self.music_params) |params| {
@@ -548,7 +549,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
 
 pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
     // stop accepting input
-    if (self.sub == .gameover_fadeout or self.sub == .wipe_fadein) {
+    if (self.sub != .none) {
         return;
     }
 
@@ -1240,7 +1241,12 @@ fn renderMinimapLayer(
 }
 
 fn beginTransitionGameOver(self: *PlayState) void {
-    self.sub = .gameover_fadeout;
+    self.sub = .gamelose_fadeout;
+    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
+}
+
+fn beginTransitionGameWin(self: *PlayState) void {
+    self.sub = .gamewin_fadeout;
     self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
 }
 
@@ -1281,7 +1287,7 @@ fn renderWipe(self: *PlayState, alpha: f64) void {
 }
 
 fn renderFade(self: *PlayState) void {
-    if (self.sub != .gameover_fadeout) {
+    if (self.sub != .gamewin_fadeout and self.sub != .gamelose_fadeout) {
         return;
     }
 

@@ -29,6 +29,19 @@ const FrameTimer = @import("timing.zig").FrameTimer;
 const ProgressionState = extern struct {
     maps: [256]bool = .{false} ** 256,
     num_complete: u32 = 0,
+    last_map_entered: u32 = 0,
+
+    fn setMapComplete(self: *ProgressionState, mapid: u32) void {
+        self.maps[mapid] = true;
+        self.num_complete = @intCast(u32, std.mem.count(bool, &self.maps, &[_]bool{true}));
+    }
+};
+
+const MapButtonState = struct {
+    state: *LevelSelectState,
+    /// Index into ProgressionState.maps
+    mapid: u32,
+    mapname: []const u8,
 };
 
 const Substate = enum {
@@ -85,6 +98,9 @@ prog_state: ProgressionState = .{},
 arena: std.heap.ArenaAllocator,
 sub: Substate = .none,
 fade_timer: FrameTimer = .{},
+buttons: []*ui.Button,
+button_states: []MapButtonState,
+num_buttons: usize = 0,
 
 const camera = Camera{
     .view = Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT),
@@ -101,6 +117,8 @@ pub fn create(game: *Game) !*LevelSelectState {
         // Initialized below
         .r_world = undefined,
         .world = undefined,
+        .buttons = undefined,
+        .button_states = undefined,
     };
 
     errdefer self.r_finger.destroy();
@@ -112,14 +130,22 @@ pub fn create(game: *Game) !*LevelSelectState {
     self.world = try wo.loadWorldFromJson(game.allocator, "assets/maps/level_select.tmj");
     errdefer self.world.deinit();
 
+    self.buttons = try game.allocator.alloc(*ui.Button, self.prog_state.maps.len);
+    errdefer game.allocator.free(self.buttons);
+
+    self.button_states = try game.allocator.alloc(MapButtonState, self.prog_state.maps.len);
+    errdefer game.allocator.free(self.button_states);
+
     const m01 = self.world.getCustomRectByName("map01") orelse return error.NoMap01;
     const m02 = self.world.getCustomRectByName("map02") orelse return error.NoMap02;
     const m03 = self.world.getCustomRectByName("map03") orelse return error.NoMap03;
-    const b01 = try self.createButtonForRect(m01, 0);
-    _ = try self.createButtonForRect(m02, 1);
-    _ = try self.createButtonForRect(m03, 2);
+    try self.createButtonForRect(m01, 0);
+    try self.createButtonForRect(m02, 1);
+    try self.createButtonForRect(m03, 2);
 
-    self.finger.moveTo(@intToFloat(f32, b01.rect.centerPoint()[0]), @intToFloat(f32, b01.rect.centerPoint()[1]), FrameTimer.initSeconds(self.game.frame_counter, 1));
+    try self.loadProgression();
+    self.updateButtonStates();
+    self.moveFingerToRecommendedMap();
 
     // TODO probably want a better way to manage this, direct IO shouldn't be here
     // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
@@ -129,41 +155,9 @@ pub fn create(game: *Game) !*LevelSelectState {
     return self;
 }
 
-fn createButtonForRect(self: *LevelSelectState, rect: Rect, mapid: u32) !*ui.Button {
-    var btn = try self.ui_root.createButton();
-    btn.rect = Rect.init(0, 0, 32, 32);
-    btn.rect.centerOn(rect.centerPoint()[0], rect.centerPoint()[1]);
-    btn.texture_rects = [4]Rect{
-        Rect.init(0, 0, 32, 32),
-        Rect.init(0, 32, 32, 32),
-        Rect.init(0, 64, 32, 32),
-        Rect.init(0, 96, 32, 32),
-    };
-    btn.setTexture(self.game.texman.getNamedTexture("level_select_button.png"));
-    var allocator = self.arena.allocator();
-    btn.tooltip_text = try std.fmt.allocPrint(allocator, "Map {d}", .{mapid + 1});
-    try self.ui_root.addChild(btn.control());
-    if (mapid > self.prog_state.num_complete) {
-        btn.state = .disabled;
-    }
-    btn.ev_click.setCallback(self, onLevelButtonClick);
-    return btn;
-}
-
-fn onLevelButtonClick(button: *ui.Button, self: *LevelSelectState) void {
-    _ = button;
-    self.beginFadeOut();
-}
-
-fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.BitmapFontSpec {
-    var font_file = try std.fs.cwd().openFile(filename, .{});
-    defer font_file.close();
-    var spec_json = try font_file.readToEndAlloc(allocator, 1024 * 1024);
-    defer allocator.free(spec_json);
-    return try bmfont.BitmapFontSpec.initJson(allocator, spec_json);
-}
-
 pub fn destroy(self: *LevelSelectState) void {
+    self.game.allocator.free(self.buttons);
+    self.game.allocator.free(self.button_states);
     self.r_finger.destroy();
     self.arena.deinit();
     if (self.music_params) |params| {
@@ -176,6 +170,54 @@ pub fn destroy(self: *LevelSelectState) void {
     self.game.allocator.destroy(self);
 }
 
+fn createButtonForRect(self: *LevelSelectState, rect: Rect, mapid: u32) !void {
+    var btn = try self.ui_root.createButton();
+    var allocator = self.arena.allocator();
+    const mapname = try std.fmt.allocPrint(allocator, "map{d:0>2}", .{mapid + 1});
+    self.button_states[self.num_buttons] = .{
+        .mapid = mapid,
+        .mapname = mapname,
+        .state = self,
+    };
+    btn.rect = Rect.init(0, 0, 32, 32);
+    btn.rect.centerOn(rect.centerPoint()[0], rect.centerPoint()[1]);
+    btn.texture_rects = [4]Rect{
+        Rect.init(0, 0, 32, 32),
+        Rect.init(0, 32, 32, 32),
+        Rect.init(0, 64, 32, 32),
+        Rect.init(0, 96, 32, 32),
+    };
+    btn.setTexture(self.game.texman.getNamedTexture("level_select_button.png"));
+    btn.tooltip_text = try std.fmt.allocPrint(allocator, "Map {d}", .{mapid + 1});
+    btn.state = .disabled;
+    try self.ui_root.addChild(btn.control());
+    btn.ev_click.setCallback(&self.button_states[self.num_buttons], onLevelButtonClick);
+    self.buttons[self.num_buttons] = btn;
+    self.num_buttons += 1;
+}
+
+fn updateButtonStates(self: *LevelSelectState) void {
+    var i: usize = 0;
+    while (i <= self.prog_state.num_complete) : (i += 1) {
+        self.buttons[i].state = .normal;
+    }
+}
+
+fn onLevelButtonClick(button: *ui.Button, state: *MapButtonState) void {
+    _ = button;
+    state.state.prog_state.last_map_entered = state.mapid;
+    state.state.game.st_play.loadWorld("map01");
+    state.state.beginFadeOut();
+}
+
+fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.BitmapFontSpec {
+    var font_file = try std.fs.cwd().openFile(filename, .{});
+    defer font_file.close();
+    var spec_json = try font_file.readToEndAlloc(allocator, 1024 * 1024);
+    defer allocator.free(spec_json);
+    return try bmfont.BitmapFontSpec.initJson(allocator, spec_json);
+}
+
 pub fn enter(self: *LevelSelectState, from: ?Game.StateId) void {
     if (self.music_params) |params| {
         params.paused.store(false, .SeqCst);
@@ -183,7 +225,17 @@ pub fn enter(self: *LevelSelectState, from: ?Game.StateId) void {
         self.music_params = self.game.audio.playMusic("assets/music/Daybreak.ogg", .{});
     }
     self.beginFadeIn();
-    _ = from;
+
+    if (from == Game.StateId.play) {
+        if (self.game.st_play.world.player_won) {
+            self.prog_state.setMapComplete(self.prog_state.last_map_entered);
+            self.saveProgression() catch |err| {
+                std.log.err("Failed to save progression: {!}", .{err});
+            };
+            self.updateButtonStates();
+        }
+    }
+    self.moveFingerToRecommendedMap();
 }
 
 pub fn leave(self: *LevelSelectState, to: ?Game.StateId) void {
@@ -255,7 +307,6 @@ fn beginFadeOut(self: *LevelSelectState) void {
 fn endFadeOut(self: *LevelSelectState) void {
     std.debug.assert(self.sub == .fadeout);
     self.sub = .none;
-    self.game.st_play.loadWorld("map01");
     self.game.changeState(.play);
 }
 
@@ -270,4 +321,40 @@ fn renderFade(self: *LevelSelectState) void {
 
     self.game.renderers.r_imm.beginUntextured();
     self.game.renderers.r_imm.drawQuadRGBA(Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT), zm.f32x4(0, 0, 0, a));
+}
+
+fn saveProgression(self: *LevelSelectState) !void {
+    var f = try std.fs.cwd().createFile("progression.dat", .{});
+    defer f.close();
+    try f.writer().writeStruct(self.prog_state);
+}
+
+fn loadProgression(self: *LevelSelectState) !void {
+    var f = std.fs.cwd().openFile("progression.dat", .{}) catch |err| {
+        if (err == error.FileNotFound) {
+            return;
+        } else {
+            return err;
+        }
+    };
+    defer f.close();
+    self.prog_state = try f.reader().readStruct(ProgressionState);
+}
+
+fn moveFingerToRecommendedMap(self: *LevelSelectState) void {
+    if (self.prog_state.num_complete < self.num_buttons) {
+        const b = self.buttons[self.prog_state.num_complete];
+        const p = b.rect.centerPoint();
+        self.finger.moveTo(
+            @intToFloat(f32, p[0]),
+            @intToFloat(f32, p[1]),
+            FrameTimer.initSeconds(self.game.frame_counter, 3),
+        );
+    } else {
+        self.finger.moveTo(
+            Game.INTERNAL_WIDTH * 2,
+            Game.INTERNAL_HEIGHT * -2,
+            FrameTimer.initSeconds(self.game.frame_counter, 3),
+        );
+    }
 }
