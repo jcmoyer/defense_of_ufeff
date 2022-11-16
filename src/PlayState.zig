@@ -134,6 +134,8 @@ t_resume: *Texture,
 t_demolish: *Texture,
 upgrade_texture_cache: std.AutoHashMapUnmanaged(*const wo.TowerSpec, *Texture) = .{},
 
+tooltip_cache: std.AutoHashMapUnmanaged(*const wo.TowerSpec, []const u8) = .{},
+
 wipe_scanlines: [Game.INTERNAL_HEIGHT]i32 = undefined,
 
 deb_render_tile_collision: bool = false,
@@ -209,7 +211,7 @@ pub fn create(game: *Game) !*PlayState {
     try self.ui_root.addChild(ui_panel.control());
 
     var b_wall = try self.ui_root.createButton();
-    b_wall.tooltip_text = wo.t_wall.tooltip;
+    b_wall.tooltip_text = self.getCachedTooltip(&wo.t_wall);
     b_wall.rect = Rect.init(16, 144, 32, 32);
     b_wall.texture_rects = makeStandardButtonRects(0, 0);
     b_wall.setTexture(self.t_wall);
@@ -217,7 +219,7 @@ pub fn create(game: *Game) !*PlayState {
     try ui_panel.addChild(b_wall.control());
 
     var b_tower = try self.ui_root.createButton();
-    b_tower.tooltip_text = wo.t_recruit.tooltip;
+    b_tower.tooltip_text = self.getCachedTooltip(&wo.t_recruit);
     b_tower.rect = Rect.init(48, 144, 32, 32);
     b_tower.texture_rects = makeStandardButtonRects(0, 0);
     b_tower.setTexture(self.t_soldier);
@@ -400,6 +402,7 @@ pub fn destroy(self: *PlayState) void {
     }
     self.r_world.destroy(self.game.allocator);
     self.upgrade_texture_cache.deinit(self.game.allocator);
+    self.tooltip_cache.deinit(self.game.allocator);
     self.button_generator.deinit();
     self.fontspec.deinit();
     self.fontspec_numbers.deinit();
@@ -1309,7 +1312,7 @@ fn updateUpgradeButtons(self: *PlayState) void {
     var i: usize = 0;
     while (i < 3) : (i += 1) {
         if (s.upgrades[i]) |spec| {
-            self.ui_upgrade_buttons[i].tooltip_text = spec.tooltip;
+            self.ui_upgrade_buttons[i].tooltip_text = self.getCachedTooltip(spec);
             self.ui_upgrade_buttons[i].setTexture(self.getCachedUpgradeButtonTexture(spec));
             self.ui_upgrade_states[i].play_state = self;
             self.ui_upgrade_states[i].tower_spec = spec;
@@ -1334,6 +1337,49 @@ fn getCachedUpgradeButtonTexture(self: *PlayState, spec: *const wo.TowerSpec) *c
         const spec_texture = self.game.texman.getNamedTexture("characters.png");
         const spec_rect = spec.anim_set.?.createAnimator("down").getCurrentRect();
         gop.value_ptr.* = self.button_generator.createButtonWithBadge(base_texture, spec_texture, spec_rect, spec.tint_rgba);
+    }
+    return gop.value_ptr.*;
+}
+
+fn renderTooltipString(allocator: std.mem.Allocator, spec: *const wo.TowerSpec) ![]const u8 {
+    const template = spec.tooltip orelse return "[no tooltip]";
+    var rendered_tip = try std.ArrayListUnmanaged(u8).initCapacity(allocator, template.len);
+    errdefer rendered_tip.deinit(allocator);
+    var tip_writer = rendered_tip.writer(allocator);
+    var i: usize = 0;
+    while (i < template.len) {
+        const ch = template[i];
+        if (ch == '%') {
+            const index_of_end = std.mem.indexOfScalarPos(u8, template, i + 1, '%');
+            if (index_of_end) |j| {
+                const var_name = template[i + 1 .. j];
+                if (var_name.len == 0) {
+                    try tip_writer.writeByte('%');
+                } else if (std.mem.eql(u8, var_name, "gold_cost")) {
+                    try tip_writer.print("{d}", .{spec.gold_cost});
+                } else {
+                    return error.UnknownVarName;
+                }
+                i = j + 1;
+            } else {
+                return error.UnmatchedPercent;
+            }
+        } else {
+            try tip_writer.writeByte(ch);
+            i += 1;
+        }
+    }
+    return rendered_tip.toOwnedSlice(allocator);
+}
+
+fn getCachedTooltip(self: *PlayState, spec: *const wo.TowerSpec) []const u8 {
+    var gop = self.tooltip_cache.getOrPut(self.game.allocator, spec) catch unreachable;
+    if (!gop.found_existing) {
+        gop.value_ptr.* = renderTooltipString(self.game.allocator, spec) catch |err| {
+            std.log.warn("Failed to render tooltip string: {!}; template: `{s}`", .{ err, spec.tooltip orelse "[no tooltip]" });
+            gop.value_ptr.* = "[tooltip error]";
+            return gop.value_ptr.*;
+        };
     }
     return gop.value_ptr.*;
 }

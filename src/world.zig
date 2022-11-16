@@ -413,13 +413,13 @@ pub const t_wall = TowerSpec{
     .cooldown = 0,
     .max_range = 0,
     .gold_cost = 1,
-    .tooltip = "Build Wall\n$1\n\nBlocks monster movement.\nCan be built over.",
+    .tooltip = "Build Wall\n$%gold_cost%\n\nBlocks monster movement.\nCan be built over.",
 };
 
 pub const t_recruit = TowerSpec{
     .cooldown = 2,
     .gold_cost = 5,
-    .tooltip = "Train Recruit\n$5\n\nWeak melee attack.\nBlocks monster movement.\nUpgrades into other units.",
+    .tooltip = "Train Recruit\n$%gold_cost%\n\nWeak melee attack.\nBlocks monster movement.\nUpgrades into other units.",
     .upgrades = [3]?*const TowerSpec{ &t_soldier, &t_rogue, &t_magician },
     .anim_set = anim.a_human1.animationSet(),
     .updateFn = recruitUpdate,
@@ -442,7 +442,7 @@ fn recruitUpdate(self: *Tower, frame: u64) void {
 pub const t_magician = TowerSpec{
     .cooldown = 2,
     .gold_cost = 5,
-    .tooltip = "Upgrade to Magician\n$5\n\nMelee attack.\nElemental specializations.",
+    .tooltip = "Upgrade to Magician\n$%gold_cost%\n\nMelee attack.\nElemental specializations.",
     .upgrades = [3]?*const TowerSpec{ null, null, null },
     .anim_set = anim.a_human3.animationSet(),
     .updateFn = magicianUpdate,
@@ -467,7 +467,7 @@ fn magicianUpdate(self: *Tower, frame: u64) void {
 pub const t_soldier = TowerSpec{
     .cooldown = 2,
     .gold_cost = 5,
-    .tooltip = "Upgrade to Soldier\n$5\n\nMelee attack.",
+    .tooltip = "Upgrade to Soldier\n$%gold_cost%\n\nMelee attack.",
     .upgrades = [3]?*const TowerSpec{ null, null, null },
     .anim_set = anim.a_human2.animationSet(),
     .updateFn = soldierUpdate,
@@ -492,7 +492,7 @@ fn soldierUpdate(self: *Tower, frame: u64) void {
 pub const t_rogue = TowerSpec{
     .cooldown = 1,
     .gold_cost = 10,
-    .tooltip = "Upgrade to Rogue\n$5\n\nMelee attack.\nHas ranged specializations.",
+    .tooltip = "Upgrade to Rogue\n$%gold_cost%\n\nMelee attack.\nHas ranged specializations.",
 
     .anim_set = anim.a_human4.animationSet(),
     .updateFn = rogueUpdate,
@@ -518,7 +518,7 @@ fn rogueUpdate(self: *Tower, frame: u64) void {
 pub const t_ninja = TowerSpec{
     .cooldown = 0.75,
     .gold_cost = 25,
-    .tooltip = "Upgrade to Ninja\n$5\n\nMelee multi-hit attack.\nExcels at single target.",
+    .tooltip = "Upgrade to Ninja\n$%gold_cost%\n\nMelee multi-hit attack.\nExcels at single target.",
 
     .anim_set = anim.a_human4.animationSet(),
     .updateFn = ninjaUpdate,
@@ -558,7 +558,7 @@ fn ninjaUpdate(self: *Tower, frame: u64) void {
 pub const t_archer = TowerSpec{
     .cooldown = 1.5,
     .gold_cost = 10,
-    .tooltip = "Upgrade to Archer\n$10\n\nFires slow moving projectiles\nthat have a minimum range.",
+    .tooltip = "Upgrade to Archer\n$%gold_cost%\n\nFires slow moving projectiles\nthat have a minimum range.",
 
     .anim_set = anim.a_human4.animationSet(),
     .updateFn = archerUpdate,
@@ -588,7 +588,7 @@ fn archerUpdate(self: *Tower, frame: u64) void {
 pub const t_gunner = TowerSpec{
     .cooldown = 3,
     .gold_cost = 15,
-    .tooltip = "Upgrade to Gunner\n$10\n\nHigh damage projectiles.\nHigh cooldown.",
+    .tooltip = "Upgrade to Gunner\n$%gold_cost%\n\nHigh damage projectiles.\nHigh cooldown.",
 
     .anim_set = anim.a_human4.animationSet(),
     .updateFn = gunnerUpdate,
