@@ -443,7 +443,7 @@ pub const t_magician = TowerSpec{
     .cooldown = 2,
     .gold_cost = 5,
     .tooltip = "Upgrade to Magician\n$%gold_cost%\n\nMelee attack.\nElemental specializations.",
-    .upgrades = [3]?*const TowerSpec{ null, null, null },
+    .upgrades = [3]?*const TowerSpec{ &t_pyromancer, null, null },
     .anim_set = anim.a_human3.animationSet(),
     .updateFn = magicianUpdate,
     .max_range = 24,
@@ -462,6 +462,38 @@ fn magicianUpdate(self: *Tower, frame: u64) void {
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
     }
+}
+
+pub const t_pyromancer = TowerSpec{
+    .cooldown = 10,
+    .gold_cost = 25,
+    .tooltip = "Upgrade to Pyromancer\n$%gold_cost%\n\nAoE DoT effect.\nLong cooldown.",
+    .upgrades = [3]?*const TowerSpec{ null, null, null },
+    .anim_set = anim.a_human3.animationSet(),
+    .updateFn = pyroUpdate,
+    .max_range = 75,
+    .tint_rgba = .{ 255, 100, 100, 255 },
+};
+
+fn pyroUpdate(self: *Tower, frame: u64) void {
+    if (self.cooldown.expired(frame)) {
+        const m = self.pickMonsterGeneric() orelse return;
+        const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
+        // const r = self.angleTo(p[0], p[1]);
+        self.lookTowards(p[0], p[1]);
+        self.cooldown.restart(frame);
+        _ = self.world.spawnField(.{
+            .position = .{ @intToFloat(f32, p[0]), @intToFloat(f32, p[1]) },
+            .radius = 30,
+            .duration_sec = 5,
+            .tick_rate_sec = 1,
+            .tickFn = pyroFieldTick,
+        }) catch unreachable;
+    }
+}
+
+fn pyroFieldTick(self: *Field) void {
+    self.world.hurtMonstersInRadius(.{ self.world_x, self.world_y }, self.radius, 3);
 }
 
 pub const t_soldier = TowerSpec{
@@ -791,8 +823,8 @@ pub const Tower = struct {
         if (self.spec.anim_set) |as| {
             self.animator = as.createAnimator("down");
         }
-        self.invested_gold += self.spec.gold_cost;
         self.killAssocEffect();
+        self.spawn(self.world.world_frame);
     }
 };
 
@@ -1208,6 +1240,30 @@ const DelayedEffect = struct {
     timer: FrameTimer,
 };
 
+const FieldId = GenHandle(Field);
+
+const Field = struct {
+    id: FieldId = undefined,
+    world: *World,
+    world_x: f32,
+    world_y: f32,
+    radius: f32,
+    dead: bool = false,
+    tickFn: *const fn (*Field) void,
+    life_timer: FrameTimer,
+    tick_timer: FrameTimer,
+
+    fn update(self: *Field) void {
+        if (self.tick_timer.expired(self.world.world_frame)) {
+            self.tickFn(self);
+            self.tick_timer.restart(self.world.world_frame);
+        }
+        if (self.life_timer.expired(self.world.world_frame)) {
+            self.dead = true;
+        }
+    }
+};
+
 pub const World = struct {
     allocator: Allocator,
     map: Tilemap = .{},
@@ -1222,6 +1278,7 @@ pub const World = struct {
     projectiles: IntrusiveSlotMap(Projectile) = .{},
     pending_projectiles: std.ArrayListUnmanaged(Projectile) = .{},
     sprite_effects: IntrusiveGenSlotMap(SpriteEffect) = .{},
+    fields: IntrusiveGenSlotMap(Field) = .{},
     floating_text: IntrusiveSlotMap(FloatingText) = .{},
     delayed_damage: std.ArrayListUnmanaged(DelayedDamage) = .{},
     waves: WaveList = .{},
@@ -1492,6 +1549,19 @@ pub const World = struct {
         return ptr;
     }
 
+    pub fn hurtMonstersInRadius(self: *World, pos: [2]f32, radius: f32, amt: u32) void {
+        for (self.monsters.slice()) |*m| {
+            if (m.dead) {
+                continue;
+            }
+            const p = m.getWorldCollisionRect().toRectf().centerPoint();
+            const d = mu.dist(p, pos);
+            if (d < radius) {
+                m.hurt(amt);
+            }
+        }
+    }
+
     pub fn pickClosestMonster(self: World, world_x: i32, world_y: i32, range_min: f32, range_max: f32) ?MonsterId {
         if (self.monsters.slice().len == 0) {
             return null;
@@ -1534,6 +1604,26 @@ pub const World = struct {
         });
         self.towers.getPtr(id).spawn(self.world_frame);
         return id;
+    }
+
+    const FieldOptions = struct {
+        position: [2]f32,
+        radius: f32,
+        duration_sec: f32,
+        tick_rate_sec: f32,
+        tickFn: *const fn (*Field) void,
+    };
+
+    pub fn spawnField(self: *World, opts: FieldOptions) !FieldId {
+        return try self.fields.put(self.allocator, Field{
+            .world = self,
+            .world_x = opts.position[0],
+            .world_y = opts.position[1],
+            .radius = opts.radius,
+            .life_timer = FrameTimer.initSeconds(self.world_frame, opts.duration_sec),
+            .tick_timer = FrameTimer.initSeconds(self.world_frame, opts.tick_rate_sec),
+            .tickFn = opts.tickFn,
+        });
     }
 
     pub fn spawnMonster(self: *World, spec: *const MonsterSpec, spawn_id: u32) !MonsterId {
@@ -1599,6 +1689,7 @@ pub const World = struct {
         var effect_pending_removal = std.ArrayListUnmanaged(SpriteEffectId){};
         var text_pending_removal = std.ArrayListUnmanaged(u32){};
         var active_waves_pending_removal = std.ArrayListUnmanaged(usize){};
+        var fields_pending_removal = std.ArrayListUnmanaged(FieldId){};
         self.goal.update(self.world_frame);
 
         for (self.active_waves.items) |wave_id, active_wave_index| {
@@ -1642,6 +1733,13 @@ pub const World = struct {
                     }
                 }
                 _ = self.delayed_damage.swapRemove(damage_id);
+            }
+        }
+
+        for (self.fields.slice()) |*f| {
+            f.update();
+            if (f.dead) {
+                fields_pending_removal.append(frame_arena, f.id) catch unreachable;
             }
         }
 
@@ -1701,6 +1799,10 @@ pub const World = struct {
 
         for (text_pending_removal.items) |id| {
             self.floating_text.erase(id);
+        }
+
+        for (fields_pending_removal.items) |id| {
+            self.fields.erase(id);
         }
 
         new_projectile_ids.ensureTotalCapacity(frame_arena, self.pending_projectiles.items.len) catch unreachable;

@@ -516,6 +516,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     self.renderMonsters(cam_interp, alpha);
     self.renderStolenHearts(cam_interp, alpha);
     self.renderTowers(cam_interp);
+    self.renderFields(cam_interp, alpha);
     self.renderSpriteEffects(cam_interp, alpha);
     self.renderProjectiles(cam_interp, alpha);
     self.renderHealthBars(cam_interp, alpha);
@@ -623,6 +624,20 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
                 self.interact_state = .none;
             }
         }
+    }
+}
+
+fn renderFields(
+    self: *PlayState,
+    cam: Camera,
+    alpha: f64,
+) void {
+    _ = alpha;
+    const viewf = cam.view.toRectf();
+
+    self.game.renderers.r_imm.beginUntextured();
+    for (self.world.fields.slice()) |f| {
+        self.game.renderers.r_imm.drawCircle(16, .{ f.world_x - viewf.left(), f.world_y - viewf.top(), 0, 1 }, f.radius, .{ 1, 1, 1, 1 });
     }
 }
 
