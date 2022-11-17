@@ -414,6 +414,7 @@ pub const t_wall = TowerSpec{
     .max_range = 0,
     .gold_cost = 1,
     .tooltip = "Build Wall\n$%gold_cost%\n\nBlocks monster movement.\nCan be built over.",
+    .upgrades = [3]?*const TowerSpec{ &t_recruit, null, null },
 };
 
 pub const t_recruit = TowerSpec{
