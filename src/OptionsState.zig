@@ -21,6 +21,7 @@ const audio = @import("audio.zig");
 const sdl = @import("sdl.zig");
 const ui = @import("ui.zig");
 const Texture = @import("texture.zig").Texture;
+const mathutil = @import("mathutil.zig");
 
 game: *Game,
 fontspec: bmfont.BitmapFontSpec,
@@ -31,6 +32,12 @@ next_option_y: i32 = 50,
 btn_fullscreen: *ui.Button,
 scale_index: usize = 1,
 scale_text: [1]u8 = undefined,
+
+tb_music: *ui.Trackbar,
+tb_sound: *ui.Trackbar,
+
+sound_tooltip: [32]u8 = undefined,
+music_tooltip: [32]u8 = undefined,
 
 const scales = [5]u8{ 1, 2, 3, 4, 5 };
 const option_width = 128;
@@ -76,6 +83,26 @@ fn addOption(self: *OptionsState, name: []const u8, cb: anytype, text: []const u
     };
 }
 
+fn addOptionTrackbar(self: *OptionsState, name: []const u8, cb: anytype, initial_value: f32) !*ui.Trackbar {
+    var label = try self.ui_root.createLabel();
+    label.rect = Rect.init(0, self.next_option_y, option_width, option_height);
+    label.rect.alignRight(Game.INTERNAL_WIDTH / 2);
+    label.text = name;
+    try self.ui_root.addChild(label.control());
+
+    var tb = try self.ui_root.createTrackbar();
+    tb.rect = label.rect;
+    tb.rect.alignLeft(Game.INTERNAL_WIDTH / 2);
+    tb.min_value = 0;
+    tb.max_value = 100;
+    tb.value = @floatToInt(u32, initial_value * 100.0);
+    tb.ev_changed.setCallback(self, cb);
+    try self.ui_root.addChild(tb.control());
+
+    self.next_option_y += option_height;
+    return tb;
+}
+
 pub fn create(game: *Game) !*OptionsState {
     var self = try game.allocator.create(OptionsState);
     self.* = .{
@@ -84,6 +111,8 @@ pub fn create(game: *Game) !*OptionsState {
         .ui_root = ui.Root.init(game.allocator, &game.sdl_backend),
         // Initialized below
         .btn_fullscreen = undefined,
+        .tb_music = undefined,
+        .tb_sound = undefined,
     };
 
     var b_back = try self.ui_root.createButton();
@@ -96,11 +125,18 @@ pub fn create(game: *Game) !*OptionsState {
     b_back.setTexture(self.game.texman.getNamedTexture("button_base.png"));
     try self.ui_root.addChild(b_back.control());
 
+    const music_coef = self.game.audio.mix_music_coef.load(.SeqCst);
+    const sound_coef = self.game.audio.mix_sound_coef.load(.SeqCst);
+
     var fullscreen = try self.addOption("Fullscreen", onFullscreenChange, "no", "Alt+Enter anywhere");
     self.btn_fullscreen = fullscreen.button;
     _ = try self.addOption("Scale", onScaleChange, "2", "Windowed only");
+    self.tb_music = try self.addOptionTrackbar("Music", onMusicVolumeChange, music_coef);
+    self.tb_sound = try self.addOptionTrackbar("Sound", onSoundVolumeChange, sound_coef);
     var meme = try self.addOption("Jump", onScaleChange, "Alt", "Nice corndog");
     meme.button.state = .disabled;
+
+    self.updateAudioTooltips();
 
     // TODO probably want a better way to manage this, direct IO shouldn't be here
     // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
@@ -135,6 +171,36 @@ fn onScaleChange(button: *ui.Button, self: *OptionsState) void {
         std.log.err("onScaleChange: bufPrint failed: {!}", .{err});
         return;
     };
+}
+
+fn onMusicVolumeChange(trackbar: *ui.Trackbar, self: *OptionsState) void {
+    self.game.audio.mix_music_coef.store(trackbar.valueAsPercent(), .SeqCst);
+    self.updateAudioTooltips();
+}
+
+fn onSoundVolumeChange(trackbar: *ui.Trackbar, self: *OptionsState) void {
+    self.game.audio.mix_sound_coef.store(trackbar.valueAsPercent(), .SeqCst);
+    self.updateAudioTooltips();
+}
+
+fn updateAudioTooltips(self: *OptionsState) void {
+    if (self.tb_music.value > 0) {
+        self.tb_music.tooltip_text = std.fmt.bufPrint(&self.music_tooltip, "{d}% ({d:.1}db)", .{
+            @floatToInt(u32, self.tb_music.valueAsPercent() * 100),
+            mathutil.ampScalarToDb(f32, self.tb_music.valueAsPercent()),
+        }) catch unreachable;
+    } else {
+        self.tb_music.tooltip_text = std.fmt.bufPrint(&self.music_tooltip, "muted", .{}) catch unreachable;
+    }
+
+    if (self.tb_sound.value > 0) {
+        self.tb_sound.tooltip_text = std.fmt.bufPrint(&self.sound_tooltip, "{d}% ({d:.1}db)", .{
+            @floatToInt(u32, self.tb_sound.valueAsPercent() * 100),
+            mathutil.ampScalarToDb(f32, self.tb_sound.valueAsPercent()),
+        }) catch unreachable;
+    } else {
+        self.tb_sound.tooltip_text = std.fmt.bufPrint(&self.sound_tooltip, "muted", .{}) catch unreachable;
+    }
 }
 
 fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.BitmapFontSpec {

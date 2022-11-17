@@ -261,6 +261,120 @@ pub const Label = struct {
     }
 };
 
+pub const Trackbar = struct {
+    root: *Root,
+    rect: Rect,
+    texture: ?*const Texture = null,
+    min_value: u32,
+    max_value: u32,
+    value: u32,
+    ev_changed: EventCallback(Trackbar) = .{},
+    tooltip_text: ?[]const u8 = null,
+
+    pub fn deinit(self: *Trackbar) void {
+        self.root.allocator.destroy(self);
+    }
+
+    pub fn handleMouseDown(self: *Trackbar, args: MouseEventArgs) void {
+        self.handleMouseEvent(args);
+    }
+
+    pub fn handleMouseMove(self: *Trackbar, args: MouseEventArgs) void {
+        self.handleMouseEvent(args);
+    }
+
+    fn handleMouseEvent(self: *Trackbar, args: MouseEventArgs) void {
+        var cr = self.computeClickableRect();
+        const p = cr.clampPoint(args.x - cr.left(), args.y - cr.top());
+        if (args.buttons.left) {
+            const crf = cr.toRectf();
+            const xf = @intToFloat(f32, p[0]);
+            // hack: we get to this point because rect.contains() is used for
+            // hit testing, but x+w is not considered "inside" the rectangle
+            // because it produces strange results with button edges. Need to
+            // investigate. For now, subtract 1 so a trackbar can be dragged
+            // all the way to the right.
+            const percent_x = xf / (crf.w - 1.0);
+            std.debug.print("{d}\n", .{percent_x});
+            self.value = self.min_value + @floatToInt(u32, @intToFloat(f32, self.max_value - self.min_value) * percent_x);
+            self.ev_changed.invoke(self);
+        }
+    }
+
+    fn handleMouseEnter(self: *Trackbar) void {
+        self.root.interaction_hint = .clickable;
+    }
+
+    fn handleMouseLeave(self: *Trackbar) void {
+        self.root.interaction_hint = .none;
+    }
+
+    pub fn interactRect(self: *Trackbar) ?Rect {
+        return self.rect;
+    }
+
+    pub fn setPanCallback(self: *Trackbar, userdata_ptr: anytype, comptime cb: *const fn (*Minimap, @TypeOf(userdata_ptr), f32, f32) void) void {
+        const Ptr = @TypeOf(userdata_ptr);
+        const alignment = @typeInfo(Ptr).Pointer.alignment;
+        const Impl = struct {
+            fn callbackImpl(button: *Minimap, userdata: ?*anyopaque, x: f32, y: f32) void {
+                var userdata_ptr_ = @ptrCast(Ptr, @alignCast(alignment, userdata));
+                cb(button, userdata_ptr_, x, y);
+            }
+        };
+        self.pan_userdata = userdata_ptr;
+        self.pan_callback = Impl.callbackImpl;
+    }
+
+    pub fn control(self: *Trackbar) Control {
+        return Control.init(self, .{
+            .deinitFn = deinit,
+            .handleMouseMoveFn = handleMouseMove,
+            .handleMouseDownFn = handleMouseDown,
+            .handleMouseEnterFn = handleMouseEnter,
+            .handleMouseLeaveFn = handleMouseLeave,
+            .interactRectFn = interactRect,
+            .getBackgroundFn = getBackground,
+            .customRenderFn = customRender,
+            .getTooltipTextFn = getTooltipText,
+        });
+    }
+
+    pub fn getTooltipText(self: *Trackbar) ?[]const u8 {
+        return self.tooltip_text;
+    }
+
+    pub fn getBackground(self: *Trackbar) Background {
+        if (self.texture) |t| {
+            return Background{ .texture = ControlTexture{ .texture = t } };
+        } else {
+            return .none;
+        }
+    }
+
+    fn computeClickableRect(self: *Trackbar) Rect {
+        var rect = self.rect;
+        // remember rect is relative to parent, so we make it local space
+        rect.x = 0;
+        rect.y = 0;
+        return rect;
+    }
+
+    pub fn valueAsPercent(self: *Trackbar) f32 {
+        return @intToFloat(f32, self.value - self.min_value) / @intToFloat(f32, self.max_value);
+    }
+
+    pub fn customRender(self: *Trackbar, ctx: CustomRenderContext) void {
+        const cr = self.computeClickableRect().toRectf();
+
+        const y = cr.centerPoint()[1];
+        ctx.drawLine(cr.left(), y, cr.right(), y);
+
+        const x = self.valueAsPercent() * cr.w;
+        ctx.drawLine(x, cr.top(), x, cr.bottom());
+    }
+};
+
 pub const Minimap = struct {
     root: *Root,
     rect: Rect,
@@ -793,6 +907,12 @@ pub const Root = struct {
                     };
                     result.control.handleMouseUp(local_args);
                     result.control.handleMouseClick(local_args);
+                    // it's possible clicking the control updated its tooltip; maybe
+                    // we should add setTooltipText and flag the tooltip as dirty in
+                    // the interface?
+                    if (self.hover) |h| {
+                        self.tooltip_text = h.getTooltipText();
+                    }
                     handled = true;
                 }
             }
@@ -812,6 +932,10 @@ pub const Root = struct {
             };
 
             result.control.handleMouseDown(local_args);
+            // see related comment in handleMouseUp
+            if (self.hover) |h| {
+                self.tooltip_text = h.getTooltipText();
+            }
             return true;
         }
         return false;
@@ -860,6 +984,19 @@ pub const Root = struct {
             .rect = Rect.init(0, 0, 0, 0),
             .view = .{},
             .bounds = .{},
+        };
+        try self.controls.append(self.allocator, ptr.control());
+        return ptr;
+    }
+
+    pub fn createTrackbar(self: *Root) !*Trackbar {
+        var ptr = try self.allocator.create(Trackbar);
+        ptr.* = Trackbar{
+            .root = self,
+            .rect = Rect.init(0, 0, 0, 0),
+            .min_value = 0,
+            .max_value = 0,
+            .value = 0,
         };
         try self.controls.append(self.allocator, ptr.control());
         return ptr;
