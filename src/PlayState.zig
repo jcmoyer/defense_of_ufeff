@@ -478,8 +478,18 @@ pub fn update(self: *PlayState) void {
         self.beginTransitionGameWin();
     }
 
-    if ((self.sub == .gamelose_fadeout or self.sub == .gamewin_fadeout) and self.fade_timer.expired(self.game.frame_counter)) {
-        self.game.changeState(.levelselect);
+    if (self.sub == .gamelose_fadeout or self.sub == .gamewin_fadeout) {
+        if (self.music_params) |params| {
+            params.volume.store(self.fade_timer.invProgressClamped(self.game.frame_counter), .SeqCst);
+        }
+        if (self.fade_timer.expired(self.game.frame_counter)) {
+            if (self.music_params) |params| {
+                params.done.store(true, .SeqCst);
+                params.release();
+                self.music_params = null;
+            }
+            self.game.changeState(.levelselect);
+        }
     }
 
     if (self.music_params) |params| {
@@ -1162,6 +1172,7 @@ pub fn loadWorld(self: *PlayState, mapid: []const u8) void {
     if (self.music_params) |params| {
         params.done.store(true, .SeqCst);
         params.release();
+        self.music_params = null;
     }
     self.world.deinit();
     self.particle_sys.clear();
