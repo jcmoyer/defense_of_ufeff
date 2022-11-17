@@ -49,12 +49,18 @@ pub const AudioParameters = struct {
     }
 };
 
+const TrackKind = enum {
+    sound,
+    music,
+};
+
 const Track = struct {
     buffer: *const Buffer,
     cursor: usize = 0,
     loop: bool = false,
     done: bool = false,
     parameters: *AudioParameters,
+    kind: TrackKind,
 
     fn deinit(self: Track) void {
         self.parameters.release();
@@ -65,6 +71,7 @@ const DecodeRequest = struct {
     filename: [:0]const u8,
     loop: bool,
     parameters: *AudioParameters,
+    kind: TrackKind,
     shutdown: bool,
 };
 
@@ -110,6 +117,7 @@ const AudioDecodeThread = struct {
             .loop = true,
             .parameters = undefined,
             .shutdown = true,
+            .kind = undefined,
         });
     }
 
@@ -153,6 +161,7 @@ const AudioDecodeThread = struct {
                     .buffer = self.system.getOrLoad(req.filename),
                     .loop = req.loop,
                     .parameters = req.parameters,
+                    .kind = req.kind,
                 };
                 req.parameters.loaded.store(true, .SeqCst);
                 self.system.tracks_m.lock();
@@ -165,6 +174,8 @@ const AudioDecodeThread = struct {
         }
     }
 };
+
+pub const AtomicF32 = std.atomic.Atomic(f32);
 
 pub const AudioSystem = struct {
     pub var instance: *AudioSystem = undefined;
@@ -182,6 +193,9 @@ pub const AudioSystem = struct {
 
     sound_thread: AudioDecodeThread,
     music_thread: AudioDecodeThread,
+
+    mix_music_coef: AtomicF32 = AtomicF32.init(mathutil.ampDbToScalar(f32, -4.5)),
+    mix_sound_coef: AtomicF32 = AtomicF32.init(mathutil.ampDbToScalar(f32, -3)),
 
     pub fn create(allocator: Allocator) *AudioSystem {
         const self = allocator.create(AudioSystem) catch |err| {
@@ -308,8 +322,13 @@ pub const AudioSystem = struct {
         defer self.tracks_m.unlock();
 
         for (self.tracks.items) |*track| {
+            const volume_coef = if (track.kind == .music)
+                self.mix_music_coef.load(.SeqCst)
+            else
+                self.mix_sound_coef.load(.SeqCst);
+
             const input_buffer = track.buffer;
-            const volume = track.parameters.volume.load(.SeqCst);
+            const volume = volume_coef * track.parameters.volume.load(.SeqCst);
             const pan = track.parameters.pan.load(.SeqCst);
 
             if (track.parameters.paused.load(.SeqCst)) {
@@ -393,6 +412,7 @@ pub const AudioSystem = struct {
             .loop = true,
             .parameters = parameters,
             .shutdown = false,
+            .kind = .music,
         };
         self.music_thread.postRequest(req);
         return parameters.addRef();
@@ -414,6 +434,7 @@ pub const AudioSystem = struct {
             .loop = false,
             .parameters = parameters,
             .shutdown = false,
+            .kind = .sound,
         };
         self.sound_thread.postRequest(req);
         return parameters.addRef();

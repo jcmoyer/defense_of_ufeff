@@ -41,3 +41,11 @@ pub fn colorMulU8(comptime N: usize, a: [N]u8, b: [N]u8) [N]u8 {
     }
     return result;
 }
+
+pub fn ampDbToScalar(comptime T: type, db: T) T {
+    return std.math.pow(T, 10, db / 20);
+}
+
+pub fn ampScalarToDb(comptime T: type, scalar: T) T {
+    return @as(T, 20) * std.math.log10(scalar);
+}
