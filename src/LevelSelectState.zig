@@ -48,6 +48,7 @@ const Substate = enum {
     none,
     fadein,
     fadeout,
+    fadeout_to_menu,
 };
 
 const Finger = struct {
@@ -250,7 +251,7 @@ pub fn update(self: *LevelSelectState) void {
         const t = self.fade_timer.progressClamped(self.game.frame_counter);
         if (self.sub == .fadein or self.sub == .none) {
             params.volume.store(t, .SeqCst);
-        } else if (self.sub == .fadeout) {
+        } else if (self.sub == .fadeout or self.sub == .fadeout_to_menu) {
             params.volume.store(1 - t, .SeqCst);
         }
     }
@@ -258,6 +259,8 @@ pub fn update(self: *LevelSelectState) void {
         self.sub = .none;
     } else if (self.sub == .fadeout and self.fade_timer.expired(self.game.frame_counter)) {
         self.endFadeOut();
+    } else if (self.sub == .fadeout_to_menu and self.fade_timer.expired(self.game.frame_counter)) {
+        self.endFadeOutToMenu();
     }
 
     self.r_world.updateAnimations();
@@ -292,6 +295,10 @@ pub fn handleEvent(self: *LevelSelectState, ev: sdl.SDL_Event) void {
         return;
     }
     _ = self.ui_root.backend.dispatchEvent(ev, &self.ui_root);
+
+    if (ev.type == .SDL_KEYDOWN and ev.key.keysym.sym == sdl.SDLK_ESCAPE) {
+        self.beginFadeOutToMenu();
+    }
 }
 
 fn beginFadeIn(self: *LevelSelectState) void {
@@ -310,8 +317,19 @@ fn endFadeOut(self: *LevelSelectState) void {
     self.game.changeState(.play);
 }
 
+fn beginFadeOutToMenu(self: *LevelSelectState) void {
+    self.sub = .fadeout_to_menu;
+    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
+}
+
+fn endFadeOutToMenu(self: *LevelSelectState) void {
+    std.debug.assert(self.sub == .fadeout_to_menu);
+    self.sub = .none;
+    self.game.changeState(.menu);
+}
+
 fn renderFade(self: *LevelSelectState) void {
-    if (self.sub != .fadein and self.sub != .fadeout) {
+    if (self.sub != .fadein and self.sub != .fadeout and self.sub != .fadeout_to_menu) {
         return;
     }
 
