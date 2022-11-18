@@ -45,7 +45,7 @@ const InteractStateSelect = struct {
 };
 
 const InteractState = union(enum) {
-    none: void,
+    none,
     build: InteractStateBuild,
     select: InteractStateSelect,
     demolish,
@@ -55,6 +55,7 @@ const UpgradeButtonState = struct {
     play_state: *PlayState,
     tower_id: wo.TowerId,
     tower_spec: *const wo.TowerSpec,
+    slot: u8,
 };
 
 const Substate = enum {
@@ -242,7 +243,7 @@ pub fn create(game: *Game) !*PlayState {
     try ui_panel.addChild(self.b_recruit.control());
 
     self.b_call_wave = try self.ui_root.createButton();
-    self.b_call_wave.tooltip_text = "Call next wave";
+    self.b_call_wave.tooltip_text = "Call next wave (G)";
     self.b_call_wave.rect = Rect.init(48, 176, 32, 32);
     self.b_call_wave.setTexture(self.t_call_wave);
     self.b_call_wave.ev_click.setCallback(self, onCallWaveClick);
@@ -271,7 +272,7 @@ pub fn create(game: *Game) !*PlayState {
     self.btn_pause_resume.setTexture(self.t_pause);
     self.btn_pause_resume.rect = Rect.init(16, 208, 32, 32);
     self.btn_pause_resume.texture_rects = makeStandardButtonRects(0, 0);
-    self.btn_pause_resume.tooltip_text = "Pause";
+    self.btn_pause_resume.tooltip_text = "Pause (Space)";
     try ui_panel.addChild(self.btn_pause_resume.control());
     self.btn_pause_resume.ev_click.setCallback(self, onPauseClick);
 
@@ -279,14 +280,14 @@ pub fn create(game: *Game) !*PlayState {
     self.btn_fastforward.setTexture(self.t_fast_off);
     self.btn_fastforward.rect = Rect.init(48, 208, 32, 32);
     self.btn_fastforward.texture_rects = makeStandardButtonRects(0, 0);
-    self.btn_fastforward.tooltip_text = "Fast-forward";
+    self.btn_fastforward.tooltip_text = "Fast-forward (Q)";
     self.btn_fastforward.ev_click.setCallback(self, onFastForwardClick);
     try ui_panel.addChild(self.btn_fastforward.control());
 
     self.btn_demolish = try self.ui_root.createButton();
     self.btn_demolish.setTexture(self.t_demolish);
     self.btn_demolish.rect = Rect.init(16, 176, 32, 32);
-    self.btn_demolish.tooltip_text = "Demolish\n\nReturns 50% of the total gold\ninvested into the tower.";
+    self.btn_demolish.tooltip_text = "Demolish (R)\n\nReturns 50% of the total gold\ninvested into the tower.";
     self.btn_demolish.ev_click.setCallback(self, onDemolishClick);
     try ui_panel.addChild(self.btn_demolish.control());
 
@@ -310,7 +311,7 @@ pub fn create(game: *Game) !*PlayState {
             b.*.ev_mouse_leave.setCallback(&self.ui_upgrade_states[i], onUpgradeMouseLeave);
         } else if (i == 3) {
             b.*.setTexture(self.t_demolish);
-            b.*.tooltip_text = "Demolish\n\nReturns 50% of the total gold\ninvested into the tower.";
+            b.*.tooltip_text = "Demolish (4)\n\nReturns 50% of the total gold\ninvested into the tower.";
             b.*.ev_click.setCallback(self, onUpgradeDemolishClick);
         }
     }
@@ -344,39 +345,25 @@ fn onTowerClick(button: *ui.Button, self: *PlayState) void {
 fn onCallWaveClick(button: *ui.Button, self: *PlayState) void {
     _ = button;
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
-    _ = self.world.startNextWave();
+    self.callWave();
 }
 
 fn onPauseClick(button: *ui.Button, self: *PlayState) void {
+    _ = button;
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
-    self.paused = !self.paused;
-    if (!self.paused) {
-        button.tooltip_text = "Pause";
-        button.setTexture(self.t_pause);
-    } else {
-        button.tooltip_text = "Resume";
-        button.setTexture(self.t_resume);
-    }
+    self.togglePause();
 }
 
 fn onFastForwardClick(button: *ui.Button, self: *PlayState) void {
+    _ = button;
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
-    self.fast = !self.fast;
-    if (!self.fast) {
-        button.setTexture(self.t_fast_off);
-    } else {
-        button.setTexture(self.t_fast_on);
-    }
+    self.toggleFast();
 }
 
 fn onUpgradeClick(button: *ui.Button, upgrade: *UpgradeButtonState) void {
     _ = button;
-    upgrade.play_state.game.audio.playSound("assets/sounds/coindrop.ogg", .{}).release();
-    if (upgrade.play_state.world.canAfford(upgrade.tower_spec)) {
-        upgrade.play_state.world.player_gold -= upgrade.tower_spec.gold_cost;
-        upgrade.play_state.world.towers.getPtr(upgrade.tower_id).upgradeInto(upgrade.tower_spec);
-        upgrade.play_state.updateUpgradeButtons();
-    }
+    std.debug.assert(upgrade.play_state.interact_state == .select);
+    upgrade.play_state.upgradeSelectedTower(upgrade.slot);
 }
 
 fn onUpgradeMouseEnter(button: *ui.Button, upgrade: *UpgradeButtonState) void {
@@ -394,16 +381,15 @@ fn onUpgradeMouseLeave(button: *ui.Button, upgrade: *UpgradeButtonState) void {
 }
 
 fn onUpgradeDemolishClick(button: *ui.Button, self: *PlayState) void {
-    std.debug.assert(self.interact_state == .select);
     _ = button;
-    self.world.sellTower(self.interact_state.select.selected_tower);
-    self.interact_state = .none;
+    std.debug.assert(self.interact_state == .select);
+    self.sellSelectedTower();
 }
 
 fn onDemolishClick(button: *ui.Button, self: *PlayState) void {
     _ = button;
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
-    self.interact_state = .demolish;
+    self.enterDemolishMode();
 }
 
 fn onMinimapPan(_: *ui.Minimap, self: *PlayState, x: f32, y: f32) void {
@@ -627,6 +613,14 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
                     self.interact_state = .none;
                 }
             },
+            sdl.SDLK_1 => self.upgradeSelectedTower(0),
+            sdl.SDLK_2 => self.upgradeSelectedTower(1),
+            sdl.SDLK_3 => self.upgradeSelectedTower(2),
+            sdl.SDLK_4 => self.sellSelectedTower(),
+            sdl.SDLK_SPACE => self.togglePause(),
+            sdl.SDLK_q => self.toggleFast(),
+            sdl.SDLK_g => self.callWave(),
+            sdl.SDLK_r => self.enterDemolishMode(),
             else => {},
         }
     }
@@ -1410,6 +1404,7 @@ fn updateUpgradeButtons(self: *PlayState) void {
             self.ui_upgrade_states[i].play_state = self;
             self.ui_upgrade_states[i].tower_spec = spec;
             self.ui_upgrade_states[i].tower_id = self.interact_state.select.selected_tower;
+            self.ui_upgrade_states[i].slot = @intCast(u8, i);
             if (self.world.canAfford(spec)) {
                 self.ui_upgrade_buttons[i].state = .normal;
             } else {
@@ -1625,4 +1620,54 @@ fn setInitialUIState(self: *PlayState) void {
     self.wave_timer = .{
         .fontspec = &self.fontspec,
     };
+}
+
+fn callWave(self: *PlayState) void {
+    _ = self.world.startNextWave();
+}
+
+fn togglePause(self: *PlayState) void {
+    self.paused = !self.paused;
+    if (!self.paused) {
+        self.btn_pause_resume.tooltip_text = "Pause (Space)";
+        self.btn_pause_resume.setTexture(self.t_pause);
+    } else {
+        self.btn_pause_resume.tooltip_text = "Resume (Space)";
+        self.btn_pause_resume.setTexture(self.t_resume);
+    }
+}
+
+fn toggleFast(self: *PlayState) void {
+    self.fast = !self.fast;
+    if (!self.fast) {
+        self.btn_fastforward.setTexture(self.t_fast_off);
+    } else {
+        self.btn_fastforward.setTexture(self.t_fast_on);
+    }
+}
+
+fn upgradeSelectedTower(self: *PlayState, slot: u8) void {
+    if (self.interact_state == .select) {
+        var tower_to_upgrade = self.world.towers.getPtr(self.interact_state.select.selected_tower);
+        const upgrade_spec = tower_to_upgrade.spec.upgrades[slot];
+        if (upgrade_spec) |spec| {
+            if (self.world.canAfford(spec)) {
+                self.game.audio.playSound("assets/sounds/coindrop.ogg", .{}).release();
+                self.world.player_gold -= spec.gold_cost;
+                tower_to_upgrade.upgradeInto(spec);
+                self.updateUpgradeButtons();
+            }
+        }
+    }
+}
+
+fn sellSelectedTower(self: *PlayState) void {
+    if (self.interact_state == .select) {
+        self.world.sellTower(self.interact_state.select.selected_tower);
+        self.interact_state = .none;
+    }
+}
+
+fn enterDemolishMode(self: *PlayState) void {
+    self.interact_state = .demolish;
 }
