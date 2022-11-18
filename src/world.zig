@@ -491,6 +491,7 @@ fn pyroUpdate(self: *Tower, frame: u64) void {
             .tick_rate_sec = 1,
             .tickFn = pyroFieldTick,
         }) catch unreachable;
+        self.world.playPositionalSoundId(.flame, p[0], p[1]);
     }
 }
 
@@ -902,6 +903,7 @@ pub const SpriteEffectId = GenHandle(SpriteEffect);
 const SoundId = enum {
     none,
     stab,
+    flame,
 };
 
 pub const SpriteEffect = struct {
@@ -1910,6 +1912,7 @@ pub const World = struct {
         switch (sound) {
             .none => {},
             .stab => self.playPositionalSound("assets/sounds/stab.ogg", world_x, world_y),
+            .flame => self.playPositionalSound("assets/sounds/flame.ogg", world_x, world_y),
         }
     }
 };
