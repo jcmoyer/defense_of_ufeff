@@ -836,32 +836,8 @@ pub const Spawn = struct {
 
     id: u32 = undefined,
     coord: TileCoord,
-    emitter: particle.Emitter,
     timer: FrameTimer,
     spawn_interval: f32,
-
-    fn emit(self: *Spawn) void {
-        self.emitter.emitFunc(16, emitGen, null);
-    }
-
-    fn updatePart(p: *particle.Particle) void {
-        const a = std.math.min(1.0, @intToFloat(f32, 60 -| p.frames_alive) / 60.0);
-        p.color_a = @floatToInt(u8, a * 255);
-        p.size *= 0.97;
-        p.vel[1] *= 0.95;
-        p.vel[0] *= 0.9;
-    }
-
-    fn emitGen(p: *particle.Particle, ctx: *const particle.GeneratorContext) void {
-        _ = ctx;
-        p.vel = [2]f32{
-            rng.random().float(f32) * 4 - rng.random().float(f32) * 4,
-            -rng.random().float(f32) * 2,
-        };
-        p.size = rng.random().float(f32) * 7;
-        p.color_a = 255;
-        p.updateFn = updatePart;
-    }
 };
 
 const se_bow = SpriteEffectSpec{
@@ -1320,9 +1296,6 @@ pub const World = struct {
 
     pub fn deinit(self: *World) void {
         self.path_cache.deinit();
-        for (self.spawns.slice()) |*s| {
-            s.emitter.deinit(self.allocator);
-        }
         self.fields.deinit(self.allocator);
         self.spawns.deinit(self.allocator);
         self.monsters.deinit(self.allocator);
@@ -1401,12 +1374,7 @@ pub const World = struct {
             .coord = coord,
             .timer = FrameTimer.initSeconds(0, 1),
             .spawn_interval = 1,
-            .emitter = try particle.Emitter.initCapacity(self.allocator, 16),
         });
-        self.spawns.getPtr(s_id).emitter.pos = [2]f32{
-            @intToFloat(f32, coord.x * 16) + 8,
-            @intToFloat(f32, coord.y * 16) + 16,
-        };
         const name_dup = try self.allocator.dupe(u8, name);
         try self.spawn_map.put(self.allocator, name_dup, s_id);
     }
@@ -1638,7 +1606,6 @@ pub const World = struct {
 
     pub fn spawnMonster(self: *World, spec: *const MonsterSpec, spawn_id: u32) !MonsterId {
         const pos = self.getSpawnPosition(spawn_id);
-        self.getSpawnPtr(spawn_id).emit();
         var mon = Monster{
             .world = self,
             .spec = spec,

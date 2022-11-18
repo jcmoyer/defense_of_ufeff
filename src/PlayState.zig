@@ -546,8 +546,9 @@ pub fn render(self: *PlayState, alpha: f64) void {
         self.game.input.mouse.client_y,
     );
 
-    gl.clearColor(0x64.0 / 255.0, 0x95.0 / 255.0, 0xED.0 / 255.0, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    self.game.renderers.r_quad.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
+    self.game.renderers.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
+    self.game.renderers.r_imm.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
 
     var cam_interp = Camera.lerp(self.prev_camera, self.camera, alpha);
     cam_interp.clampToBounds();
@@ -583,11 +584,6 @@ pub fn render(self: *PlayState, alpha: f64) void {
         .font_texture = self.game.texman.getNamedTexture("CommonCase.png"),
         .font_spec = &self.fontspec,
     }, self.ui_root);
-
-    self.game.renderers.r_quad.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
-    for (self.world.spawns.slice()) |*s| {
-        s.emitter.render(&self.game.renderers.r_quad, @floatCast(f32, alpha));
-    }
 
     self.renderWipe(alpha);
     self.renderFade();
