@@ -132,9 +132,11 @@ t_fast_on: *Texture,
 t_pause: *Texture,
 t_resume: *Texture,
 t_demolish: *Texture,
+t_call_wave: *Texture,
 upgrade_texture_cache: std.AutoHashMapUnmanaged(*const wo.TowerSpec, *Texture) = .{},
 b_wall: *ui.Button,
 b_recruit: *ui.Button,
+b_call_wave: *ui.Button,
 
 particle_sys: particle.ParticleSystem,
 
@@ -186,12 +188,14 @@ pub fn create(game: *Game) !*PlayState {
         .t_pause = undefined,
         .t_resume = undefined,
         .t_demolish = undefined,
+        .t_call_wave = undefined,
         .button_generator = undefined,
         .wave_timer = undefined,
         .r_world = undefined,
         .particle_sys = undefined,
         .b_wall = undefined,
         .b_recruit = undefined,
+        .b_call_wave = undefined,
     };
 
     self.particle_sys = try particle.ParticleSystem.initCapacity(game.allocator, 1024);
@@ -212,6 +216,7 @@ pub fn create(game: *Game) !*PlayState {
     self.t_wall = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(128, 0, 32, 32), white);
     self.t_soldier = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(160, 0, 32, 32), white);
     self.t_fast_on = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(192, 0, 32, 32), white);
+    self.t_call_wave = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(224, 0, 32, 32), white);
 
     const t_panel = self.game.texman.getNamedTexture("ui_panel.png");
     var ui_panel = try self.ui_root.createPanel();
@@ -235,6 +240,13 @@ pub fn create(game: *Game) !*PlayState {
     self.b_recruit.setTexture(self.t_soldier);
     self.b_recruit.ev_click.setCallback(self, onTowerClick);
     try ui_panel.addChild(self.b_recruit.control());
+
+    self.b_call_wave = try self.ui_root.createButton();
+    self.b_call_wave.tooltip_text = "Call next wave";
+    self.b_call_wave.rect = Rect.init(48, 176, 32, 32);
+    self.b_call_wave.setTexture(self.t_call_wave);
+    self.b_call_wave.ev_click.setCallback(self, onCallWaveClick);
+    try ui_panel.addChild(self.b_call_wave.control());
 
     self.ui_minimap = try self.ui_root.createMinimap();
     self.ui_minimap.rect = Rect.init(16, 16, 64, 64);
@@ -329,6 +341,12 @@ fn onTowerClick(button: *ui.Button, self: *PlayState) void {
     self.interact_state = .{ .build = InteractStateBuild{
         .tower_spec = &wo.t_recruit,
     } };
+}
+
+fn onCallWaveClick(button: *ui.Button, self: *PlayState) void {
+    _ = button;
+    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
+    _ = self.world.startNextWave();
 }
 
 fn onPauseClick(button: *ui.Button, self: *PlayState) void {
@@ -514,7 +532,9 @@ pub fn update(self: *PlayState) void {
 fn updateUI(self: *PlayState) void {
     self.ui_gold.text = std.fmt.bufPrint(&self.gold_text, "${d}", .{self.world.player_gold}) catch unreachable;
     self.ui_lives.text = std.fmt.bufPrint(&self.lives_text, "\x03{d}", .{self.world.lives_at_goal}) catch unreachable;
-    self.wave_timer.setTimerText(self.world.next_wave_timer.remainingSeconds(self.world.world_frame));
+    if (self.world.next_wave_timer) |timer| {
+        self.wave_timer.setTimerText(timer.remainingSeconds(self.world.world_frame));
+    }
     self.updateUpgradeButtons();
     if (self.wave_timer.state == .middle_screen and self.wave_timer.state_timer.expired(self.world.world_frame)) {
         self.wave_timer.state = .move_to_corner;
@@ -531,6 +551,13 @@ fn updateUI(self: *PlayState) void {
         self.b_recruit.state = .normal;
     } else if (!self.world.canAfford(&wo.t_recruit)) {
         self.b_recruit.state = .disabled;
+    }
+    if (self.world.remainingWaveCount() == 0) {
+        self.b_call_wave.state = .disabled;
+    } else {
+        if (self.b_call_wave.state == .disabled) {
+            self.b_call_wave.state = .normal;
+        }
     }
 }
 
@@ -1234,8 +1261,6 @@ pub fn loadWorld(self: *PlayState, mapid: []const u8) void {
     // should probably clean this up eventually
     self.world.view = self.camera.view;
     self.world.particle_sys = &self.particle_sys;
-
-    self.world.setNextWaveTimer(15);
 }
 
 fn createMinimap(self: *PlayState) !void {
@@ -1538,6 +1563,8 @@ fn endWipe(self: *PlayState) void {
 }
 
 fn renderWaveTimer(self: *PlayState, alpha: f64) void {
+    const next_wave_timer = self.world.next_wave_timer orelse return;
+
     var rect = self.wave_timer.text_measure;
     var box_rect = rect;
     box_rect.inflate(4, 4);
@@ -1565,7 +1592,7 @@ fn renderWaveTimer(self: *PlayState, alpha: f64) void {
 
     var total_alpha: f32 = 1.0;
     var text_alpha: u8 = 255;
-    const sec = self.world.next_wave_timer.remainingSecondsUnbounded(self.world.world_frame);
+    const sec = next_wave_timer.remainingSecondsUnbounded(self.world.world_frame);
     if (sec <= 5) {
         const diff = 5.0 - sec;
         text_alpha = @floatToInt(u8, (0.5 * (1.0 + std.math.cos(diff * 8.0))) * 255.0);

@@ -1300,7 +1300,8 @@ pub const World = struct {
     next_wave: usize = 0,
     player_won: bool = false,
     music_filename: ?[:0]const u8 = null,
-    next_wave_timer: FrameTimer = .{},
+    /// `null` when there are no more waves.
+    next_wave_timer: ?FrameTimer = FrameTimer.initSeconds(0, 15),
     rng: std.rand.DefaultPrng,
     particle_sys: *particle.ParticleSystem = undefined,
 
@@ -1677,16 +1678,22 @@ pub const World = struct {
 
     /// Returns true if next wave could be started, false means all waves are finished.
     pub fn startNextWave(self: *World) bool {
-        if (self.next_wave < self.waves.waves.len) {
+        if (self.remainingWaveCount() > 0) {
             self.startWave(self.next_wave);
-            if (self.next_wave + 1 < self.waves.waves.len) {
-                self.next_wave_timer = FrameTimer.initSeconds(self.world_frame, self.waves.getWaveDuration(self.next_wave));
-            }
             self.next_wave += 1;
+            if (self.remainingWaveCount() > 0) {
+                self.next_wave_timer = FrameTimer.initSeconds(self.world_frame, self.waves.getWaveDuration(self.next_wave));
+            } else {
+                self.next_wave_timer = null;
+            }
             return true;
         } else {
             return false;
         }
+    }
+
+    pub fn remainingWaveCount(self: *World) usize {
+        return self.waves.waves.len - self.next_wave;
     }
 
     pub fn update(self: *World, frame_arena: Allocator) void {
@@ -1830,7 +1837,12 @@ pub const World = struct {
         }
 
         if (self.active_waves.items.len == 0) {
-            if (self.next_wave_timer.expired(self.world_frame) and !self.startNextWave()) {
+            if (self.next_wave_timer) |timer| {
+                if (timer.expired(self.world_frame)) {
+                    _ = self.startNextWave();
+                }
+            } else {
+                // wait for all monsters to be finished
                 if (self.monsters.slice().len == 0) {
                     self.player_won = true;
                 }
