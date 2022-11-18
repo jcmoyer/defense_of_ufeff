@@ -76,8 +76,16 @@ pub fn inflate(self: *Rect, dx: c_int, dy: c_int) void {
 pub fn intersect(self: Rect, other: Rect, subrect: ?*Rect) bool {
     const xmin = std.math.max(self.x, other.x);
     const ymin = std.math.max(self.y, other.y);
-    const xmax = std.math.min(self.right(), other.right());
-    const ymax = std.math.min(self.bottom(), other.bottom());
+    // TODO: need to figure out if we want inclusive or exclusive width/height
+    // (maybe just provide both?) This routine produces undesirable results in
+    // some circumstances without the subtraction by one. For example, on a grid
+    // where each square is 16x16, the cells at [2,2] (32,32,48,48) and [2,3]
+    // (32,48,48,64) would "intersect" because the bottom edge of [2,2] touches
+    // the top edge of [2,3]. But such an intersection would produce a
+    // zero-height rectangle which seems wrong. So we fudge the numbers such
+    // that the above example becomes (32,32,47,47) and (32,48,47,63).
+    const xmax = std.math.min(self.right() - 1, other.right() - 1);
+    const ymax = std.math.min(self.bottom() - 1, other.bottom() - 1);
     if (xmax < xmin or ymax < ymin) {
         return false;
     } else {

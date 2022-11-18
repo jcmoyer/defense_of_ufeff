@@ -1410,25 +1410,30 @@ pub const World = struct {
             }
             return false;
         }
+        const tile_world_rect = Rect.init(
+            @intCast(i32, coord.worldX()),
+            @intCast(i32, coord.worldY()),
+            16,
+            16,
+        );
         for (self.monsters.slice()) |m| {
-            const blocked_coord = m.getTilePosition();
-            if (std.meta.eql(coord, blocked_coord)) {
+            if (m.getWorldCollisionRect().intersect(tile_world_rect, null)) {
                 return false;
             }
+            // old behavior, do we need this?
+            // const blocked_coord = m.getTilePosition();
+            // if (std.meta.eql(coord, blocked_coord)) {
+            //     return false;
+            // }
         }
         self.map.copyInto(&self.scratch_map);
         self.scratch_map.at2DPtr(.base, coord.x, coord.y).flags.contains_tower = true;
         self.scratch_cache.clear();
 
-        // TODO: do we actually need to path from all monsters? it seems spawn points should be enough
-        // for (self.monsters.slice()) |*m| {
-        //     if (!self.findTheoreticalPath(m.getTilePosition(), self.goal.?)) {
-        //         return false;
-        //     }
-        // }
-
-        for (self.spawns.slice()) |*sp| {
-            if (!self.findTheoreticalPath(sp.coord, self.goal.getTilePosition())) {
+        // (2022-11-02) Q: do we actually need to path from all monsters? it seems spawn points should be enough
+        // (2022-11-18) A: Yes, you can wall a monster in that would stray from the spawn->goal path with the newly placed tile.
+        for (self.monsters.slice()) |*m| {
+            if (!self.findTheoreticalPath(m.getTilePosition(), self.goal.getTilePosition())) {
                 return false;
             }
         }
