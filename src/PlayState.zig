@@ -133,6 +133,8 @@ t_pause: *Texture,
 t_resume: *Texture,
 t_demolish: *Texture,
 upgrade_texture_cache: std.AutoHashMapUnmanaged(*const wo.TowerSpec, *Texture) = .{},
+b_wall: *ui.Button,
+b_recruit: *ui.Button,
 
 particle_sys: particle.ParticleSystem,
 
@@ -188,6 +190,8 @@ pub fn create(game: *Game) !*PlayState {
         .wave_timer = undefined,
         .r_world = undefined,
         .particle_sys = undefined,
+        .b_wall = undefined,
+        .b_recruit = undefined,
     };
 
     self.particle_sys = try particle.ParticleSystem.initCapacity(game.allocator, 1024);
@@ -216,21 +220,21 @@ pub fn create(game: *Game) !*PlayState {
     ui_panel.background = .{ .texture = .{ .texture = t_panel } };
     try self.ui_root.addChild(ui_panel.control());
 
-    var b_wall = try self.ui_root.createButton();
-    b_wall.tooltip_text = self.getCachedTooltip(&wo.t_wall);
-    b_wall.rect = Rect.init(16, 144, 32, 32);
-    b_wall.texture_rects = makeStandardButtonRects(0, 0);
-    b_wall.setTexture(self.t_wall);
-    b_wall.ev_click.setCallback(self, onWallClick);
-    try ui_panel.addChild(b_wall.control());
+    self.b_wall = try self.ui_root.createButton();
+    self.b_wall.tooltip_text = self.getCachedTooltip(&wo.t_wall);
+    self.b_wall.rect = Rect.init(16, 144, 32, 32);
+    self.b_wall.texture_rects = makeStandardButtonRects(0, 0);
+    self.b_wall.setTexture(self.t_wall);
+    self.b_wall.ev_click.setCallback(self, onWallClick);
+    try ui_panel.addChild(self.b_wall.control());
 
-    var b_tower = try self.ui_root.createButton();
-    b_tower.tooltip_text = self.getCachedTooltip(&wo.t_recruit);
-    b_tower.rect = Rect.init(48, 144, 32, 32);
-    b_tower.texture_rects = makeStandardButtonRects(0, 0);
-    b_tower.setTexture(self.t_soldier);
-    b_tower.ev_click.setCallback(self, onTowerClick);
-    try ui_panel.addChild(b_tower.control());
+    self.b_recruit = try self.ui_root.createButton();
+    self.b_recruit.tooltip_text = self.getCachedTooltip(&wo.t_recruit);
+    self.b_recruit.rect = Rect.init(48, 144, 32, 32);
+    self.b_recruit.texture_rects = makeStandardButtonRects(0, 0);
+    self.b_recruit.setTexture(self.t_soldier);
+    self.b_recruit.ev_click.setCallback(self, onTowerClick);
+    try ui_panel.addChild(self.b_recruit.control());
 
     self.ui_minimap = try self.ui_root.createMinimap();
     self.ui_minimap.rect = Rect.init(16, 16, 64, 64);
@@ -517,6 +521,16 @@ fn updateUI(self: *PlayState) void {
         self.wave_timer.state_timer = FrameTimer.initSeconds(self.world.world_frame, 2);
     } else if (self.wave_timer.state == .move_to_corner and self.wave_timer.state_timer.expired(self.world.world_frame)) {
         self.wave_timer.state = .corner;
+    }
+    if (self.world.canAfford(&wo.t_wall) and self.b_wall.state == .disabled) {
+        self.b_wall.state = .normal;
+    } else if (!self.world.canAfford(&wo.t_wall)) {
+        self.b_wall.state = .disabled;
+    }
+    if (self.world.canAfford(&wo.t_recruit) and self.b_recruit.state == .disabled) {
+        self.b_recruit.state = .normal;
+    } else if (!self.world.canAfford(&wo.t_recruit)) {
+        self.b_recruit.state = .disabled;
     }
 }
 
