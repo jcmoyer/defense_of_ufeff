@@ -93,6 +93,9 @@ pub const Projectile = struct {
         if (self.spec.rotation == .rotation_from_velocity) {
             self.angle = std.math.atan2(f32, self.vel_y, self.vel_x);
         }
+        if (!self.world.safe_zone.containsRect(self.getWorldCollisionRect())) {
+            self.dead = true;
+        }
     }
 
     fn hit(self: *Projectile, monster: *Monster) void {
@@ -1282,6 +1285,7 @@ pub const World = struct {
     next_wave_timer: ?FrameTimer = null,
     rng: std.rand.DefaultPrng,
     particle_sys: *particle.ParticleSystem = undefined,
+    safe_zone: Rect = Rect.init(0, 0, 0, 0),
 
     pub fn init(allocator: Allocator) World {
         return .{
@@ -1323,6 +1327,12 @@ pub const World = struct {
         if (self.music_filename) |s| {
             self.allocator.free(s);
         }
+    }
+
+    /// Happens after successful load from json
+    fn finalizeInit(self: *World) void {
+        self.safe_zone = Rect.init(0, 0, @intCast(i32, self.getWidth() * 16), @intCast(i32, self.getHeight() * 16));
+        self.safe_zone.inflate(256, 256);
     }
 
     fn addCustomRect(self: *World, name: []const u8, rect: Rect) !void {
@@ -1748,9 +1758,12 @@ pub const World = struct {
         // API is designed to support this use case with a couple changes.
         for (self.projectiles.slice()) |*p| {
             p.update(self.world_frame);
+            if (p.dead) {
+                proj_pending_removal.append(frame_arena, p.id) catch unreachable;
+                continue;
+            }
             for (self.monsters.slice()) |*m| {
-                var rect: Rect = undefined;
-                if (p.getWorldCollisionRect().intersect(m.getWorldCollisionRect(), &rect)) {
+                if (p.getWorldCollisionRect().intersect(m.getWorldCollisionRect(), null)) {
                     if (m.dead) {
                         continue;
                     }
@@ -1762,6 +1775,7 @@ pub const World = struct {
                         }
                         if (p.dead) {
                             proj_pending_removal.append(frame_arena, p.id) catch unreachable;
+                            break;
                         }
                     }
                 }
@@ -2230,6 +2244,7 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !World {
         world.music_filename = try allocator.dupeZ(u8, music_filename);
     }
 
+    world.finalizeInit();
     return world;
 }
 
