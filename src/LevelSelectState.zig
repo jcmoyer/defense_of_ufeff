@@ -204,6 +204,7 @@ fn updateButtonStates(self: *LevelSelectState) void {
 
 fn onLevelButtonClick(button: *ui.Button, state: *MapButtonState) void {
     _ = button;
+    state.state.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     state.state.prog_state.last_map_entered = state.mapid;
     state.state.game.st_play.loadWorld(state.mapname);
     state.state.beginFadeOut();
