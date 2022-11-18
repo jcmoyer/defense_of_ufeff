@@ -39,6 +39,9 @@ tb_sound: *ui.Trackbar,
 sound_tooltip: [32]u8 = undefined,
 music_tooltip: [32]u8 = undefined,
 
+/// We can get to Options from Menu or PlayMenu
+entered_from: ?Game.StateId = null,
+
 const scales = [5]u8{ 1, 2, 3, 4, 5 };
 const option_width = 128;
 const option_height = 32;
@@ -138,16 +141,14 @@ pub fn create(game: *Game) !*OptionsState {
 
     self.updateAudioTooltips();
 
-    // TODO probably want a better way to manage this, direct IO shouldn't be here
-    // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
-    self.fontspec = try loadFontSpec(self.game.allocator, "assets/tables/CommonCase.json");
+    self.fontspec = try bmfont.BitmapFontSpec.loadFromFile(self.game.allocator, "assets/tables/CommonCase.json");
     return self;
 }
 
 fn onBackClick(button: *ui.Button, self: *OptionsState) void {
     _ = button;
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
-    self.game.changeState(.menu);
+    self.game.changeState(self.entered_from.?);
 }
 
 fn onFullscreenChange(button: *ui.Button, self: *OptionsState) void {
@@ -203,14 +204,6 @@ fn updateAudioTooltips(self: *OptionsState) void {
     }
 }
 
-fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.BitmapFontSpec {
-    var font_file = try std.fs.cwd().openFile(filename, .{});
-    defer font_file.close();
-    var spec_json = try font_file.readToEndAlloc(allocator, 1024 * 1024);
-    defer allocator.free(spec_json);
-    return try bmfont.BitmapFontSpec.initJson(allocator, spec_json);
-}
-
 pub fn destroy(self: *OptionsState) void {
     self.fontspec.deinit();
     self.ui_root.deinit();
@@ -218,8 +211,7 @@ pub fn destroy(self: *OptionsState) void {
 }
 
 pub fn enter(self: *OptionsState, from: ?Game.StateId) void {
-    _ = self;
-    _ = from;
+    self.entered_from = from;
 }
 
 pub fn leave(self: *OptionsState, to: ?Game.StateId) void {

@@ -95,9 +95,7 @@ pub fn create(game: *Game) !*MenuState {
     self.ui_tip.rect.translate(-8, -8);
     try self.ui_root.addChild(self.ui_tip.control());
 
-    // TODO probably want a better way to manage this, direct IO shouldn't be here
-    // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
-    self.fontspec = try loadFontSpec(self.game.allocator, "assets/tables/CommonCase.json");
+    self.fontspec = try bmfont.BitmapFontSpec.loadFromFile(self.game.allocator, "assets/tables/CommonCase.json");
     return self;
 }
 
@@ -126,14 +124,6 @@ fn onButtonClick(button: *ui.Button, self: *MenuState) void {
     _ = button;
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.showRandomTip();
-}
-
-fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.BitmapFontSpec {
-    var font_file = try std.fs.cwd().openFile(filename, .{});
-    defer font_file.close();
-    var spec_json = try font_file.readToEndAlloc(allocator, 1024 * 1024);
-    defer allocator.free(spec_json);
-    return try bmfont.BitmapFontSpec.initJson(allocator, spec_json);
 }
 
 pub fn destroy(self: *MenuState) void {

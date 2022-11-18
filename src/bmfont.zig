@@ -80,6 +80,14 @@ pub const BitmapFontSpec = struct {
         self.kerning_map.deinit(self.allocator);
     }
 
+    pub fn loadFromFile(allocator: std.mem.Allocator, filename: []const u8) !BitmapFontSpec {
+        var font_file = try std.fs.cwd().openFile(filename, .{});
+        defer font_file.close();
+        var spec_json = try font_file.readToEndAlloc(allocator, 1024 * 1024);
+        defer allocator.free(spec_json);
+        return try BitmapFontSpec.initJson(allocator, spec_json);
+    }
+
     pub fn mapGlyph(self: BitmapFontSpec, glyph: u8) Rect {
         return self.map.get(glyph) orelse {
             std.log.warn("Could not map glyph: `{c}`", .{glyph});

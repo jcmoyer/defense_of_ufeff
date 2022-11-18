@@ -148,9 +148,7 @@ pub fn create(game: *Game) !*LevelSelectState {
     self.updateButtonStates();
     self.moveFingerToRecommendedMap();
 
-    // TODO probably want a better way to manage this, direct IO shouldn't be here
-    // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
-    self.fontspec = try loadFontSpec(self.game.allocator, "assets/tables/CommonCase.json");
+    self.fontspec = try bmfont.BitmapFontSpec.loadFromFile(self.game.allocator, "assets/tables/CommonCase.json");
     errdefer self.fontspec.deinit();
 
     return self;
@@ -209,14 +207,6 @@ fn onLevelButtonClick(button: *ui.Button, state: *MapButtonState) void {
     state.state.prog_state.last_map_entered = state.mapid;
     state.state.game.st_play.loadWorld(state.mapname);
     state.state.beginFadeOut();
-}
-
-fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.BitmapFontSpec {
-    var font_file = try std.fs.cwd().openFile(filename, .{});
-    defer font_file.close();
-    var spec_json = try font_file.readToEndAlloc(allocator, 1024 * 1024);
-    defer allocator.free(spec_json);
-    return try bmfont.BitmapFontSpec.initJson(allocator, spec_json);
 }
 
 pub fn enter(self: *LevelSelectState, from: ?Game.StateId) void {

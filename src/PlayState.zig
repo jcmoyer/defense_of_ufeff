@@ -315,10 +315,8 @@ pub fn create(game: *Game) !*PlayState {
         }
     }
 
-    // TODO probably want a better way to manage this, direct IO shouldn't be here
-    // TODO undefined minefield, need to be more careful. Can't deinit an undefined thing.
-    self.fontspec = try loadFontSpec(self.game.allocator, "assets/tables/CommonCase.json");
-    self.fontspec_numbers = try loadFontSpec(self.game.allocator, "assets/tables/floating_text.json");
+    self.fontspec = try bmfont.BitmapFontSpec.loadFromFile(self.game.allocator, "assets/tables/CommonCase.json");
+    self.fontspec_numbers = try bmfont.BitmapFontSpec.loadFromFile(self.game.allocator, "assets/tables/floating_text.json");
 
     self.wave_timer = .{
         .fontspec = &self.fontspec,
@@ -416,14 +414,6 @@ fn onMinimapPan(_: *ui.Minimap, self: *PlayState, x: f32, y: f32) void {
     self.camera.clampToBounds();
 }
 
-fn loadFontSpec(allocator: std.mem.Allocator, filename: []const u8) !bmfont.BitmapFontSpec {
-    var font_file = try std.fs.cwd().openFile(filename, .{});
-    defer font_file.close();
-    var spec_json = try font_file.readToEndAlloc(allocator, 1024 * 1024);
-    defer allocator.free(spec_json);
-    return try bmfont.BitmapFontSpec.initJson(allocator, spec_json);
-}
-
 pub fn destroy(self: *PlayState) void {
     if (self.music_params) |params| {
         params.release();
@@ -444,10 +434,13 @@ pub fn destroy(self: *PlayState) void {
 }
 
 pub fn enter(self: *PlayState, from: ?Game.StateId) void {
-    _ = from;
-    self.setInitialUIState();
-    self.beginWipe();
-    // self.loadWorld("map01");
+    if (from != Game.StateId.playmenu) {
+        self.setInitialUIState();
+        self.beginWipe();
+    }
+    if (self.music_params) |params| {
+        params.paused.store(false, .SeqCst);
+    }
 }
 
 pub fn leave(self: *PlayState, to: ?Game.StateId) void {
@@ -627,8 +620,12 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
     if (ev.type == .SDL_KEYDOWN) {
         switch (ev.key.keysym.sym) {
             sdl.SDLK_F1 => self.deb_render_tile_collision = !self.deb_render_tile_collision,
-            sdl.SDLK_ESCAPE => if (self.interact_state == .build) {
-                self.interact_state = .none;
+            sdl.SDLK_ESCAPE => {
+                if (self.interact_state == .none) {
+                    self.game.changeState(.playmenu);
+                } else if (self.interact_state == .build) {
+                    self.interact_state = .none;
+                }
             },
             else => {},
         }
@@ -1231,7 +1228,9 @@ pub fn loadWorld(self: *PlayState, mapid: []const u8) void {
 
     // get this loading asap
     if (self.world.music_filename) |music_filename| {
-        self.music_params = self.game.audio.playMusic(music_filename, .{});
+        self.music_params = self.game.audio.playMusic(music_filename, .{
+            .start_paused = true,
+        });
     }
 
     self.createMinimap() catch |err| {
@@ -1338,7 +1337,7 @@ fn renderMinimapLayer(
     self.game.renderers.r_batch.end();
 }
 
-fn beginTransitionGameOver(self: *PlayState) void {
+pub fn beginTransitionGameOver(self: *PlayState) void {
     self.sub = .gamelose_fadeout;
     self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
 }

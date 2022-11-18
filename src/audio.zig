@@ -78,6 +78,7 @@ const DecodeRequest = struct {
 pub const AudioOptions = struct {
     initial_volume: f32 = 1,
     initial_pan: f32 = 0.5,
+    start_paused: bool = false,
 };
 
 const AudioDecodeThread = struct {
@@ -407,6 +408,7 @@ pub const AudioSystem = struct {
         };
         parameters.volume.storeUnchecked(opts.initial_volume);
         parameters.pan.storeUnchecked(opts.initial_pan);
+        parameters.paused.storeUnchecked(opts.start_paused);
         var req = DecodeRequest{
             .filename = dup_filename,
             .loop = true,
@@ -429,6 +431,7 @@ pub const AudioSystem = struct {
         };
         parameters.volume.storeUnchecked(opts.initial_volume);
         parameters.pan.storeUnchecked(opts.initial_pan);
+        parameters.paused.storeUnchecked(opts.start_paused);
         var req = DecodeRequest{
             .filename = dup_filename,
             .loop = false,
