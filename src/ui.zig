@@ -295,7 +295,6 @@ pub const Trackbar = struct {
             // investigate. For now, subtract 1 so a trackbar can be dragged
             // all the way to the right.
             const percent_x = xf / (crf.w - 1.0);
-            std.debug.print("{d}\n", .{percent_x});
             self.value = self.min_value + @floatToInt(u32, @intToFloat(f32, self.max_value - self.min_value) * percent_x);
             self.ev_changed.invoke(self);
         }
