@@ -1279,7 +1279,7 @@ pub const World = struct {
     player_won: bool = false,
     music_filename: ?[:0]const u8 = null,
     /// `null` when there are no more waves.
-    next_wave_timer: ?FrameTimer = FrameTimer.initSeconds(0, 15),
+    next_wave_timer: ?FrameTimer = null,
     rng: std.rand.DefaultPrng,
     particle_sys: *particle.ParticleSystem = undefined,
 

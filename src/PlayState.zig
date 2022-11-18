@@ -1250,6 +1250,12 @@ pub fn loadWorld(self: *PlayState, mapid: []const u8) void {
     // should probably clean this up eventually
     self.world.view = self.camera.view;
     self.world.particle_sys = &self.particle_sys;
+    self.world.setNextWaveTimer(15);
+
+    if (self.world.remainingWaveCount() == 0) {
+        // We will stay in this state, just nothing will happen
+        std.log.warn("World `{s}` has no waves", .{mapid});
+    }
 }
 
 fn createMinimap(self: *PlayState) !void {
