@@ -430,8 +430,8 @@ pub fn enter(self: *PlayState, from: ?Game.StateId) void {
 }
 
 pub fn leave(self: *PlayState, to: ?Game.StateId) void {
-    _ = self;
     _ = to;
+    self.ui_root.clearTransientState();
 }
 
 pub fn update(self: *PlayState) void {
@@ -1335,12 +1335,12 @@ fn renderMinimapLayer(
 
 pub fn beginTransitionGameOver(self: *PlayState) void {
     self.sub = .gamelose_fadeout;
-    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
+    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 1);
 }
 
 fn beginTransitionGameWin(self: *PlayState) void {
     self.sub = .gamewin_fadeout;
-    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
+    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 1);
 }
 
 fn renderWipe(self: *PlayState, alpha: f64) void {

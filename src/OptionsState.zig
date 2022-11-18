@@ -215,13 +215,13 @@ pub fn enter(self: *OptionsState, from: ?Game.StateId) void {
 }
 
 pub fn leave(self: *OptionsState, to: ?Game.StateId) void {
-    _ = self;
     _ = to;
+    self.ui_root.clearTransientState();
 }
 
 pub fn update(self: *OptionsState) void {
     // hehe
-    self.game.st_menu.update();
+    self.game.st_menu.updateBackground();
     self.btn_fullscreen.text = if (self.game.isFullscreen()) "yes" else "no";
 }
 

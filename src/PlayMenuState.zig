@@ -100,8 +100,8 @@ pub fn enter(self: *PlayMenuState, from: ?Game.StateId) void {
 }
 
 pub fn leave(self: *PlayMenuState, to: ?Game.StateId) void {
-    _ = self;
     _ = to;
+    self.ui_root.clearTransientState();
 }
 
 pub fn update(self: *PlayMenuState) void {

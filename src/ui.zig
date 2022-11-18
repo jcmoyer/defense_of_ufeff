@@ -800,6 +800,14 @@ pub const Root = struct {
         self.backend.deinit();
     }
 
+    pub fn clearTransientState(self: *Root) void {
+        self.hover = null;
+        self.mouse_down_control = null;
+        self.tooltip_text = null;
+        self.interaction_hint = .none;
+        self.backend.setCursorForHint(self.interaction_hint);
+    }
+
     pub fn isMouseOnElement(self: *Root, x: i32, y: i32) bool {
         for (self.children.items) |child| {
             if (!child.isVisible()) {

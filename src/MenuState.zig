@@ -21,6 +21,13 @@ const audio = @import("audio.zig");
 const sdl = @import("sdl.zig");
 const ui = @import("ui.zig");
 const Texture = @import("texture.zig").Texture;
+const FrameTimer = @import("timing.zig").FrameTimer;
+
+const Substate = enum {
+    none,
+    fade_from_levelselect,
+    fade_to_levelselect,
+};
 
 game: *Game,
 fontspec: bmfont.BitmapFontSpec,
@@ -31,6 +38,8 @@ tip_index: usize = 0,
 menu_start: i32 = 80,
 p_scroll_offset: f32 = 0,
 scroll_offset: f32 = 0,
+sub: Substate = .none,
+fade_timer: FrameTimer = .{},
 
 const tips = [_][]const u8{
     "You can build over top of walls!\nThis lets you maze first, then build towers.",
@@ -106,7 +115,7 @@ fn showRandomTip(self: *MenuState) void {
 fn onPlayGameClick(button: *ui.Button, self: *MenuState) void {
     _ = button;
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
-    self.game.changeState(.levelselect);
+    self.beginFadeToLevelSelect();
 }
 
 fn onOptionsClick(button: *ui.Button, self: *MenuState) void {
@@ -133,21 +142,25 @@ pub fn destroy(self: *MenuState) void {
 }
 
 pub fn enter(self: *MenuState, from: ?Game.StateId) void {
-    _ = self;
-    _ = from;
+    if (from == Game.StateId.levelselect) {
+        self.beginFadeFromLevelSelect();
+    }
 }
 
 pub fn leave(self: *MenuState, to: ?Game.StateId) void {
-    _ = self;
     _ = to;
+    self.ui_root.clearTransientState();
 }
 
 pub fn update(self: *MenuState) void {
-    self.p_scroll_offset = self.scroll_offset;
-    self.scroll_offset += 0.5;
-    while (self.scroll_offset >= 32) {
-        self.scroll_offset -= 32;
-        self.p_scroll_offset -= 32;
+    self.updateBackground();
+
+    if (self.sub == .fade_to_levelselect and self.fade_timer.expired(self.game.frame_counter)) {
+        self.endFadeToLevelSelect();
+    }
+
+    if (self.sub == .fade_from_levelselect and self.fade_timer.expired(self.game.frame_counter)) {
+        self.endFadeFromLevelSelect();
     }
 }
 
@@ -177,10 +190,25 @@ pub fn render(self: *MenuState, alpha: f64) void {
         .font_texture = self.game.texman.getNamedTexture("CommonCase.png"),
         .font_spec = &self.fontspec,
     }, self.ui_root);
+
+    self.renderFade();
 }
 
 pub fn handleEvent(self: *MenuState, ev: sdl.SDL_Event) void {
+    if (self.sub != .none) {
+        return;
+    }
+
     _ = self.ui_root.backend.dispatchEvent(ev, &self.ui_root);
+}
+
+pub fn updateBackground(self: *MenuState) void {
+    self.p_scroll_offset = self.scroll_offset;
+    self.scroll_offset += 0.5;
+    while (self.scroll_offset >= 32) {
+        self.scroll_offset -= 32;
+        self.p_scroll_offset -= 32;
+    }
 }
 
 pub fn renderBackground(self: *MenuState, alpha: f64) void {
@@ -213,4 +241,36 @@ pub fn renderBackground(self: *MenuState, alpha: f64) void {
         }
     }
     self.game.renderers.r_batch.end();
+}
+
+fn beginFadeToLevelSelect(self: *MenuState) void {
+    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 1);
+    self.sub = .fade_to_levelselect;
+}
+
+fn endFadeToLevelSelect(self: *MenuState) void {
+    self.sub = .none;
+    self.game.changeState(.levelselect);
+}
+
+fn beginFadeFromLevelSelect(self: *MenuState) void {
+    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 1);
+    self.sub = .fade_from_levelselect;
+}
+
+fn endFadeFromLevelSelect(self: *MenuState) void {
+    self.sub = .none;
+}
+
+fn renderFade(self: *MenuState) void {
+    if (self.sub != .fade_to_levelselect and self.sub != .fade_from_levelselect) {
+        return;
+    }
+
+    const t_out = self.fade_timer.progressClamped(self.game.frame_counter);
+    const t_in = 1 - t_out;
+    const a = if (self.sub == .fade_from_levelselect) t_in else t_out;
+
+    self.game.renderers.r_imm.beginUntextured();
+    self.game.renderers.r_imm.drawQuadRGBA(Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT), zm.f32x4(0, 0, 0, a));
 }

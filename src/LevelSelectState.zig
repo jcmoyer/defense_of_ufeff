@@ -61,6 +61,8 @@ const Finger = struct {
     target_x: f32 = 0,
     target_y: f32 = 0,
     move_timer: FrameTimer = .{},
+    move_finished: bool = false,
+    unlocking_button: ?*ui.Button = null,
 
     fn update(self: *Finger, frame: u64) void {
         self.p_world_x = self.world_x;
@@ -69,6 +71,13 @@ const Finger = struct {
         const k = std.math.pow(f32, t, 5);
         self.world_x = zm.lerpV(self.start_x, self.target_x, k);
         self.world_y = zm.lerpV(self.start_y, self.target_y, k);
+        if (!self.move_finished and t == 1) {
+            if (self.unlocking_button) |b| {
+                b.state = .normal;
+            }
+            audio.AudioSystem.instance.playSound("assets/sounds/blip.ogg", .{}).release();
+            self.move_finished = true;
+        }
     }
 
     fn moveTo(self: *Finger, target_x: f32, target_y: f32, timer: FrameTimer) void {
@@ -151,6 +160,12 @@ pub fn create(game: *Game) !*LevelSelectState {
     self.fontspec = try bmfont.BitmapFontSpec.loadFromFile(self.game.allocator, "assets/tables/CommonCase.json");
     errdefer self.fontspec.deinit();
 
+    // might as well preload this early since it takes like 8 sec
+    self.music_params = self.game.audio.playMusic("assets/music/Daybreak.ogg", .{
+        .start_paused = true,
+        .initial_volume = 0,
+    });
+
     return self;
 }
 
@@ -197,9 +212,10 @@ fn createButtonForRect(self: *LevelSelectState, rect: Rect, mapid: u32) !void {
 
 fn updateButtonStates(self: *LevelSelectState) void {
     var i: usize = 0;
-    while (i <= self.prog_state.num_complete) : (i += 1) {
+    while (i < self.prog_state.num_complete) : (i += 1) {
         self.buttons[i].state = .normal;
     }
+    // last map unlocked by finger
 }
 
 fn onLevelButtonClick(button: *ui.Button, state: *MapButtonState) void {
@@ -213,8 +229,6 @@ fn onLevelButtonClick(button: *ui.Button, state: *MapButtonState) void {
 pub fn enter(self: *LevelSelectState, from: ?Game.StateId) void {
     if (self.music_params) |params| {
         params.paused.store(false, .SeqCst);
-    } else {
-        self.music_params = self.game.audio.playMusic("assets/music/Daybreak.ogg", .{});
     }
     self.beginFadeIn();
 
@@ -227,6 +241,11 @@ pub fn enter(self: *LevelSelectState, from: ?Game.StateId) void {
             self.updateButtonStates();
         }
     }
+
+    if (from == Game.StateId.menu) {
+        self.finger = .{};
+    }
+
     self.moveFingerToRecommendedMap();
 }
 
@@ -235,6 +254,7 @@ pub fn leave(self: *LevelSelectState, to: ?Game.StateId) void {
     if (self.music_params) |params| {
         params.paused.store(true, .SeqCst);
     }
+    self.ui_root.clearTransientState();
 }
 
 pub fn update(self: *LevelSelectState) void {
@@ -294,12 +314,12 @@ pub fn handleEvent(self: *LevelSelectState, ev: sdl.SDL_Event) void {
 
 fn beginFadeIn(self: *LevelSelectState) void {
     self.sub = .fadein;
-    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
+    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 1);
 }
 
 fn beginFadeOut(self: *LevelSelectState) void {
     self.sub = .fadeout;
-    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
+    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 1);
 }
 
 fn endFadeOut(self: *LevelSelectState) void {
@@ -310,7 +330,7 @@ fn endFadeOut(self: *LevelSelectState) void {
 
 fn beginFadeOutToMenu(self: *LevelSelectState) void {
     self.sub = .fadeout_to_menu;
-    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
+    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 1);
 }
 
 fn endFadeOutToMenu(self: *LevelSelectState) void {
@@ -354,6 +374,7 @@ fn moveFingerToRecommendedMap(self: *LevelSelectState) void {
     if (self.prog_state.num_complete < self.num_buttons) {
         const b = self.buttons[self.prog_state.num_complete];
         const p = b.rect.centerPoint();
+        self.finger.unlocking_button = self.buttons[self.prog_state.num_complete];
         self.finger.moveTo(
             @intToFloat(f32, p[0]),
             @intToFloat(f32, p[1]),
