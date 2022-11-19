@@ -1200,6 +1200,23 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
         );
     }
     self.game.renderers.r_quad.end();
+
+    const tile_coord = self.mouseToTile();
+    const t0 = self.world.map.at2DPtr(.base, tile_coord.x, tile_coord.y);
+    const t1 = self.world.map.at2DPtr(.detail, tile_coord.x, tile_coord.y);
+    var textbuf: [256]u8 = undefined;
+    const slice = std.fmt.bufPrint(&textbuf, "base: {d}\ndetail: {d}", .{ t0.id, t1.id }) catch unreachable;
+    self.game.renderers.r_font.begin(.{
+        .texture = self.game.texman.getNamedTexture("CommonCase.png"),
+        .spec = &self.fontspec,
+    });
+    self.game.renderers.r_font.drawText(slice, .{
+        .dest = Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT),
+        .color = .{ 255, 255, 255, 255 },
+        .h_alignment = .left,
+        .v_alignment = .top,
+    });
+    self.game.renderers.r_font.end();
 }
 
 pub fn loadWorld(self: *PlayState, mapid: []const u8) void {
