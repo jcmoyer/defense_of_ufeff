@@ -1131,7 +1131,7 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
     );
     const map = self.world.map;
 
-    self.game.renderers.r_imm.beginUntextured();
+    self.game.renderers.r_quad.begin(.{});
     var y: usize = min_tile_y;
     var x: usize = 0;
     while (y < max_tile_y) : (y += 1) {
@@ -1145,55 +1145,61 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
                 .h = 16,
             };
             if (t.all()) {
-                self.game.renderers.r_imm.drawQuadRGBA(dest, [_]f32{ 1, 0, 0, 0.6 });
+                self.game.renderers.r_quad.drawQuadRGBA(dest, 255, 0, 0, 150);
                 continue;
             }
 
             if (t.from_left) {
                 var left_rect = dest;
                 left_rect.w = 4;
-                self.game.renderers.r_imm.drawQuadRGBA(left_rect, [_]f32{ 1, 0, 0, 0.6 });
+                self.game.renderers.r_quad.drawQuadRGBA(left_rect, 255, 0, 0, 150);
             }
 
             if (t.from_top) {
                 var top_rect = dest;
                 top_rect.h = 4;
-                self.game.renderers.r_imm.drawQuadRGBA(top_rect, [_]f32{ 1, 0, 0, 0.6 });
+                self.game.renderers.r_quad.drawQuadRGBA(top_rect, 255, 0, 0, 150);
             }
 
             if (t.from_bottom) {
                 var bot_rect = dest;
                 bot_rect.translate(0, bot_rect.h - 4);
                 bot_rect.h = 4;
-                self.game.renderers.r_imm.drawQuadRGBA(bot_rect, [_]f32{ 1, 0, 0, 0.6 });
+                self.game.renderers.r_quad.drawQuadRGBA(bot_rect, 255, 0, 0, 150);
             }
 
             if (t.from_right) {
                 var right_rect = dest;
                 right_rect.translate(right_rect.w - 4, 0);
                 right_rect.w = 4;
-                self.game.renderers.r_imm.drawQuadRGBA(right_rect, [_]f32{ 1, 0, 0, 0.6 });
+                self.game.renderers.r_quad.drawQuadRGBA(right_rect, 255, 0, 0, 150);
             }
         }
     }
 
-    self.game.renderers.r_imm.beginUntextured();
     for (self.world.monsters.slice()) |m| {
         var wc = m.getWorldCollisionRect();
         wc.translate(-cam.view.left(), -cam.view.top());
-        self.game.renderers.r_imm.drawQuadRGBA(
+        self.game.renderers.r_quad.drawQuadRGBA(
             wc,
-            [4]f32{ 0, 0, 1, 0.5 },
+            0,
+            0,
+            255,
+            150,
         );
     }
     for (self.world.projectiles.slice()) |p| {
         var wc = p.getWorldCollisionRect();
         wc.translate(-cam.view.left(), -cam.view.top());
-        self.game.renderers.r_imm.drawQuadRGBA(
+        self.game.renderers.r_quad.drawQuadRGBA(
             wc,
-            [4]f32{ 0, 0, 1, 0.5 },
+            0,
+            0,
+            255,
+            150,
         );
     }
+    self.game.renderers.r_quad.end();
 }
 
 pub fn loadWorld(self: *PlayState, mapid: []const u8) void {
