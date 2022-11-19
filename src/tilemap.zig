@@ -186,6 +186,8 @@ pub const Tile = struct {
             44...55,
             76...87,
             108...119,
+            // Wood planks, used as bridge in map03
+            690,
             // Plain tiles
             24...25,
             => CollisionFlags.initNone(),
