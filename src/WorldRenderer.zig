@@ -114,6 +114,10 @@ fn renderTilemapLayer(
         var tx: u8 = 0;
         while (x < range.max.x) : (x += 1) {
             const t = map.at2DPtr(layer, x, y);
+            // filter tiles to selected bank
+            if (t.bank != bank) {
+                continue;
+            }
             if (t.isWater()) {
                 const dest = Rect{
                     .x = @intCast(i32, x * 16) + translate_x,
@@ -141,7 +145,7 @@ fn renderTilemapLayer(
                 // self.foam_buf[self.n_water].dest.inflate(1, 1);
 
                 self.n_water += 1;
-            } else if (t.bank == bank) {
+            } else {
                 const src = Rect{
                     .x = (t.id % n_tiles_wide) * 16,
                     .y = (t.id / n_tiles_wide) * 16,
