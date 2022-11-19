@@ -460,6 +460,7 @@ pub fn update(self: *PlayState) void {
     self.ui_minimap.bounds = self.camera.bounds;
 
     self.heart_anim.update();
+    self.r_world.updateAnimations();
     self.particle_sys.update(self.world.world_frame);
 
     self.world.view = self.camera.view;
