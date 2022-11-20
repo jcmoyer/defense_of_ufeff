@@ -42,7 +42,6 @@ const MapButtonState = struct {
     state: *LevelSelectState,
     /// Index into ProgressionState.maps
     mapid: u32,
-    mapname: []const u8,
 };
 
 const Substate = enum {
@@ -188,10 +187,8 @@ pub fn destroy(self: *LevelSelectState) void {
 fn createButtonForRect(self: *LevelSelectState, rect: Rect, mapid: u32) !void {
     var btn = try self.ui_root.createButton();
     var allocator = self.arena.allocator();
-    const mapname = try std.fmt.allocPrint(allocator, "map{d:0>2}", .{mapid + 1});
     self.button_states[self.num_buttons] = .{
         .mapid = mapid,
-        .mapname = mapname,
         .state = self,
     };
     btn.rect = Rect.init(0, 0, 32, 32);
@@ -223,7 +220,7 @@ fn onLevelButtonClick(button: *ui.Button, state: *MapButtonState) void {
     _ = button;
     state.state.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     state.state.prog_state.last_map_entered = state.mapid;
-    state.state.game.st_play.loadWorld(state.mapname);
+    state.state.game.st_play.loadWorld(state.mapid);
     state.state.beginFadeOut();
 }
 

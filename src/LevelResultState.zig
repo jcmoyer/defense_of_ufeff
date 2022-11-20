@@ -106,9 +106,23 @@ pub fn create(game: *Game) !*LevelResultState {
     btn_levelselect_l.rect = Rect.init(0, 0, 128, 32);
     btn_levelselect_l.rect.centerOnPoint(screen_center);
     btn_levelselect_l.rect.translate(0, 25);
+    btn_levelselect_l.rect.alignRight(screen_center[0]);
+    btn_levelselect_l.rect.translate(-4, 0);
     btn_levelselect_l.setTexture(self.game.texman.getNamedTexture("menu_button.png"));
     btn_levelselect_l.texture_rects = wide_button_rects;
     try self.ui_root_lose.addChild(btn_levelselect_l.control());
+
+    var btn_retry_l = try self.ui_root_lose.createButton();
+    btn_retry_l.text = "Retry";
+    btn_retry_l.ev_click.setCallback(self, onRetryClick);
+    btn_retry_l.rect = Rect.init(0, 0, 128, 32);
+    btn_retry_l.rect.centerOnPoint(screen_center);
+    btn_retry_l.rect.translate(0, 25);
+    btn_retry_l.rect.alignLeft(screen_center[0]);
+    btn_retry_l.rect.translate(4, 0);
+    btn_retry_l.setTexture(self.game.texman.getNamedTexture("menu_button.png"));
+    btn_retry_l.texture_rects = wide_button_rects;
+    try self.ui_root_lose.addChild(btn_retry_l.control());
 
     self.fontspec = try bmfont.BitmapFontSpec.loadFromFile(self.game.allocator, "assets/tables/CommonCase.json");
     errdefer self.fontspec.deinit();
@@ -141,6 +155,10 @@ pub fn update(self: *LevelResultState) void {
 
     if (self.sub == .fade_to_levelselect and self.fade_timer.expired(self.game.frame_counter)) {
         self.endFadeToLevelSelect();
+    }
+
+    if (self.sub == .fade_to_play and self.fade_timer.expired(self.game.frame_counter)) {
+        self.endFadeToPlay();
     }
 }
 
@@ -184,21 +202,21 @@ fn endFadeToLevelSelect(self: *LevelResultState) void {
     self.game.changeState(.levelselect);
 }
 
+fn beginFadeToPlay(self: *LevelResultState) void {
+    self.sub = .fade_to_play;
+    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 1);
+}
+
+fn endFadeToPlay(self: *LevelResultState) void {
+    self.sub = .none;
+    self.game.st_play.restartCurrentWorld();
+    self.game.changeState(.play);
+}
+
 fn endFadeOut(self: *LevelResultState) void {
     std.debug.assert(self.sub == .fadeout);
     self.sub = .none;
     self.game.changeState(.play);
-}
-
-fn beginFadeOutToMenu(self: *LevelResultState) void {
-    self.sub = .fadeout_to_menu;
-    self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 1);
-}
-
-fn endFadeOutToMenu(self: *LevelResultState) void {
-    std.debug.assert(self.sub == .fadeout_to_menu);
-    self.sub = .none;
-    self.game.changeState(.menu);
 }
 
 fn renderFade(self: *LevelResultState) void {
@@ -221,4 +239,9 @@ fn getCurrentUiRoot(self: *LevelResultState) *ui.Root {
 fn onLevelSelectClick(_: *ui.Button, self: *LevelResultState) void {
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.beginFadeToLevelSelect();
+}
+
+fn onRetryClick(_: *ui.Button, self: *LevelResultState) void {
+    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
+    self.beginFadeToPlay();
 }

@@ -149,6 +149,7 @@ wipe_scanlines: [Game.INTERNAL_HEIGHT]i32 = undefined,
 deb_render_tile_collision: bool = false,
 
 rng: std.rand.DefaultPrng = std.rand.DefaultPrng.init(0),
+current_mapid: ?u32 = null,
 
 const wipe_scanline_width = Game.INTERNAL_WIDTH / 4;
 
@@ -1226,7 +1227,16 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
     self.game.renderers.r_font.end();
 }
 
-pub fn loadWorld(self: *PlayState, mapid: []const u8) void {
+pub fn restartCurrentWorld(self: *PlayState) void {
+    if (self.current_mapid) |mapid| {
+        self.loadWorld(mapid);
+    } else {
+        std.log.err("Tried to restart current world but current_mapid is null", .{});
+        std.process.exit(1);
+    }
+}
+
+pub fn loadWorld(self: *PlayState, mapid: u32) void {
     if (self.music_params) |params| {
         params.done.store(true, .SeqCst);
         params.release();
@@ -1235,7 +1245,7 @@ pub fn loadWorld(self: *PlayState, mapid: []const u8) void {
     self.world.deinit();
     self.particle_sys.clear();
 
-    const filename = std.fmt.allocPrint(self.game.allocator, "assets/maps/{s}.tmj", .{mapid}) catch |err| {
+    const filename = std.fmt.allocPrint(self.game.allocator, "assets/maps/map{d:0>2}.tmj", .{mapid + 1}) catch |err| {
         std.log.err("Failed to allocate world path: {!}", .{err});
         std.process.exit(1);
     };
@@ -1257,7 +1267,8 @@ pub fn loadWorld(self: *PlayState, mapid: []const u8) void {
         std.log.err("Failed to create minimap: {!}", .{err});
         std.process.exit(1);
     };
-    // self.world.animan = &self.aman;
+
+    self.current_mapid = mapid;
 
     // Init camera for this map
 
@@ -1285,7 +1296,7 @@ pub fn loadWorld(self: *PlayState, mapid: []const u8) void {
 
     if (self.world.remainingWaveCount() == 0) {
         // We will stay in this state, just nothing will happen
-        std.log.warn("World `{s}` has no waves", .{mapid});
+        std.log.warn("World `{s}` has no waves", .{filename});
     }
 }
 
