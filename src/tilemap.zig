@@ -153,7 +153,8 @@ pub const TileLayer = enum {
 pub const TileInstanceFlags = packed struct {
     construction_blocked: bool = false,
     contains_tower: bool = false,
-    reserved: u6 = 0,
+    pathable_override: bool = false,
+    reserved: u5 = 0,
 };
 
 pub const Tile = struct {
@@ -167,6 +168,9 @@ pub const Tile = struct {
 
     // TODO: this should probably be data driven, maybe we can specify this in tiled?
     pub fn getCollisionFlags(self: Tile) CollisionFlags {
+        if (self.flags.pathable_override) {
+            return CollisionFlags.initNone();
+        }
         return switch (self.bank) {
             .none => CollisionFlags.initNone(),
             .terrain => self.getTerrainCollisionFlags(),
@@ -201,6 +205,21 @@ pub const Tile = struct {
             168 => .{
                 .from_left = true,
             },
+            // Sand (cliff)
+            148 => .{ .from_left = true, .from_top = true },
+            150 => .{ .from_top = true },
+            151 => .{ .from_top = true, .from_right = true },
+            177, 178 => .{},
+            180 => .{ .from_left = true },
+            181 => .{ .from_right = true },
+            183 => .{ .from_right = true },
+            209 => .{ .from_left = true },
+            210 => .{ .from_right = true },
+            212 => .{ .from_left = true },
+            213 => .{},
+            214 => .{ .from_left = true },
+            215 => .{ .from_right = true },
+            244, 245, 247 => CollisionFlags.initAll(),
             else => CollisionFlags.initAll(),
         };
     }

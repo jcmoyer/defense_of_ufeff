@@ -2314,6 +2314,18 @@ fn loadObjectGroup(layer: TiledObjectGroup, ctx: LoadContext) !void {
             ctx.world.play_area = Rect.init(obj.x, obj.y, obj.width, obj.height);
         } else if (std.mem.eql(u8, obj.class, "custom_rect")) {
             try ctx.world.addCustomRect(obj.name, Rect.init(obj.x, obj.y, obj.width, obj.height));
+        } else if (std.mem.eql(u8, obj.class, "pathable")) {
+            const tile_start = TileCoord.initSignedWorld(obj.x, obj.y);
+            const tile_end = TileCoord.initSignedWorld(obj.x + obj.width, obj.y + obj.height);
+            var ty: usize = tile_start.y;
+            while (ty < tile_end.y) : (ty += 1) {
+                var tx: usize = tile_start.x;
+                while (tx < tile_end.x) : (tx += 1) {
+                    std.debug.print("override{d},{d}\n", .{ tx, ty });
+                    ctx.world.map.at2DPtr(.base, tx, ty).flags.pathable_override = true;
+                    ctx.world.map.at2DPtr(.detail, tx, ty).flags.pathable_override = true;
+                }
+            }
         }
     }
 }
