@@ -18,6 +18,7 @@ const QuadBatch = @import("QuadBatch.zig");
 const BitmapFont = bmfont.BitmapFont;
 const particle = @import("particle.zig");
 const audio = @import("audio.zig");
+const rend = @import("render.zig");
 // eventually should probably eliminate this dependency
 const sdl = @import("sdl.zig");
 const ui = @import("ui.zig");
@@ -340,16 +341,12 @@ fn endFadeOutToMenu(self: *LevelSelectState) void {
 }
 
 fn renderFade(self: *LevelSelectState) void {
-    if (self.sub != .fadein and self.sub != .fadeout and self.sub != .fadeout_to_menu) {
-        return;
-    }
-
-    const t_out = self.fade_timer.progressClamped(self.game.frame_counter);
-    const t_in = 1 - t_out;
-    const a = if (self.sub == .fadein) t_in else t_out;
-
-    self.game.renderers.r_imm.beginUntextured();
-    self.game.renderers.r_imm.drawQuadRGBA(Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT), zm.f32x4(0, 0, 0, a));
+    const d: rend.FadeDirection = switch (self.sub) {
+        .fadein => .in,
+        .fadeout, .fadeout_to_menu => .out,
+        else => return,
+    };
+    rend.renderLinearFade(self.game.renderers, d, self.fade_timer.progressClamped(self.game.frame_counter));
 }
 
 fn saveProgression(self: *LevelSelectState) !void {

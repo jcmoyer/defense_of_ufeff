@@ -15,6 +15,7 @@ const PlayState = @import("PlayState.zig");
 const OptionsState = @import("OptionsState.zig");
 const LevelSelectState = @import("LevelSelectState.zig");
 const PlayMenuState = @import("PlayMenuState.zig");
+const LevelResultState = @import("LevelResultState.zig");
 const ui = @import("ui.zig");
 const InputState = @import("input.zig").InputState;
 const Rect = @import("Rect.zig");
@@ -47,6 +48,7 @@ st_play: *PlayState,
 st_options: *OptionsState,
 st_levelselect: *LevelSelectState,
 st_playmenu: *PlayMenuState,
+st_levelresult: *LevelResultState,
 
 frame_counter: u64 = 0,
 output_scale_x: f32 = 2,
@@ -63,6 +65,7 @@ pub const StateId = enum {
     options,
     levelselect,
     playmenu,
+    levelresult,
 };
 
 /// Allocate a Game and initialize core systems.
@@ -82,6 +85,7 @@ pub fn create(allocator: Allocator) !*Game {
         .st_options = undefined,
         .st_levelselect = undefined,
         .st_playmenu = undefined,
+        .st_levelresult = undefined,
         .sdl_backend = undefined,
         .renderers = undefined,
     };
@@ -162,6 +166,11 @@ pub fn create(allocator: Allocator) !*Game {
         std.process.exit(1);
     };
 
+    ptr.st_levelresult = LevelResultState.create(ptr) catch |err| {
+        log.err("Could not create LevelResultState: {!}", .{err});
+        std.process.exit(1);
+    };
+
     // At this point, the game object should be fully constructed and in a valid state.
 
     return ptr;
@@ -173,6 +182,7 @@ pub fn destroy(self: *Game) void {
     self.st_menu.destroy();
     self.st_options.destroy();
     self.st_levelselect.destroy();
+    self.st_levelresult.destroy();
     self.renderers.deinit();
     self.texman.deinit();
     self.audio.destroy();
@@ -324,6 +334,8 @@ fn performLayout(self: *Game) void {
     self.sdl_backend.client_rect = self.output_rect;
     self.sdl_backend.coord_scale_x = self.output_scale_x;
     self.sdl_backend.coord_scale_y = self.output_scale_y;
+    self.renderers.output_width = @intCast(u32, self.output_rect.w);
+    self.renderers.output_height = @intCast(u32, self.output_rect.h);
 }
 
 fn initFramebuffer(self: *Game) void {
@@ -384,6 +396,7 @@ fn stateDispatchEvent(self: *Game, id: StateId, ev: sdl.SDL_Event) void {
         .options => self.st_options.handleEvent(ev),
         .levelselect => self.st_levelselect.handleEvent(ev),
         .playmenu => self.st_playmenu.handleEvent(ev),
+        .levelresult => self.st_levelresult.handleEvent(ev),
     }
 }
 
@@ -394,6 +407,7 @@ fn stateDispatchUpdate(self: *Game, id: StateId) void {
         .options => self.st_options.update(),
         .levelselect => self.st_levelselect.update(),
         .playmenu => self.st_playmenu.update(),
+        .levelresult => self.st_levelresult.update(),
     }
 }
 
@@ -404,6 +418,7 @@ fn stateDispatchRender(self: *Game, id: StateId, alpha: f64) void {
         .options => self.st_options.render(alpha),
         .levelselect => self.st_levelselect.render(alpha),
         .playmenu => self.st_playmenu.render(alpha),
+        .levelresult => self.st_levelresult.render(alpha),
     }
 }
 
@@ -414,6 +429,7 @@ fn stateDispatchEnter(self: *Game, id: StateId, from: ?StateId) void {
         .options => self.st_options.enter(from),
         .levelselect => self.st_levelselect.enter(from),
         .playmenu => self.st_playmenu.enter(from),
+        .levelresult => self.st_levelresult.enter(from),
     }
 }
 
@@ -424,6 +440,7 @@ fn stateDispatchLeave(self: *Game, id: StateId, to: ?StateId) void {
         .options => self.st_options.leave(to),
         .levelselect => self.st_levelselect.leave(to),
         .playmenu => self.st_playmenu.leave(to),
+        .levelresult => self.st_levelresult.leave(to),
     }
 }
 

@@ -18,6 +18,7 @@ const QuadBatch = @import("QuadBatch.zig");
 const BitmapFont = bmfont.BitmapFont;
 const particle = @import("particle.zig");
 const audio = @import("audio.zig");
+const rend = @import("render.zig");
 // eventually should probably eliminate this dependency
 const sdl = @import("sdl.zig");
 const ui = @import("ui.zig");
@@ -490,7 +491,12 @@ pub fn update(self: *PlayState) void {
                 params.release();
                 self.music_params = null;
             }
-            self.game.changeState(.levelselect);
+            if (self.sub == .gamelose_fadeout) {
+                self.game.st_levelresult.setResultKind(.lose);
+            } else {
+                self.game.st_levelresult.setResultKind(.win);
+            }
+            self.game.changeState(.levelresult);
         }
     }
 
@@ -1405,14 +1411,11 @@ fn renderWipe(self: *PlayState, alpha: f64) void {
 }
 
 fn renderFade(self: *PlayState) void {
-    if (self.sub != .gamewin_fadeout and self.sub != .gamelose_fadeout) {
-        return;
-    }
-
-    const a = self.fade_timer.progressClamped(self.game.frame_counter);
-
-    self.game.renderers.r_imm.beginUntextured();
-    self.game.renderers.r_imm.drawQuadRGBA(Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT), zm.f32x4(0, 0, 0, a));
+    const d: rend.FadeDirection = switch (self.sub) {
+        .gamewin_fadeout, .gamelose_fadeout => .out,
+        else => return,
+    };
+    rend.renderLinearFade(self.game.renderers, d, self.fade_timer.progressClamped(self.game.frame_counter));
 }
 
 fn updateUpgradeButtons(self: *PlayState) void {
