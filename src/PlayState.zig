@@ -1245,11 +1245,8 @@ pub fn loadWorld(self: *PlayState, mapid: u32) void {
     self.world.deinit();
     self.particle_sys.clear();
 
-    const filename = std.fmt.allocPrint(self.game.allocator, "assets/maps/map{d:0>2}.tmj", .{mapid + 1}) catch |err| {
-        std.log.err("Failed to allocate world path: {!}", .{err});
-        std.process.exit(1);
-    };
-    defer self.game.allocator.free(filename);
+    var filename_buf: [32]u8 = undefined;
+    const filename = wo.bufPrintWorldFilename(&filename_buf, mapid) catch unreachable;
 
     self.world = wo.loadWorldFromJson(self.game.allocator, filename) catch |err| {
         std.log.err("failed to load tilemap {!}", .{err});

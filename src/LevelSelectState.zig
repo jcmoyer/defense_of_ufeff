@@ -200,7 +200,22 @@ fn createButtonForRect(self: *LevelSelectState, rect: Rect, mapid: u32) !void {
         Rect.init(0, 96, 32, 32),
     };
     btn.setTexture(self.game.texman.getNamedTexture("level_select_button.png"));
-    btn.tooltip_text = try std.fmt.allocPrint(allocator, "Map {d}", .{mapid + 1});
+
+    var filename_buf: [32]u8 = undefined;
+    const filename = try wo.bufPrintWorldFilename(&filename_buf, mapid);
+    const world = try wo.loadWorldRawJson(allocator, filename);
+    var has_title: bool = false;
+    if (world.getProperty("title")) |title| {
+        if (title.isString()) {
+            btn.tooltip_text = try std.fmt.allocPrint(allocator, "Map {d}: {s}", .{ mapid + 1, title.value });
+            has_title = true;
+        } else {
+            std.log.warn("World `{s}` has non-string title", .{filename});
+        }
+    }
+    if (!has_title) {
+        btn.tooltip_text = try std.fmt.allocPrint(allocator, "Map {d}", .{mapid + 1});
+    }
     btn.state = .disabled;
     try self.ui_root.addChild(btn.control());
     btn.ev_click.setCallback(&self.button_states[self.num_buttons], onLevelButtonClick);

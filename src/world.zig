@@ -2253,6 +2253,22 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !World {
     return world;
 }
 
+pub fn loadWorldRawJson(allocator: Allocator, filename: []const u8) !TiledDoc {
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    var arena_allocator = arena.allocator();
+    defer arena.deinit();
+
+    var file = try std.fs.cwd().openFile(filename, .{});
+    defer file.close();
+
+    const buffer = try file.readToEndAlloc(arena_allocator, 1024 * 1024);
+
+    var tokens = std.json.TokenStream.init(buffer);
+    var doc = try std.json.parse(TiledDoc, &tokens, .{ .allocator = allocator, .ignore_unknown_fields = true });
+
+    return doc;
+}
+
 const LoadContext = struct {
     arena: Allocator,
     /// Loading data into this world
@@ -2456,7 +2472,7 @@ const TiledDoc = struct {
     layers: []TiledLayer,
     properties: ?[]TiledMapProperty = null,
 
-    fn getProperty(self: TiledDoc, name: []const u8) ?TiledMapProperty {
+    pub fn getProperty(self: TiledDoc, name: []const u8) ?TiledMapProperty {
         if (self.properties) |props| {
             for (props) |prop| {
                 if (std.mem.eql(u8, prop.name, name)) {
@@ -2468,13 +2484,22 @@ const TiledDoc = struct {
     }
 };
 
+const TiledMapPropertyType = enum {
+    file,
+    string,
+};
+
 const TiledMapProperty = struct {
     name: []const u8,
-    type: []const u8,
+    type: TiledMapPropertyType,
     value: []const u8,
 
-    fn isFile(self: TiledMapProperty) bool {
-        return std.mem.eql(u8, self.type, "file");
+    pub fn isString(self: TiledMapProperty) bool {
+        return self.type == .string;
+    }
+
+    pub fn isFile(self: TiledMapProperty) bool {
+        return self.type == .file;
     }
 };
 
@@ -2492,4 +2517,11 @@ fn nameToMonsterSpec(name: []const u8) ?*const MonsterSpec {
         return &m_mole;
     }
     return null;
+}
+
+/// `assets/maps/mapXX.tmj` - buffer should be at least 21 chars
+pub fn bufPrintWorldFilename(buf: []u8, mapid: u32) ![]u8 {
+    std.debug.assert(buf.len >= 21);
+    std.debug.assert(mapid < 99);
+    return std.fmt.bufPrint(buf, "assets/maps/map{d:0>2}.tmj", .{mapid + 1});
 }
