@@ -14,9 +14,14 @@ pub const ParticleV2 = struct {
     prev_pos: [2]f32 = .{ 0, 0 },
     pos: [2]f32 = .{ 0, 0 },
     vel: [2]f32 = .{ 0, 0 },
+    damp_vel: [2]f32 = .{ 0, 0 },
     acc: [2]f32 = .{ 0, 0 },
     rgba: [4]u8 = .{ 255, 255, 255, 255 },
+    prev_scale: f32 = 1,
     scale: f32 = 1,
+    prev_rotation: f32 = 0,
+    rotation: f32 = 0,
+    angular_vel: f32 = 0,
     life: timing.FrameTimer = .{},
     kind: ParticleKind = .color,
     alive: bool = false,
@@ -28,21 +33,53 @@ pub const ParticleKind = enum(u8) {
     warp,
 };
 
+pub const EmissionParams = struct {
+    vel_x_range: [2]f32 = .{ -1, 1 },
+    vel_y_range: [2]f32 = .{ -1, 1 },
+    accel_x_range: [2]f32 = .{ 0, 0 },
+    accel_y_range: [2]f32 = .{ 0, 0 },
+    life_range: [2]f32 = .{ 1, 1 },
+    damp_vel_x_range: [2]f32 = .{ 1, 1 },
+    damp_vel_y_range: [2]f32 = .{ 1, 1 },
+    angular_vel_range: [2]f32 = .{ 0, 0 },
+};
+
+pub const warp_params = EmissionParams{
+    .vel_x_range = .{ -5, 5 },
+    .vel_y_range = .{ 0, -5 },
+    .accel_y_range = .{ -0.4, 0 },
+    .damp_vel_x_range = .{ 0.5, 0.7 },
+    .damp_vel_y_range = .{ 0.45, 0.6 },
+    .angular_vel_range = .{ 0.0, 0.3 },
+    .life_range = .{ 1.5, 2.5 },
+};
+
 pub const PointEmitter = struct {
     parent: *ParticleSystem,
     pos: [2]f32 = .{ 0, 0 },
+    params: EmissionParams = .{},
 
     pub fn emit(self: *PointEmitter, kind: ParticleKind, frame: u64) void {
         var rand = self.parent.rng.random();
-        const vx = rand.float(f32) - 0.5;
-        const vy = -rand.float(f32);
+
+        const ax = zm.lerpV(self.params.accel_x_range[0], self.params.accel_x_range[1], rand.float(f32));
+        const ay = zm.lerpV(self.params.accel_y_range[0], self.params.accel_y_range[1], rand.float(f32));
+        const vx = zm.lerpV(self.params.vel_x_range[0], self.params.vel_x_range[1], rand.float(f32));
+        const vy = zm.lerpV(self.params.vel_y_range[0], self.params.vel_y_range[1], rand.float(f32));
+        const life_sec = zm.lerpV(self.params.life_range[0], self.params.life_range[1], rand.float(f32));
+        const dvx = zm.lerpV(self.params.damp_vel_x_range[0], self.params.damp_vel_x_range[1], rand.float(f32));
+        const dvy = zm.lerpV(self.params.damp_vel_y_range[0], self.params.damp_vel_y_range[1], rand.float(f32));
+        const av = zm.lerpV(self.params.angular_vel_range[0], self.params.angular_vel_range[1], rand.float(f32));
 
         self.parent.addParticle(.{
             .pos = self.pos,
+            .acc = .{ ax, ay },
             .vel = .{ vx, vy },
+            .damp_vel = .{ dvx, dvy },
+            .angular_vel = av,
             .alive = true,
             .kind = kind,
-            .life = timing.FrameTimer.initSeconds(frame, 1),
+            .life = timing.FrameTimer.initSeconds(frame, life_sec),
         });
     }
 };
@@ -115,6 +152,16 @@ pub const ParticleSystem = struct {
             self.particles.items(.prev_pos)[0..self.num_alive],
             self.particles.items(.pos)[0..self.num_alive],
         );
+        std.mem.copy(
+            f32,
+            self.particles.items(.prev_rotation)[0..self.num_alive],
+            self.particles.items(.rotation)[0..self.num_alive],
+        );
+        std.mem.copy(
+            f32,
+            self.particles.items(.prev_scale)[0..self.num_alive],
+            self.particles.items(.scale)[0..self.num_alive],
+        );
 
         var i: usize = 0;
         while (i < self.num_alive) {
@@ -127,7 +174,8 @@ pub const ParticleSystem = struct {
                 self.num_alive -= 1;
             } else {
                 self.particles.items(.pos)[i] = @bitCast(V2, self.particles.items(.pos)[i]) + @bitCast(V2, self.particles.items(.vel)[i]);
-                self.particles.items(.vel)[i] = @bitCast(V2, self.particles.items(.vel)[i]) + @bitCast(V2, self.particles.items(.acc)[i]);
+                self.particles.items(.vel)[i] = (@bitCast(V2, self.particles.items(.vel)[i]) + @bitCast(V2, self.particles.items(.acc)[i])) * @bitCast(V2, self.particles.items(.damp_vel)[i]);
+                self.particles.items(.rotation)[i] = self.particles.items(.rotation)[i] + self.particles.items(.angular_vel)[i];
 
                 // TODO: non-hardcoded animation
                 const a = self.particles.items(.life)[i].invProgressClamped(frame) * 255.0;

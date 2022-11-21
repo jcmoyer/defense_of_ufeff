@@ -1042,6 +1042,7 @@ pub const Goal = struct {
             .emitter = .{
                 .parent = &world.particle_sys,
                 .pos = .{ @intToFloat(f32, world_x + 8), @intToFloat(f32, world_y + 16) },
+                .params = particle.warp_params,
             },
         };
         return self;

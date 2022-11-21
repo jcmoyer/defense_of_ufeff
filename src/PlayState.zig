@@ -708,9 +708,9 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
 }
 
 const particle_rects = [@typeInfo(particle.ParticleKind).Enum.fields.len]Rectf{
-    Rectf.init(0, 0, 0, 0),
+    Rectf.init(0, 240, 16, 16),
     Rect.init(11 * 16, 0, 16, 16).toRectf(),
-    Rectf.init(176, 80, 16, 16),
+    Rectf.init(0, 240, 4, 4),
 };
 
 fn renderFields(
@@ -719,7 +719,6 @@ fn renderFields(
     cam: Camera,
     alpha: f64,
 ) void {
-    _ = alpha;
     const viewf = cam.view.toRectf();
 
     renderers.r_batch.begin(.{
@@ -729,6 +728,7 @@ fn renderFields(
     var sys = world.particle_sys;
 
     const pos = sys.particles.items(.pos);
+    const prev_pos = sys.particles.items(.prev_pos);
 
     var i: usize = 0;
 
@@ -736,12 +736,19 @@ fn renderFields(
         const src = particle_rects[@enumToInt(sys.particles.items(.kind)[i])];
         const s = sys.particles.items(.scale)[i];
         const c = sys.particles.items(.rgba)[i];
-        var rf = Rectf.init(0, 0, 16, 16);
-        rf.centerOn(pos[i][0], pos[i][1]);
+        const r = sys.particles.items(.rotation)[i];
+
+        const V2 = @Vector(2, f32);
+
+        const p = zm.lerp(@bitCast(V2, prev_pos[i]), @bitCast(V2, pos[i]), @floatCast(f32, alpha));
+
+        var t = zm.mul(zm.scaling(s, s, 1), zm.rotationZ(r));
+        t = zm.mul(t, zm.translation(p[0] - viewf.left(), p[1] - viewf.top(), 0));
+
         renderers.r_batch.drawQuadTransformed(.{
             .src = src,
             .color = c,
-            .transform = zm.mul(zm.scaling(s, s, 1), zm.translation(pos[i][0] - viewf.left(), pos[i][1] - viewf.top(), 0)),
+            .transform = t,
         });
     }
     renderers.r_batch.end();
