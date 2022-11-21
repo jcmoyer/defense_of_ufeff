@@ -844,8 +844,14 @@ pub const Spawn = struct {
 
     id: u32 = undefined,
     coord: TileCoord,
-    timer: FrameTimer,
-    spawn_interval: f32,
+    /// If spawn is outside of playable area, this will be null
+    emitter: ?particle.PointEmitter = null,
+
+    fn emitWarpParticles(self: *Spawn, frame: u64) void {
+        if (self.emitter) |*em| {
+            em.emitCount(.warp, frame, 16);
+        }
+    }
 };
 
 const se_bow = SpriteEffectSpec{
@@ -1058,10 +1064,7 @@ pub const Goal = struct {
     }
 
     fn emitWarpParticles(self: *Goal) void {
-        var i: u32 = 0;
-        while (i < 16) : (i += 1) {
-            self.emitter.emit(.warp, self.world.world_frame);
-        }
+        self.emitter.emitCount(.warp, self.world.world_frame, 16);
     }
 };
 
@@ -1343,6 +1346,17 @@ pub const World = struct {
     fn finalizeInit(self: *World) void {
         self.safe_zone = Rect.init(0, 0, @intCast(i32, self.getWidth() * 16), @intCast(i32, self.getHeight() * 16));
         self.safe_zone.inflate(256, 256);
+
+        const range = self.getPlayableRange();
+        for (self.spawns.slice()) |*spawn| {
+            if (range.contains(spawn.coord)) {
+                spawn.emitter = particle.PointEmitter{
+                    .parent = &self.particle_sys,
+                    .pos = .{ @intToFloat(f32, spawn.coord.worldX() + 8), @intToFloat(f32, spawn.coord.worldY() + 16) },
+                    .params = particle.warp_params,
+                };
+            }
+        }
     }
 
     fn addCustomRect(self: *World, name: []const u8, rect: Rect) !void {
@@ -1392,8 +1406,6 @@ pub const World = struct {
     fn createSpawn(self: *World, name: []const u8, coord: TileCoord) !void {
         const s_id = try self.spawns.put(self.allocator, Spawn{
             .coord = coord,
-            .timer = FrameTimer.initSeconds(0, 1),
-            .spawn_interval = 1,
         });
         const name_dup = try self.allocator.dupe(u8, name);
         try self.spawn_map.put(self.allocator, name_dup, s_id);
@@ -1632,18 +1644,22 @@ pub const World = struct {
     }
 
     pub fn spawnMonster(self: *World, spec: *const MonsterSpec, spawn_id: u32) !MonsterId {
-        const pos = self.getSpawnPosition(spawn_id);
+        var spawn = self.spawns.getPtr(spawn_id);
+        spawn.emitWarpParticles(self.world_frame);
+
         var mon = Monster{
             .world = self,
             .spec = spec,
             .spawn_id = spawn_id,
         };
-        mon.setTilePosition(pos);
+        mon.setTilePosition(spawn.coord);
         mon.computePath();
+
         const id = try self.monsters.put(self.allocator, mon);
         self.monsters.getPtr(id).spawn(self.world_frame);
 
-        self.playPositionalSound("assets/sounds/spawn.ogg", @intCast(i32, pos.worldX()), @intCast(i32, pos.worldY()));
+        const sound_pos = mon.getWorldCollisionRect().centerPoint();
+        self.playPositionalSound("assets/sounds/spawn.ogg", sound_pos[0], sound_pos[1]);
         return id;
     }
 

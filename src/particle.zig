@@ -82,6 +82,13 @@ pub const PointEmitter = struct {
             .life = timing.FrameTimer.initSeconds(frame, life_sec),
         });
     }
+
+    pub fn emitCount(self: *PointEmitter, kind: ParticleKind, frame: u64, count: u16) void {
+        var i: u16 = 0;
+        while (i < count) : (i += 1) {
+            self.emit(kind, frame);
+        }
+    }
 };
 
 pub const CircleEmitter = struct {

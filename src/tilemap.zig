@@ -78,6 +78,10 @@ pub const TileRange = struct {
     /// Indices inclusive
     max: TileCoord,
 
+    pub fn contains(self: TileRange, coord: TileCoord) bool {
+        return coord.x >= self.min.x and coord.x <= self.max.x and coord.y >= self.min.y and coord.y <= self.max.y;
+    }
+
     pub fn getWidth(self: TileRange) usize {
         return self.max.x - self.min.x;
     }
