@@ -138,7 +138,7 @@ pub fn create(game: *Game) !*LevelSelectState {
     errdefer self.r_world.destroy(game.allocator);
 
     self.world = try wo.loadWorldFromJson(game.allocator, "assets/maps/level_select.tmj");
-    errdefer self.world.deinit();
+    errdefer self.world.destroy();
 
     self.buttons = try game.allocator.alloc(*ui.Button, self.prog_state.maps.len);
     errdefer game.allocator.free(self.buttons);
@@ -178,7 +178,7 @@ pub fn destroy(self: *LevelSelectState) void {
         params.release();
     }
     self.r_world.destroy(self.game.allocator);
-    self.world.deinit();
+    self.world.destroy();
     self.fontspec.deinit();
     self.ui_root.deinit();
     self.game.allocator.destroy(self);

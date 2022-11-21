@@ -410,7 +410,7 @@ pub fn destroy(self: *PlayState) void {
     self.fontspec.deinit();
     self.fontspec_numbers.deinit();
     if (self.world) |world| {
-        world.deinit();
+        world.destroy();
         self.world = null;
     }
     self.ui_root.deinit();
@@ -1247,7 +1247,7 @@ pub fn restartCurrentWorld(self: *PlayState) void {
 
 pub fn loadWorld(self: *PlayState, mapid: u32) void {
     if (self.world) |world| {
-        world.deinit();
+        world.destroy();
         self.world = null;
     }
     if (self.music_params) |params| {

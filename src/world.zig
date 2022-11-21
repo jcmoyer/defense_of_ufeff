@@ -1310,7 +1310,7 @@ pub const World = struct {
     particle_sys: particle.ParticleSystem,
     safe_zone: Rect = Rect.init(0, 0, 0, 0),
 
-    pub fn deinit(self: *World) void {
+    pub fn destroy(self: *World) void {
         self.particle_sys.deinit();
         self.path_cache.deinit();
         self.fields.deinit(self.allocator);
@@ -1340,6 +1340,7 @@ pub const World = struct {
         if (self.music_filename) |s| {
             self.allocator.free(s);
         }
+        self.allocator.destroy(self);
     }
 
     /// Happens after successful load from json
