@@ -103,7 +103,7 @@ music_params: ?*audio.AudioParameters = null,
 r_world: *WorldRenderer,
 r_finger: FingerRenderer,
 finger: Finger = .{},
-world: World,
+world: *World,
 prog_state: ProgressionState = .{},
 arena: std.heap.ArenaAllocator,
 sub: Substate = .none,
@@ -246,7 +246,7 @@ pub fn enter(self: *LevelSelectState, from: ?Game.StateId) void {
     self.beginFadeIn();
 
     if (from == Game.StateId.play) {
-        if (self.game.st_play.world.player_won) {
+        if (self.game.st_play.world.?.player_won) {
             self.prog_state.setMapComplete(self.prog_state.last_map_entered);
             self.saveProgression() catch |err| {
                 std.log.err("Failed to save progression: {!}", .{err});

@@ -13,6 +13,8 @@ const SpriteBatch = @import("SpriteBatch.zig");
 const zm = @import("zmath");
 const anim = @import("animation.zig");
 const wo = @import("world.zig");
+const World = wo.World;
+const RenderServices = rend.RenderServices;
 const bmfont = @import("bmfont.zig");
 const QuadBatch = @import("QuadBatch.zig");
 const BitmapFont = bmfont.BitmapFont;
@@ -97,8 +99,7 @@ game: *Game,
 camera: Camera = DEFAULT_CAMERA,
 prev_camera: Camera = DEFAULT_CAMERA,
 r_world: *WorldRenderer,
-heart_anim: anim.Animator = anim.a_goal_heart.animationSet().createAnimator("default"),
-world: wo.World,
+world: ?*wo.World = null,
 fontspec: bmfont.BitmapFontSpec,
 fontspec_numbers: bmfont.BitmapFontSpec,
 frame_arena: std.heap.ArenaAllocator,
@@ -140,8 +141,6 @@ b_wall: *ui.Button,
 b_recruit: *ui.Button,
 b_call_wave: *ui.Button,
 
-particle_sys: particle.ParticleSystem,
-
 tooltip_cache: std.AutoArrayHashMapUnmanaged(*const wo.TowerSpec, []const u8) = .{},
 
 wipe_scanlines: [Game.INTERNAL_HEIGHT]i32 = undefined,
@@ -166,14 +165,13 @@ pub fn create(game: *Game) !*PlayState {
     var self = try game.allocator.create(PlayState);
     self.* = .{
         .game = game,
-        .world = wo.World.init(game.allocator),
-        .fontspec = undefined,
-        .fontspec_numbers = undefined,
         .ui_root = ui.Root.init(game.allocator, &game.sdl_backend),
         .t_minimap = game.texman.createInMemory(),
         // Created/destroyed in update()
         .frame_arena = undefined,
         // Initialized below
+        .fontspec = undefined,
+        .fontspec_numbers = undefined,
         .ui_buttons = undefined,
         .ui_minimap = undefined,
         .ui_gold = undefined,
@@ -195,14 +193,10 @@ pub fn create(game: *Game) !*PlayState {
         .button_generator = undefined,
         .wave_timer = undefined,
         .r_world = undefined,
-        .particle_sys = undefined,
         .b_wall = undefined,
         .b_recruit = undefined,
         .b_call_wave = undefined,
     };
-
-    self.particle_sys = try particle.ParticleSystem.initCapacity(game.allocator, 1024);
-    errdefer self.particle_sys.deinit();
 
     self.r_world = try WorldRenderer.create(game.allocator, &game.renderers);
     errdefer self.r_world.destroy(game.allocator);
@@ -406,7 +400,6 @@ pub fn destroy(self: *PlayState) void {
     if (self.music_params) |params| {
         params.release();
     }
-    self.particle_sys.deinit();
     self.r_world.destroy(self.game.allocator);
     self.upgrade_texture_cache.deinit(self.game.allocator);
     for (self.tooltip_cache.values()) |str| {
@@ -416,7 +409,10 @@ pub fn destroy(self: *PlayState) void {
     self.button_generator.deinit();
     self.fontspec.deinit();
     self.fontspec_numbers.deinit();
-    self.world.deinit();
+    if (self.world) |world| {
+        world.deinit();
+        self.world = null;
+    }
     self.ui_root.deinit();
     self.game.allocator.destroy(self);
 }
@@ -437,6 +433,8 @@ pub fn leave(self: *PlayState, to: ?Game.StateId) void {
 }
 
 pub fn update(self: *PlayState) void {
+    var world = self.world orelse @panic("update with no world");
+
     self.frame_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer self.frame_arena.deinit();
     var arena = self.frame_arena.allocator();
@@ -461,24 +459,22 @@ pub fn update(self: *PlayState) void {
     self.ui_minimap.view = self.camera.view;
     self.ui_minimap.bounds = self.camera.bounds;
 
-    self.heart_anim.update();
     self.r_world.updateAnimations();
-    self.particle_sys.update(self.world.world_frame);
 
-    self.world.view = self.camera.view;
+    world.view = self.camera.view;
     if (self.sub == .none and !self.paused) {
-        self.world.update(arena);
+        world.update(arena);
         if (self.fast) {
-            self.world.update(arena);
+            world.update(arena);
         }
     }
     self.updateUI();
 
-    if (self.sub == .none and self.world.recoverable_lives == 0) {
+    if (self.sub == .none and world.recoverable_lives == 0) {
         self.beginTransitionGameOver();
     }
 
-    if (self.sub == .none and self.world.player_won) {
+    if (self.sub == .none and world.player_won) {
         self.beginTransitionGameWin();
     }
 
@@ -517,29 +513,32 @@ pub fn update(self: *PlayState) void {
 }
 
 fn updateUI(self: *PlayState) void {
-    self.ui_gold.text = std.fmt.bufPrint(&self.gold_text, "${d}", .{self.world.player_gold}) catch unreachable;
-    self.ui_lives.text = std.fmt.bufPrint(&self.lives_text, "\x03{d}", .{self.world.lives_at_goal}) catch unreachable;
-    if (self.world.next_wave_timer) |timer| {
-        self.wave_timer.setTimerText(timer.remainingSeconds(self.world.world_frame));
+    // unreachable because called from context where world has already been null-checked
+    var world = self.world orelse unreachable;
+
+    self.ui_gold.text = std.fmt.bufPrint(&self.gold_text, "${d}", .{world.player_gold}) catch unreachable;
+    self.ui_lives.text = std.fmt.bufPrint(&self.lives_text, "\x03{d}", .{world.lives_at_goal}) catch unreachable;
+    if (world.next_wave_timer) |timer| {
+        self.wave_timer.setTimerText(timer.remainingSeconds(world.world_frame));
     }
     self.updateUpgradeButtons();
-    if (self.wave_timer.state == .middle_screen and self.wave_timer.state_timer.expired(self.world.world_frame)) {
+    if (self.wave_timer.state == .middle_screen and self.wave_timer.state_timer.expired(world.world_frame)) {
         self.wave_timer.state = .move_to_corner;
-        self.wave_timer.state_timer = FrameTimer.initSeconds(self.world.world_frame, 2);
-    } else if (self.wave_timer.state == .move_to_corner and self.wave_timer.state_timer.expired(self.world.world_frame)) {
+        self.wave_timer.state_timer = FrameTimer.initSeconds(world.world_frame, 2);
+    } else if (self.wave_timer.state == .move_to_corner and self.wave_timer.state_timer.expired(world.world_frame)) {
         self.wave_timer.state = .corner;
     }
-    if (self.world.canAfford(&wo.t_wall) and self.b_wall.state == .disabled) {
+    if (world.canAfford(&wo.t_wall) and self.b_wall.state == .disabled) {
         self.b_wall.state = .normal;
-    } else if (!self.world.canAfford(&wo.t_wall)) {
+    } else if (!world.canAfford(&wo.t_wall)) {
         self.b_wall.state = .disabled;
     }
-    if (self.world.canAfford(&wo.t_recruit) and self.b_recruit.state == .disabled) {
+    if (world.canAfford(&wo.t_recruit) and self.b_recruit.state == .disabled) {
         self.b_recruit.state = .normal;
-    } else if (!self.world.canAfford(&wo.t_recruit)) {
+    } else if (!world.canAfford(&wo.t_recruit)) {
         self.b_recruit.state = .disabled;
     }
-    if (self.world.remainingWaveCount() == 0) {
+    if (world.remainingWaveCount() == 0) {
         self.b_call_wave.state = .disabled;
     } else {
         if (self.b_call_wave.state == .disabled) {
@@ -549,6 +548,8 @@ fn updateUI(self: *PlayState) void {
 }
 
 pub fn render(self: *PlayState, alpha: f64) void {
+    var world = self.world orelse @panic("render with no world");
+
     const mouse_p = self.game.unproject(
         self.game.input.mouse.client_x,
         self.game.input.mouse.client_y,
@@ -561,25 +562,45 @@ pub fn render(self: *PlayState, alpha: f64) void {
     var cam_interp = Camera.lerp(self.prev_camera, self.camera, alpha);
     cam_interp.clampToBounds();
 
-    self.r_world.renderTilemap(cam_interp, &self.world.map, self.game.frame_counter);
-    self.renderGoal(cam_interp, alpha);
-    self.renderMonsters(cam_interp, alpha);
-    self.renderStolenHearts(cam_interp, alpha);
-    self.renderTowers(cam_interp);
-    self.renderFields(cam_interp, alpha);
-    self.renderSpriteEffects(cam_interp, alpha);
-    self.renderProjectiles(cam_interp, alpha);
-    self.renderHealthBars(cam_interp, alpha);
-    self.renderFloatingText(cam_interp, alpha);
-    self.renderBlockedConstructionRects(cam_interp);
-    self.renderGrid(cam_interp);
-    // self.renderSelection(cam_interp);
-    self.renderRangeIndicator(cam_interp);
-    self.renderWaveTimer(alpha);
-    if (!self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
-        self.renderPlacementIndicator(cam_interp);
-        self.renderDemolishIndicator(cam_interp);
+    self.r_world.renderTilemap(cam_interp, &self.world.?.map, self.game.frame_counter);
+    renderGoal(&self.game.renderers, world, cam_interp, alpha);
+    renderMonsters(&self.game.renderers, world, cam_interp, alpha);
+    renderStolenHearts(&self.game.renderers, world, cam_interp, alpha, self.r_world.heart_anim);
+    renderTowers(&self.game.renderers, world, cam_interp, if (self.interact_state == .select) self.interact_state.select.selected_tower else null);
+    renderFields(&self.game.renderers, world, cam_interp, alpha);
+    renderSpriteEffects(&self.game.renderers, world, cam_interp, alpha);
+    renderProjectiles(&self.game.renderers, world, cam_interp, alpha);
+    renderHealthBars(&self.game.renderers, world, cam_interp, alpha);
+    renderFloatingText(&self.game.renderers, world, cam_interp, alpha, .{
+        .texture = self.game.texman.getNamedTexture("floating_text.png"),
+        .spec = &self.fontspec_numbers,
+    });
+    if (self.interact_state == .build) {
+        renderBlockedConstructionRects(&self.game.renderers, world, cam_interp);
+        renderGrid(&self.game.renderers, cam_interp);
     }
+    if (!self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
+        switch (self.interact_state) {
+            .build => |b| {
+                const tile_coord = self.mouseToTile();
+                const tower_center_x = @intCast(i32, tile_coord.worldX() + 8);
+                const tower_center_y = @intCast(i32, tile_coord.worldY() + 8);
+                renderPlacementIndicator(&self.game.renderers, world, cam_interp, tile_coord);
+                renderRangeIndicatorForTower(&self.game.renderers, cam_interp, b.tower_spec, tower_center_x, tower_center_y);
+            },
+            .demolish => {
+                self.renderDemolishIndicator(cam_interp);
+            },
+            .select => |s| {
+                const selected_tower = world.towers.getPtr(s.selected_tower);
+                const selected_spec = if (s.hovered_spec) |hovered| hovered else selected_tower.spec;
+                const p = selected_tower.getWorldCollisionRect().centerPoint();
+                renderRangeIndicatorForTower(&self.game.renderers, cam_interp, selected_spec, p[0], p[1]);
+            },
+            else => {},
+        }
+    }
+    self.renderWaveTimer(alpha);
 
     if (self.deb_render_tile_collision) {
         self.debugRenderTileCollision(cam_interp);
@@ -607,6 +628,8 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
         return;
     }
 
+    var world = self.world orelse return;
+
     if (ev.type == .SDL_KEYDOWN) {
         switch (ev.key.keysym.sym) {
             sdl.SDLK_F1 => self.deb_render_tile_collision = !self.deb_render_tile_collision,
@@ -631,7 +654,7 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
 
     if (ev.type == .SDL_MOUSEMOTION) {
         const tile_coord = self.mouseToTile();
-        if (self.world.getTowerAt(tile_coord) != null) {
+        if (world.getTowerAt(tile_coord) != null) {
             self.game.sdl_backend.setCursorForHint(.clickable);
         } else {
             self.game.sdl_backend.setCursorForHint(.none);
@@ -643,18 +666,18 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
             if (self.interact_state == .build) {
                 const spec = self.interact_state.build.tower_spec;
                 const tile_coord = self.mouseToTile();
-                if (self.world.canBuildAt(tile_coord) and self.world.canAfford(spec)) {
+                if (world.canBuildAt(tile_coord) and world.canAfford(spec)) {
                     self.game.audio.playSound("assets/sounds/build.ogg", .{}).release();
-                    _ = self.world.spawnTower(spec, tile_coord) catch unreachable;
-                    self.world.player_gold -= spec.gold_cost;
+                    _ = world.spawnTower(spec, tile_coord) catch unreachable;
+                    world.player_gold -= spec.gold_cost;
                     if (sdl.SDL_GetModState() & sdl.KMOD_SHIFT == 0) {
                         self.interact_state = .none;
                     }
                 }
             } else if (self.interact_state == .demolish) {
                 const tile_coord = self.mouseToTile();
-                if (self.world.getTowerAt(tile_coord)) |id| {
-                    self.world.sellTower(id);
+                if (world.getTowerAt(tile_coord)) |id| {
+                    world.sellTower(id);
                     if (sdl.SDL_GetModState() & sdl.KMOD_SHIFT == 0) {
                         self.interact_state = .none;
                     }
@@ -663,7 +686,7 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
                 }
             } else {
                 const tile_coord = self.mouseToTile();
-                if (self.world.getTowerAt(tile_coord)) |id| {
+                if (world.getTowerAt(tile_coord)) |id| {
                     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
                     std.log.debug("Selected {any}", .{id});
                     self.interact_state = .{
@@ -684,49 +707,60 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
     }
 }
 
+const particle_rects = [@typeInfo(particle.ParticleKind).Enum.fields.len]Rectf{
+    Rectf.init(0, 0, 0, 0),
+    Rect.init(11 * 16, 0, 16, 16).toRectf(),
+    Rectf.init(176, 80, 16, 16),
+};
+
 fn renderFields(
-    self: *PlayState,
+    renderers: *RenderServices,
+    world: *World,
     cam: Camera,
     alpha: f64,
 ) void {
     _ = alpha;
     const viewf = cam.view.toRectf();
 
-    self.game.renderers.r_batch.begin(.{
-        .texture = self.game.texman.getNamedTexture("special.png"),
+    renderers.r_batch.begin(.{
+        .texture = renderers.texman.getNamedTexture("special.png"),
     });
 
-    const pos = self.particle_sys.particles.items(.pos);
+    var sys = world.particle_sys;
+
+    const pos = sys.particles.items(.pos);
 
     var i: usize = 0;
 
-    while (i < self.particle_sys.num_alive) : (i += 1) {
-        const s = self.particle_sys.particles.items(.scale)[i];
-        const c = self.particle_sys.particles.items(.rgba)[i];
+    while (i < sys.num_alive) : (i += 1) {
+        const src = particle_rects[@enumToInt(sys.particles.items(.kind)[i])];
+        const s = sys.particles.items(.scale)[i];
+        const c = sys.particles.items(.rgba)[i];
         var rf = Rectf.init(0, 0, 16, 16);
         rf.centerOn(pos[i][0], pos[i][1]);
-        self.game.renderers.r_batch.drawQuadTransformed(.{
-            .src = Rect.init(11 * 16, 0, 16, 16).toRectf(),
+        renderers.r_batch.drawQuadTransformed(.{
+            .src = src,
             .color = c,
             .transform = zm.mul(zm.scaling(s, s, 1), zm.translation(pos[i][0] - viewf.left(), pos[i][1] - viewf.top(), 0)),
         });
     }
-    self.game.renderers.r_batch.end();
+    renderers.r_batch.end();
 }
 
 fn renderSpriteEffects(
-    self: *PlayState,
+    renderers: *RenderServices,
+    world: *World,
     cam: Camera,
     alpha: f64,
 ) void {
-    const t_special = self.game.texman.getNamedTexture("special.png");
-    self.game.renderers.r_batch.begin(.{
+    const t_special = renderers.texman.getNamedTexture("special.png");
+    renderers.r_batch.begin(.{
         .texture = t_special,
     });
-    for (self.world.sprite_effects.slice()) |t| {
+    for (world.sprite_effects.slice()) |t| {
         var animator = t.animator orelse continue;
         if (t.delay) |delay| {
-            if (!delay.expired(self.world.world_frame)) {
+            if (!delay.expired(world.world_frame)) {
                 continue;
             }
         }
@@ -749,37 +783,38 @@ fn renderSpriteEffects(
         transform = zm.mul(transform, zm.rotationZ(post_angle));
         transform = zm.mul(transform, zm.translation(world_x - @intToFloat(f32, cam.view.left()), world_y - @intToFloat(f32, cam.view.top()), 0));
 
-        self.game.renderers.r_batch.drawQuadTransformed(.{
+        renderers.r_batch.drawQuadTransformed(.{
             .src = animator.getCurrentRect().toRectf(),
             .transform = transform,
         });
     }
-    self.game.renderers.r_batch.end();
+    renderers.r_batch.end();
 }
 
 fn renderProjectiles(
-    self: *PlayState,
+    renderers: *RenderServices,
+    world: *World,
     cam: Camera,
     alpha: f64,
 ) void {
-    const t_special = self.game.texman.getNamedTexture("special.png");
-    self.game.renderers.r_batch.begin(.{
+    const t_special = renderers.texman.getNamedTexture("special.png");
+    renderers.r_batch.begin(.{
         .texture = t_special,
     });
-    for (self.world.projectiles.slice()) |t| {
+    for (world.projectiles.slice()) |t| {
         var animator = t.animator orelse continue;
         const dest = t.getInterpWorldPosition(alpha);
 
         if (t.spec.rotation == .no_rotation) {
             // TODO: use non-rotated variant
-            self.game.renderers.r_batch.drawQuadRotated(
+            renderers.r_batch.drawQuadRotated(
                 animator.getCurrentRect(),
                 @intToFloat(f32, dest[0] - cam.view.left()),
                 @intToFloat(f32, dest[1] - cam.view.top()),
                 0,
             );
         } else {
-            self.game.renderers.r_batch.drawQuadRotated(
+            renderers.r_batch.drawQuadRotated(
                 animator.getCurrentRect(),
                 @intToFloat(f32, dest[0] - cam.view.left()),
                 @intToFloat(f32, dest[1] - cam.view.top()),
@@ -787,26 +822,25 @@ fn renderProjectiles(
             );
         }
     }
-    self.game.renderers.r_batch.end();
+    renderers.r_batch.end();
 }
 
 fn renderFloatingText(
-    self: *PlayState,
+    renderers: *RenderServices,
+    world: *World,
     cam: Camera,
     alpha: f64,
+    params: bmfont.BitmapFontParams,
 ) void {
-    self.game.renderers.r_font.begin(.{
-        .texture = self.game.texman.getNamedTexture("floating_text.png"),
-        .spec = &self.fontspec_numbers,
-    });
-    for (self.world.floating_text.slice()) |*t| {
+    renderers.r_font.begin(params);
+    for (world.floating_text.slice()) |*t| {
         const dest_pos = t.getInterpWorldPosition(alpha);
         var dest = Rect.init(dest_pos[0], dest_pos[1], 0, 0);
         dest.inflate(16, 16);
         dest.translate(-cam.view.left(), -cam.view.top());
         // a nice curve that fades rapidly around 70%
         const a_coef = 1 - std.math.pow(f32, t.invLifePercent(), 5);
-        self.game.renderers.r_font.drawText(
+        renderers.r_font.drawText(
             t.textSlice(),
             .{
                 .dest = dest,
@@ -821,107 +855,111 @@ fn renderFloatingText(
             },
         );
     }
-    self.game.renderers.r_font.end();
+    renderers.r_font.end();
 }
 
 fn renderTowers(
-    self: *PlayState,
+    renderers: *RenderServices,
+    world: *World,
     cam: Camera,
+    selected_tower: ?wo.TowerId,
 ) void {
-    const t_special = self.game.texman.getNamedTexture("special.png");
-    const t_characters = self.game.texman.getNamedTexture("characters.png");
+    const t_special = renderers.texman.getNamedTexture("special.png");
+    const t_characters = renderers.texman.getNamedTexture("characters.png");
 
-    var highlight_tower: ?wo.TowerId = null;
-    var highlight_mag: f32 = 0.5 * (1.0 + std.math.sin(@intToFloat(f32, self.game.frame_counter) / 15.0));
-    if (self.interact_state == .select) {
-        highlight_tower = self.interact_state.select.selected_tower;
-    }
+    var highlight_mag = @floatCast(f32, 0.5 * (1.0 + std.math.sin(@intToFloat(f64, std.time.milliTimestamp()) / 500.0)));
 
     // render tower bases
-    self.game.renderers.r_batch.begin(.{
+    renderers.r_batch.begin(.{
         .texture = t_special,
         .flash_r = 0,
         .flash_g = 255,
         .flash_b = 0,
     });
-    for (self.world.towers.slice()) |*t| {
-        self.game.renderers.r_batch.drawQuad(.{
+    for (world.towers.slice()) |*t| {
+        renderers.r_batch.drawQuad(.{
             .src = Rectf.init(0, 7 * 16, 16, 16),
             .dest = Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - cam.view.top(), 16, 16).toRectf(),
-            .flash = t.id.eql(highlight_tower),
+            .flash = t.id.eql(selected_tower),
             .flash_mag = highlight_mag,
         });
     }
-    self.game.renderers.r_batch.end();
+    renderers.r_batch.end();
 
     // render tower characters
-    self.game.renderers.r_batch.begin(.{
+    renderers.r_batch.begin(.{
         .texture = t_characters,
         .flash_r = 0,
         .flash_g = 255,
         .flash_b = 0,
     });
-    for (self.world.towers.slice()) |*t| {
+    for (world.towers.slice()) |*t| {
         if (t.animator) |animator| {
             // shift up on Y so the character is standing in the center of the tile
-            self.game.renderers.r_batch.drawQuad(.{
+            renderers.r_batch.drawQuad(.{
                 .src = animator.getCurrentRect().toRectf(),
                 .dest = Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - 4 - cam.view.top(), 16, 16).toRectf(),
-                .flash = t.id.eql(highlight_tower),
+                .flash = t.id.eql(selected_tower),
                 .flash_mag = highlight_mag,
                 .color = t.spec.tint_rgba,
             });
         }
     }
-    self.game.renderers.r_batch.end();
+    renderers.r_batch.end();
 }
 
 fn renderMonsters(
-    self: *PlayState,
+    renderers: *RenderServices,
+    world: *World,
     cam: Camera,
     a: f64,
 ) void {
-    const t_chara = self.game.texman.getNamedTexture("characters.png");
-    self.game.renderers.r_batch.begin(.{
+    const t_chara = renderers.texman.getNamedTexture("characters.png");
+    renderers.r_batch.begin(.{
         .texture = t_chara,
     });
-    for (self.world.monsters.slice()) |m| {
+    for (world.monsters.slice()) |m| {
         const w = m.getInterpWorldPosition(a);
-        self.game.renderers.r_batch.drawQuadFlash(
+        renderers.r_batch.drawQuadFlash(
             m.animator.?.getCurrentRect(),
             Rect.init(@intCast(i32, w[0]) - cam.view.left(), @intCast(i32, w[1]) - cam.view.top(), 16, 16),
             m.flash_frames > 0,
         );
     }
-    self.game.renderers.r_batch.end();
+    renderers.r_batch.end();
 }
 
 fn renderGoal(
-    self: *PlayState,
+    renderers: *RenderServices,
+    world: *World,
     cam: Camera,
     a: f64,
 ) void {
     _ = a;
-    self.game.renderers.r_batch.begin(.{
-        .texture = self.game.texman.getNamedTexture("special.png"),
+
+    const goal = world.goal orelse return;
+
+    renderers.r_batch.begin(.{
+        .texture = renderers.texman.getNamedTexture("special.png"),
     });
     const dest = Rect.init(
-        @intCast(i32, self.world.goal.world_x) - cam.view.left(),
-        @intCast(i32, self.world.goal.world_y) - cam.view.top(),
+        @intCast(i32, goal.world_x) - cam.view.left(),
+        @intCast(i32, goal.world_y) - cam.view.top(),
         16,
         16,
     );
-    self.game.renderers.r_batch.drawQuad(.{ .src = self.world.goal.animator.getCurrentRect().toRectf(), .dest = dest.toRectf() });
-    self.game.renderers.r_batch.end();
+    renderers.r_batch.drawQuad(.{ .src = goal.animator.getCurrentRect().toRectf(), .dest = dest.toRectf() });
+    renderers.r_batch.end();
 }
 
 fn renderHealthBars(
-    self: *PlayState,
+    renderers: *RenderServices,
+    world: *World,
     cam: Camera,
     a: f64,
 ) void {
-    self.game.renderers.r_quad.begin(.{});
-    for (self.world.monsters.slice()) |m| {
+    renderers.r_quad.begin(.{});
+    for (world.monsters.slice()) |m| {
         // no health bar for healthy enemies
         if (m.hp == m.spec.max_hp) {
             continue;
@@ -931,83 +969,80 @@ fn renderHealthBars(
         var dest_border = dest_red;
         dest_border.inflate(1, 1);
         dest_red.w = @floatToInt(i32, @intToFloat(f32, dest_red.w) * @intToFloat(f32, m.hp) / @intToFloat(f32, m.spec.max_hp));
-        self.game.renderers.r_quad.drawQuadRGBA(dest_border, 0, 0, 0, 255);
-        self.game.renderers.r_quad.drawQuadRGBA(dest_red, 255, 0, 0, 255);
+        renderers.r_quad.drawQuadRGBA(dest_border, 0, 0, 0, 255);
+        renderers.r_quad.drawQuadRGBA(dest_red, 255, 0, 0, 255);
     }
-    self.game.renderers.r_quad.end();
+    renderers.r_quad.end();
 }
 
 fn renderStolenHearts(
-    self: *PlayState,
+    renderers: *RenderServices,
+    world: *World,
     cam: Camera,
     a: f64,
+    heart_animator: anim.Animator,
 ) void {
-    self.game.renderers.r_batch.begin(.{
-        .texture = self.game.texman.getNamedTexture("special.png"),
+    renderers.r_batch.begin(.{
+        .texture = renderers.texman.getNamedTexture("special.png"),
     });
-    for (self.world.monsters.slice()) |m| {
+    for (world.monsters.slice()) |m| {
         const w = m.getInterpWorldPosition(a);
         if (m.carrying_life) {
-            var src = self.heart_anim.getCurrentRect();
+            var src = heart_animator.getCurrentRect();
             var dest = Rect.init(w[0] - cam.view.left(), w[1] - cam.view.top(), 16, 16);
-            self.game.renderers.r_batch.drawQuad(.{ .src = src.toRectf(), .dest = dest.toRectf() });
+            renderers.r_batch.drawQuad(.{ .src = src.toRectf(), .dest = dest.toRectf() });
         }
     }
-    self.game.renderers.r_batch.end();
+    renderers.r_batch.end();
 }
 
 fn renderGrid(
-    self: *PlayState,
+    renderers: *RenderServices,
     cam: Camera,
 ) void {
-    if (self.interact_state != .build) {
-        return;
-    }
-
-    var offset_x = @mod(cam.view.x, 16);
-    var offset_y = @mod(cam.view.y, 16);
+    var offset_x = @intToFloat(f32, @mod(cam.view.x, 16));
+    var offset_y = @intToFloat(f32, @mod(cam.view.y, 16));
     var viewf = cam.view.toRectf();
 
-    const m = zm.translation(@intToFloat(f32, -offset_x), @intToFloat(f32, -offset_y), 0);
+    const width = @intToFloat(f32, renderers.output_width);
+    const height = @intToFloat(f32, renderers.output_height);
+
     const grid_color = zm.f32x4(0, 0, 0, 0.2);
 
-    self.game.renderers.r_imm.beginUntextured();
+    renderers.r_imm.beginUntextured();
     var y: f32 = 16;
     var x: f32 = 16;
     while (y < viewf.h + 16) : (y += 16) {
-        const p0 = zm.mul(zm.f32x4(0, y, 0, 1), m);
-        const p1 = zm.mul(zm.f32x4(Game.INTERNAL_WIDTH, y, 0, 1), m);
-        self.game.renderers.r_imm.drawLine(p0, p1, grid_color);
+        const p0 = zm.f32x4(0 - offset_x, y - offset_y, 0, 1);
+        const p1 = zm.f32x4(width - offset_x, y - offset_y, 0, 1);
+        renderers.r_imm.drawLine(p0, p1, grid_color);
     }
 
     while (x < viewf.w + 16) : (x += 16) {
-        const p0 = zm.mul(zm.f32x4(x, 0, 0, 1), m);
-        const p1 = zm.mul(zm.f32x4(x, Game.INTERNAL_HEIGHT, 0, 1), m);
-        self.game.renderers.r_imm.drawLine(p0, p1, grid_color);
+        const p0 = zm.f32x4(x - offset_x, 0 - offset_y, 0, 1);
+        const p1 = zm.f32x4(x - offset_x, height - offset_y, 0, 1);
+        renderers.r_imm.drawLine(p0, p1, grid_color);
     }
 }
 
 fn renderBlockedConstructionRects(
-    self: *PlayState,
+    renderers: *RenderServices,
+    world: *World,
     cam: Camera,
 ) void {
-    if (self.interact_state != .build) {
-        return;
-    }
-
     const min_tile_x = @intCast(usize, cam.view.left()) / 16;
     const min_tile_y = @intCast(usize, cam.view.top()) / 16;
     const max_tile_x = std.math.min(
-        self.world.getWidth(),
+        world.getWidth(),
         1 + @intCast(usize, cam.view.right()) / 16,
     );
     const max_tile_y = std.math.min(
-        self.world.getHeight(),
+        world.getHeight(),
         1 + @intCast(usize, cam.view.bottom()) / 16,
     );
-    const map = self.world.map;
+    const map = world.map;
 
-    self.game.renderers.r_quad.begin(.{});
+    renderers.r_quad.begin(.{});
     var y: usize = min_tile_y;
     var x: usize = 0;
     while (y < max_tile_y) : (y += 1) {
@@ -1023,12 +1058,12 @@ fn renderBlockedConstructionRects(
                 .w = 16,
                 .h = 16,
             };
-            var a = 0.3 * @sin(@intToFloat(f32, self.game.frame_counter) / 15.0);
+            var a = 0.3 * @sin(@intToFloat(f64, std.time.milliTimestamp()) / 500.0);
             a = std.math.max(a, 0);
-            self.game.renderers.r_quad.drawQuadRGBA(dest, 255, 0, 0, @floatToInt(u8, a * 255.0));
+            renderers.r_quad.drawQuadRGBA(dest, 255, 0, 0, @floatToInt(u8, a * 255.0));
         }
     }
-    self.game.renderers.r_quad.end();
+    renderers.r_quad.end();
 }
 
 fn mouseToWorld(self: *PlayState) [2]i32 {
@@ -1047,15 +1082,15 @@ fn mouseToTile(self: *PlayState) tilemap.TileCoord {
     return tilemap.TileCoord.initSignedWorld(p[0], p[1]);
 }
 
-fn renderRangeIndicatorForTower(self: *PlayState, cam: Camera, spec: *const wo.TowerSpec, world_x: i32, world_y: i32) void {
-    self.game.renderers.r_imm.beginUntextured();
-    self.game.renderers.r_imm.drawCircle(
+fn renderRangeIndicatorForTower(renderers: *RenderServices, cam: Camera, spec: *const wo.TowerSpec, world_x: i32, world_y: i32) void {
+    renderers.r_imm.beginUntextured();
+    renderers.r_imm.drawCircle(
         32,
         zm.f32x4(@intToFloat(f32, world_x - cam.view.left()), @intToFloat(f32, world_y - cam.view.top()), 0, 0),
         spec.min_range,
         zm.f32x4(1, 0, 0, 1),
     );
-    self.game.renderers.r_imm.drawCircle(
+    renderers.r_imm.drawCircle(
         32,
         zm.f32x4(@intToFloat(f32, world_x - cam.view.left()), @intToFloat(f32, world_y - cam.view.top()), 0, 0),
         spec.max_range,
@@ -1063,35 +1098,16 @@ fn renderRangeIndicatorForTower(self: *PlayState, cam: Camera, spec: *const wo.T
     );
 }
 
-fn renderRangeIndicator(self: *PlayState, cam: Camera) void {
-    if (self.interact_state != .select) {
-        return;
-    }
-    const selected_tower = self.world.towers.getPtr(self.interact_state.select.selected_tower);
-    const selected_spec = if (self.interact_state.select.hovered_spec) |hovered| hovered else selected_tower.spec;
-    const p = selected_tower.getWorldCollisionRect().centerPoint();
-    self.renderRangeIndicatorForTower(cam, selected_spec, p[0], p[1]);
-}
-
-fn renderPlacementIndicator(self: *PlayState, cam: Camera) void {
-    if (self.interact_state != .build) {
-        return;
-    }
-
-    const tc = self.mouseToTile();
-    const color = if (self.world.canBuildAt(tc)) [4]f32{ 0, 1, 0, 0.5 } else [4]f32{ 1, 0, 0, 0.5 };
+fn renderPlacementIndicator(renderers: *RenderServices, world: *World, cam: Camera, tile_coord: tilemap.TileCoord) void {
+    const color = if (world.canBuildAt(tile_coord)) [4]f32{ 0, 1, 0, 0.5 } else [4]f32{ 1, 0, 0, 0.5 };
     const dest = Rect.init(
-        @intCast(i32, tc.x * 16) - cam.view.left(),
-        @intCast(i32, tc.y * 16) - cam.view.top(),
+        @intCast(i32, tile_coord.worldX()) - cam.view.left(),
+        @intCast(i32, tile_coord.worldY()) - cam.view.top(),
         16,
         16,
     );
-    self.game.renderers.r_imm.beginUntextured();
-    self.game.renderers.r_imm.drawQuadRGBA(dest, color);
-
-    const tower_center_x = @intCast(i32, tc.worldX() + 8);
-    const tower_center_y = @intCast(i32, tc.worldY() + 8);
-    self.renderRangeIndicatorForTower(cam, self.interact_state.build.tower_spec, tower_center_x, tower_center_y);
+    renderers.r_imm.beginUntextured();
+    renderers.r_imm.drawQuadRGBA(dest, color);
 }
 
 fn renderDemolishIndicator(self: *PlayState, cam: Camera) void {
@@ -1100,7 +1116,7 @@ fn renderDemolishIndicator(self: *PlayState, cam: Camera) void {
     }
 
     const tc = self.mouseToTile();
-    if (self.world.getTowerAt(tc) != null) {
+    if (self.world.?.getTowerAt(tc) != null) {
         const dest = Rect.init(
             @intCast(i32, tc.x * 16) - cam.view.left(),
             @intCast(i32, tc.y * 16) - cam.view.top(),
@@ -1112,32 +1128,18 @@ fn renderDemolishIndicator(self: *PlayState, cam: Camera) void {
     }
 }
 
-fn renderSelection(self: *PlayState, cam: Camera) void {
-    if (self.interact_state != .select) {
-        return;
-    }
-
-    const t = self.world.towers.getPtr(self.interact_state.select.selected_tower);
-    var r = t.getWorldCollisionRect().toRectf();
-    const cf = cam.view.toRectf();
-    r.translate(-cf.left(), -cf.top());
-
-    self.game.renderers.r_imm.beginUntextured();
-    self.game.renderers.r_imm.drawRectangle(zm.f32x4(r.left(), r.top(), 0, 0), zm.f32x4(r.right(), r.bottom(), 0, 0), zm.f32x4(0, 1, 0, 1));
-}
-
 fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
     const min_tile_x = @intCast(usize, cam.view.left()) / 16;
     const min_tile_y = @intCast(usize, cam.view.top()) / 16;
     const max_tile_x = std.math.min(
-        self.world.getWidth(),
+        self.world.?.getWidth(),
         1 + @intCast(usize, cam.view.right()) / 16,
     );
     const max_tile_y = std.math.min(
-        self.world.getHeight(),
+        self.world.?.getHeight(),
         1 + @intCast(usize, cam.view.bottom()) / 16,
     );
-    const map = self.world.map;
+    const map = self.world.?.map;
 
     self.game.renderers.r_quad.begin(.{});
     var y: usize = min_tile_y;
@@ -1185,7 +1187,7 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
         }
     }
 
-    for (self.world.monsters.slice()) |m| {
+    for (self.world.?.monsters.slice()) |m| {
         var wc = m.getWorldCollisionRect();
         wc.translate(-cam.view.left(), -cam.view.top());
         self.game.renderers.r_quad.drawQuadRGBA(
@@ -1196,7 +1198,7 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
             150,
         );
     }
-    for (self.world.projectiles.slice()) |p| {
+    for (self.world.?.projectiles.slice()) |p| {
         var wc = p.getWorldCollisionRect();
         wc.translate(-cam.view.left(), -cam.view.top());
         self.game.renderers.r_quad.drawQuadRGBA(
@@ -1210,8 +1212,8 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
     self.game.renderers.r_quad.end();
 
     const tile_coord = self.mouseToTile();
-    const t0 = self.world.map.at2DPtr(.base, tile_coord.x, tile_coord.y);
-    const t1 = self.world.map.at2DPtr(.detail, tile_coord.x, tile_coord.y);
+    const t0 = self.world.?.map.at2DPtr(.base, tile_coord.x, tile_coord.y);
+    const t1 = self.world.?.map.at2DPtr(.detail, tile_coord.x, tile_coord.y);
     var textbuf: [256]u8 = undefined;
     const slice = std.fmt.bufPrint(&textbuf, "base: {d}\ndetail: {d}", .{ t0.id, t1.id }) catch unreachable;
     self.game.renderers.r_font.begin(.{
@@ -1237,30 +1239,32 @@ pub fn restartCurrentWorld(self: *PlayState) void {
 }
 
 pub fn loadWorld(self: *PlayState, mapid: u32) void {
+    if (self.world) |world| {
+        world.deinit();
+        self.world = null;
+    }
     if (self.music_params) |params| {
         params.done.store(true, .SeqCst);
         params.release();
         self.music_params = null;
     }
-    self.world.deinit();
-    self.particle_sys.clear();
 
     var filename_buf: [32]u8 = undefined;
     const filename = wo.bufPrintWorldFilename(&filename_buf, mapid) catch unreachable;
 
-    self.world = wo.loadWorldFromJson(self.game.allocator, filename) catch |err| {
-        std.log.err("failed to load tilemap {!}", .{err});
+    var world = wo.loadWorldFromJson(self.game.allocator, filename) catch |err| {
+        std.log.err("Failed to load world: {!}", .{err});
         std.process.exit(1);
     };
 
     // get this loading asap
-    if (self.world.music_filename) |music_filename| {
+    if (world.music_filename) |music_filename| {
         self.music_params = self.game.audio.playMusic(music_filename, .{
             .start_paused = true,
         });
     }
 
-    self.createMinimap() catch |err| {
+    createMinimap(&self.game.renderers, world, self.t_minimap) catch |err| {
         std.log.err("Failed to create minimap: {!}", .{err});
         std.process.exit(1);
     };
@@ -1269,77 +1273,92 @@ pub fn loadWorld(self: *PlayState, mapid: u32) void {
 
     // Init camera for this map
 
-    if (self.world.play_area) |area| {
+    if (world.play_area) |area| {
         self.camera.bounds = area;
     } else {
         self.camera.bounds = Rect.init(
             0,
             0,
-            @intCast(i32, self.world.getWidth() * 16),
-            @intCast(i32, self.world.getHeight() * 16),
+            @intCast(i32, world.getWidth() * 16),
+            @intCast(i32, world.getHeight() * 16),
         );
     }
 
-    self.camera.view.centerOn(@intCast(i32, self.world.goal.world_x), @intCast(i32, self.world.goal.world_y));
+    if (world.goal) |goal| {
+        self.camera.view.centerOn(@intCast(i32, goal.world_x), @intCast(i32, goal.world_y));
+    } else {
+        self.camera.view.x = 0;
+        self.camera.view.y = 0;
+    }
     self.camera.clampToBounds();
 
     self.prev_camera = self.camera;
 
     // must be set before calling spawnMonster since it's used for audio parameters...
     // should probably clean this up eventually
-    self.world.view = self.camera.view;
-    self.world.particle_sys = &self.particle_sys;
-    self.world.setNextWaveTimer(15);
+    world.view = self.camera.view;
+    world.setNextWaveTimer(15);
 
-    if (self.world.remainingWaveCount() == 0) {
+    if (world.remainingWaveCount() == 0) {
         // We will stay in this state, just nothing will happen
         std.log.warn("World `{s}` has no waves", .{filename});
     }
+
+    self.world = world;
 }
 
-fn createMinimap(self: *PlayState) !void {
-    const range = self.world.getPlayableRange();
-    self.t_minimap.width = @intCast(u32, range.getWidth());
-    self.t_minimap.height = @intCast(u32, range.getHeight());
+fn createMinimap(
+    renderers: *RenderServices,
+    world: *World,
+    t_minimap: *Texture,
+) !void {
+    const range = world.getPlayableRange();
+    // TODO: probably should handle this in texture manager
+    if (t_minimap.handle != 0) {
+        gl.deleteTextures(1, &t_minimap.handle);
+        gl.genTextures(1, &t_minimap.handle);
+    }
+    t_minimap.width = @intCast(u32, range.getWidth());
+    t_minimap.height = @intCast(u32, range.getHeight());
 
     var fbo: gl.GLuint = 0;
     gl.genFramebuffers(1, &fbo);
     defer gl.deleteFramebuffers(1, &fbo);
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
-    gl.bindTexture(gl.TEXTURE_2D, self.t_minimap.handle);
+    gl.bindTexture(gl.TEXTURE_2D, t_minimap.handle);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @intCast(gl.GLsizei, self.t_minimap.width), @intCast(gl.GLsizei, self.t_minimap.height), 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, self.t_minimap.handle, 0);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @intCast(gl.GLsizei, t_minimap.width), @intCast(gl.GLsizei, t_minimap.height), 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t_minimap.handle, 0);
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
         std.log.err("createMinimap: failed to create framebuffer", .{});
         std.process.exit(1);
     }
-    gl.viewport(0, 0, @intCast(c_int, self.t_minimap.width), @intCast(c_int, self.t_minimap.height));
-    self.game.renderers.r_batch.setOutputDimensions(self.t_minimap.width, self.t_minimap.height);
-    self.renderMinimapLayer(.base, .terrain, range);
-    self.renderMinimapLayer(.base, .special, range);
-    self.renderMinimapLayer(.detail, .terrain, range);
-    self.renderMinimapLayer(.detail, .special, range);
+    gl.viewport(0, 0, @intCast(c_int, t_minimap.width), @intCast(c_int, t_minimap.height));
+    renderers.r_batch.setOutputDimensions(t_minimap.width, t_minimap.height);
+    renderMinimapLayer(renderers, world.map, .base, .terrain, range);
+    renderMinimapLayer(renderers, world.map, .base, .special, range);
+    renderMinimapLayer(renderers, world.map, .detail, .terrain, range);
+    renderMinimapLayer(renderers, world.map, .detail, .special, range);
 }
 
 fn renderMinimapLayer(
-    self: *PlayState,
+    renderers: *RenderServices,
+    map: tilemap.Tilemap,
     layer: tilemap.TileLayer,
     bank: tilemap.TileBank,
     range: TileRange,
 ) void {
-    const map = self.world.map;
     const source_texture = switch (bank) {
         .none => return,
-        .terrain => self.game.texman.getNamedTexture("terrain.png"),
-        .special => self.game.texman.getNamedTexture("special.png"),
+        .terrain => renderers.texman.getNamedTexture("terrain.png"),
+        .special => renderers.texman.getNamedTexture("special.png"),
     };
     const n_tiles_wide = @intCast(u16, source_texture.width / 16);
-    self.game.renderers.r_batch.begin(.{
+    renderers.r_batch.begin(.{
         .texture = source_texture,
     });
     var y: usize = range.min.y;
@@ -1363,13 +1382,13 @@ fn renderMinimapLayer(
                 1.0,
                 1.0,
             );
-            self.game.renderers.r_batch.drawQuad(.{
+            renderers.r_batch.drawQuad(.{
                 .src = src.toRectf(),
                 .dest = dest,
             });
         }
     }
-    self.game.renderers.r_batch.end();
+    renderers.r_batch.end();
 }
 
 pub fn beginTransitionGameOver(self: *PlayState) void {
@@ -1432,7 +1451,7 @@ fn updateUpgradeButtons(self: *PlayState) void {
         return;
     }
 
-    const t = self.world.towers.getPtr(self.interact_state.select.selected_tower);
+    const t = self.world.?.towers.getPtr(self.interact_state.select.selected_tower);
     const s = t.spec;
     var i: usize = 0;
     while (i < 3) : (i += 1) {
@@ -1443,7 +1462,7 @@ fn updateUpgradeButtons(self: *PlayState) void {
             self.ui_upgrade_states[i].tower_spec = spec;
             self.ui_upgrade_states[i].tower_id = self.interact_state.select.selected_tower;
             self.ui_upgrade_states[i].slot = @intCast(u8, i);
-            if (self.world.canAfford(spec)) {
+            if (self.world.?.canAfford(spec)) {
                 self.ui_upgrade_buttons[i].state = .normal;
             } else {
                 self.ui_upgrade_buttons[i].state = .disabled;
@@ -1591,11 +1610,11 @@ fn beginWipe(self: *PlayState) void {
 }
 
 fn endWipe(self: *PlayState) void {
-    self.wave_timer.state_timer = FrameTimer.initSeconds(self.world.world_frame, 2);
+    self.wave_timer.state_timer = FrameTimer.initSeconds(self.world.?.world_frame, 2);
 }
 
 fn renderWaveTimer(self: *PlayState, alpha: f64) void {
-    const next_wave_timer = self.world.next_wave_timer orelse return;
+    const next_wave_timer = self.world.?.next_wave_timer orelse return;
 
     var rect = self.wave_timer.text_measure;
     var box_rect = rect;
@@ -1607,8 +1626,8 @@ fn renderWaveTimer(self: *PlayState, alpha: f64) void {
     switch (self.wave_timer.state) {
         .middle_screen => {},
         .move_to_corner => {
-            const t0 = self.wave_timer.state_timer.invProgressClamped(std.math.max(self.world.world_frame -| 1, self.wave_timer.state_timer.frame_start));
-            const t1 = self.wave_timer.state_timer.invProgressClamped(self.world.world_frame);
+            const t0 = self.wave_timer.state_timer.invProgressClamped(std.math.max(self.world.?.world_frame -| 1, self.wave_timer.state_timer.frame_start));
+            const t1 = self.wave_timer.state_timer.invProgressClamped(self.world.?.world_frame);
             const tx = zm.lerpV(t0, t1, @floatCast(f32, alpha));
             const k = 1 - std.math.pow(f32, tx, 3);
             box_rect.x = @floatToInt(i32, zm.lerpV(@intToFloat(f32, box_rect.x), 0.0, k));
@@ -1624,7 +1643,7 @@ fn renderWaveTimer(self: *PlayState, alpha: f64) void {
 
     var total_alpha: f32 = 1.0;
     var text_alpha: u8 = 255;
-    const sec = next_wave_timer.remainingSecondsUnbounded(self.world.world_frame);
+    const sec = next_wave_timer.remainingSecondsUnbounded(self.world.?.world_frame);
     if (sec <= 5) {
         const diff = 5.0 - sec;
         text_alpha = @floatToInt(u8, (0.5 * (1.0 + std.math.cos(diff * 8.0))) * 255.0);
@@ -1661,7 +1680,11 @@ fn setInitialUIState(self: *PlayState) void {
 }
 
 fn callWave(self: *PlayState) void {
-    _ = self.world.startNextWave();
+    if (self.world) |world| {
+        _ = world.startNextWave();
+    } else {
+        std.log.warn("Attempted to call wave with no world loaded", .{});
+    }
 }
 
 fn togglePause(self: *PlayState) void {
@@ -1686,12 +1709,12 @@ fn toggleFast(self: *PlayState) void {
 
 fn upgradeSelectedTower(self: *PlayState, slot: u8) void {
     if (self.interact_state == .select) {
-        var tower_to_upgrade = self.world.towers.getPtr(self.interact_state.select.selected_tower);
+        var tower_to_upgrade = self.world.?.towers.getPtr(self.interact_state.select.selected_tower);
         const upgrade_spec = tower_to_upgrade.spec.upgrades[slot];
         if (upgrade_spec) |spec| {
-            if (self.world.canAfford(spec)) {
+            if (self.world.?.canAfford(spec)) {
                 self.game.audio.playSound("assets/sounds/coindrop.ogg", .{}).release();
-                self.world.player_gold -= spec.gold_cost;
+                self.world.?.player_gold -= spec.gold_cost;
                 tower_to_upgrade.upgradeInto(spec);
                 self.updateUpgradeButtons();
             }
@@ -1701,7 +1724,7 @@ fn upgradeSelectedTower(self: *PlayState, slot: u8) void {
 
 fn sellSelectedTower(self: *PlayState) void {
     if (self.interact_state == .select) {
-        self.world.sellTower(self.interact_state.select.selected_tower);
+        self.world.?.sellTower(self.interact_state.select.selected_tower);
         self.interact_state = .none;
     }
 }

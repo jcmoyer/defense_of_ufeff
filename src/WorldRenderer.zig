@@ -27,6 +27,7 @@ foam_anim_l: anim.Animator,
 foam_anim_r: anim.Animator,
 foam_anim_u: anim.Animator,
 foam_anim_d: anim.Animator,
+heart_anim: anim.Animator = anim.a_goal_heart.animationSet().createAnimator("default"),
 
 const WaterDraw = struct {
     dest: Rect,
@@ -86,6 +87,7 @@ pub fn updateAnimations(self: *WorldRenderer) void {
     self.foam_anim_r.update();
     self.foam_anim_u.update();
     self.foam_anim_d.update();
+    self.heart_anim.update();
 }
 
 fn renderTilemapLayer(

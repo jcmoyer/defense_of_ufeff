@@ -156,6 +156,8 @@ pub const MonsterId = GenHandle(Monster);
 
 pub const Monster = struct {
     const PathingState = enum {
+        /// Used when there is no goal in the world; monster spawns and does not move
+        none,
         to_goal,
         to_spawn,
     };
@@ -200,7 +202,8 @@ pub const Monster = struct {
 
     fn computePath(self: *Monster) void {
         self.path = switch (self.pathing_state) {
-            .to_goal => self.world.findPath(self.getTilePosition(), self.world.goal.getTilePosition()).?,
+            .none => &[_]TileCoord{},
+            .to_goal => self.world.findPath(self.getTilePosition(), self.world.goal.?.getTilePosition()).?,
             .to_spawn => self.world.findPath(self.getTilePosition(), self.world.getSpawnPosition(self.spawn_id)).?,
         };
         self.path_index = 0;
@@ -219,6 +222,7 @@ pub const Monster = struct {
     }
 
     fn warpToSpawn(self: *Monster) void {
+        self.world.goal.?.emitWarpParticles();
         self.setTilePosition(self.world.getSpawnPosition(self.spawn_id));
         self.computePath();
         self.path_index = 0;
@@ -226,6 +230,7 @@ pub const Monster = struct {
 
     fn updatePathingState(self: *Monster) void {
         switch (self.pathing_state) {
+            .none => {},
             .to_goal => {
                 if (self.atEndOfPath()) {
                     if (self.world.lives_at_goal > 0) {
@@ -1023,14 +1028,21 @@ pub const FloatingText = struct {
 };
 
 pub const Goal = struct {
+    world: *World,
     world_x: u32,
     world_y: u32,
     animator: anim.Animator = anim.a_goal.animationSet().createAnimator("default"),
+    emitter: particle.PointEmitter,
 
-    fn init(world_x: u32, world_y: u32) Goal {
+    fn init(world: *World, world_x: u32, world_y: u32) Goal {
         var self = Goal{
+            .world = world,
             .world_x = world_x,
             .world_y = world_y,
+            .emitter = .{
+                .parent = &world.particle_sys,
+                .pos = .{ @intToFloat(f32, world_x + 8), @intToFloat(f32, world_y + 16) },
+            },
         };
         return self;
     }
@@ -1042,6 +1054,13 @@ pub const Goal = struct {
     fn update(self: *Goal, frame: u64) void {
         _ = frame;
         self.animator.update();
+    }
+
+    fn emitWarpParticles(self: *Goal) void {
+        var i: u32 = 0;
+        while (i < 16) : (i += 1) {
+            self.emitter.emit(.warp, self.world.world_frame);
+        }
     }
 };
 
@@ -1270,7 +1289,7 @@ pub const World = struct {
     active_waves: std.ArrayListUnmanaged(usize) = .{},
     pathfinder: PathfindingState,
     path_cache: PathfindingCache,
-    goal: Goal,
+    goal: ?Goal = null,
     view: Rect = .{},
     play_area: ?Rect = null,
     custom_rects: std.StringArrayHashMapUnmanaged(Rect) = .{},
@@ -1284,21 +1303,11 @@ pub const World = struct {
     /// `null` when there are no more waves.
     next_wave_timer: ?FrameTimer = null,
     rng: std.rand.DefaultPrng,
-    particle_sys: *particle.ParticleSystem = undefined,
+    particle_sys: particle.ParticleSystem,
     safe_zone: Rect = Rect.init(0, 0, 0, 0),
 
-    pub fn init(allocator: Allocator) World {
-        return .{
-            .allocator = allocator,
-            .pathfinder = PathfindingState.init(allocator),
-            .path_cache = PathfindingCache.init(allocator),
-            .scratch_cache = PathfindingCache.init(allocator),
-            .goal = undefined,
-            .rng = std.rand.DefaultPrng.init(@intCast(u64, std.time.milliTimestamp())),
-        };
-    }
-
     pub fn deinit(self: *World) void {
+        self.particle_sys.deinit();
         self.path_cache.deinit();
         self.fields.deinit(self.allocator);
         self.spawns.deinit(self.allocator);
@@ -1376,7 +1385,7 @@ pub const World = struct {
     }
 
     fn setGoal(self: *World, coord: TileCoord) void {
-        self.goal = Goal.init(coord.worldX(), coord.worldY());
+        self.goal = Goal.init(self, coord.worldX(), coord.worldY());
     }
 
     fn createSpawn(self: *World, name: []const u8, coord: TileCoord) !void {
@@ -1432,9 +1441,11 @@ pub const World = struct {
 
         // (2022-11-02) Q: do we actually need to path from all monsters? it seems spawn points should be enough
         // (2022-11-18) A: Yes, you can wall a monster in that would stray from the spawn->goal path with the newly placed tile.
-        for (self.monsters.slice()) |*m| {
-            if (!self.findTheoreticalPath(m.getTilePosition(), self.goal.getTilePosition())) {
-                return false;
+        if (self.goal) |goal| {
+            for (self.monsters.slice()) |*m| {
+                if (!self.findTheoreticalPath(m.getTilePosition(), goal.getTilePosition())) {
+                    return false;
+                }
             }
         }
 
@@ -1615,7 +1626,7 @@ pub const World = struct {
             .life_timer = FrameTimer.initSeconds(self.world_frame, opts.duration_sec),
             .tick_timer = FrameTimer.initSeconds(self.world_frame, opts.tick_rate_sec),
             .tickFn = opts.tickFn,
-            .emitter = .{ .parent = self.particle_sys, .pos = opts.position, .radius = opts.radius },
+            .emitter = .{ .parent = &self.particle_sys, .pos = opts.position, .radius = opts.radius },
         });
     }
 
@@ -1688,7 +1699,10 @@ pub const World = struct {
         var text_pending_removal = std.ArrayListUnmanaged(u32){};
         var active_waves_pending_removal = std.ArrayListUnmanaged(usize){};
         var fields_pending_removal = std.ArrayListUnmanaged(FieldId){};
-        self.goal.update(self.world_frame);
+
+        if (self.goal) |*goal| {
+            goal.update(self.world_frame);
+        }
 
         for (self.active_waves.items) |wave_id, active_wave_index| {
             if (!self.waves.waves[wave_id].anyRemainingEvents()) {
@@ -1836,6 +1850,8 @@ pub const World = struct {
                 }
             }
         }
+
+        self.particle_sys.update(self.world_frame);
 
         self.world_frame += 1;
     }
@@ -2180,7 +2196,7 @@ pub fn loadWavesFromJson(allocator: Allocator, filename: []const u8, world: *Wor
     };
 }
 
-pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !World {
+pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !*World {
     var arena = std.heap.ArenaAllocator.init(allocator);
     var arena_allocator = arena.allocator();
     defer arena.deinit();
@@ -2189,17 +2205,40 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !World {
     defer file.close();
 
     const buffer = try file.readToEndAlloc(arena_allocator, 1024 * 1024);
-
     var tokens = std.json.TokenStream.init(buffer);
     var doc = try std.json.parse(TiledDoc, &tokens, .{ .allocator = arena_allocator, .ignore_unknown_fields = true });
 
-    var world = World.init(allocator);
+    var world = try allocator.create(World);
+    errdefer allocator.destroy(world);
+
+    world.* = .{
+        .allocator = allocator,
+        .pathfinder = PathfindingState.init(allocator),
+        .path_cache = PathfindingCache.init(allocator),
+        .scratch_cache = PathfindingCache.init(allocator),
+        .rng = std.rand.DefaultPrng.init(@intCast(u64, std.time.milliTimestamp())),
+        // Initialized below (failure to do so is an error)
+        .particle_sys = undefined,
+        .goal = undefined,
+    };
+
     world.map = try Tilemap.init(allocator, doc.width, doc.height);
-    world.scratch_map = try Tilemap.init(allocator, doc.width, doc.height);
     errdefer world.map.deinit(allocator);
+
+    world.scratch_map = try Tilemap.init(allocator, doc.width, doc.height);
+    errdefer world.scratch_map.deinit(allocator);
+
     try world.pathfinder.reserve(world.map.tileCount());
+    errdefer world.pathfinder.deinit();
+
     try world.path_cache.reserve(world.map.tileCount());
+    errdefer world.path_cache.deinit();
+
     try world.scratch_cache.reserve(world.map.tileCount());
+    errdefer world.scratch_cache.deinit();
+
+    world.particle_sys = try particle.ParticleSystem.initCapacity(allocator, 1024);
+    errdefer world.particle_sys.deinit();
 
     var classifier = BankClassifier{};
     defer classifier.deinit(arena_allocator);
@@ -2218,7 +2257,7 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !World {
     for (doc.layers) |layer| {
         const ctx = LoadContext{
             .arena = arena_allocator,
-            .world = &world,
+            .world = world,
             .classifier = &classifier,
         };
         switch (layer) {
@@ -2236,7 +2275,7 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !World {
         }
         const wave_filename = try std.fs.path.resolve(arena_allocator, &[_][]const u8{ map_dirname, wave_file.value });
         std.log.debug("Load wave_file from `{s}`", .{wave_filename});
-        world.waves = try loadWavesFromJson(allocator, wave_filename, &world);
+        world.waves = try loadWavesFromJson(allocator, wave_filename, world);
     }
 
     if (doc.getProperty("music")) |music| {

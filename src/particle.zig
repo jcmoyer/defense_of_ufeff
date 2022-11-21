@@ -25,6 +25,26 @@ pub const ParticleV2 = struct {
 pub const ParticleKind = enum(u8) {
     color,
     fire,
+    warp,
+};
+
+pub const PointEmitter = struct {
+    parent: *ParticleSystem,
+    pos: [2]f32 = .{ 0, 0 },
+
+    pub fn emit(self: *PointEmitter, kind: ParticleKind, frame: u64) void {
+        var rand = self.parent.rng.random();
+        const vx = rand.float(f32) - 0.5;
+        const vy = -rand.float(f32);
+
+        self.parent.addParticle(.{
+            .pos = self.pos,
+            .vel = .{ vx, vy },
+            .alive = true,
+            .kind = kind,
+            .life = timing.FrameTimer.initSeconds(frame, 1),
+        });
+    }
 };
 
 pub const CircleEmitter = struct {
