@@ -1346,10 +1346,41 @@ fn createMinimap(
     }
     gl.viewport(0, 0, @intCast(c_int, t_minimap.width), @intCast(c_int, t_minimap.height));
     renderers.r_batch.setOutputDimensions(t_minimap.width, t_minimap.height);
+    renderers.r_quad.setOutputDimensions(t_minimap.width, t_minimap.height);
     renderMinimapLayer(renderers, world.map, .base, .terrain, range);
     renderMinimapLayer(renderers, world.map, .base, .special, range);
     renderMinimapLayer(renderers, world.map, .detail, .terrain, range);
     renderMinimapLayer(renderers, world.map, .detail, .special, range);
+    renderMinimapBlockage(renderers, world.map, range);
+}
+
+fn renderMinimapBlockage(
+    renderers: *RenderServices,
+    map: tilemap.Tilemap,
+    range: TileRange,
+) void {
+    renderers.r_quad.begin(.{});
+    var y: usize = range.min.y;
+    var x: usize = 0;
+    while (y <= range.max.y) : (y += 1) {
+        x = range.min.x;
+        while (x <= range.max.x) : (x += 1) {
+            const t = map.at2DPtr(.base, x, y);
+            const dest = Rectf.init(
+                @intToFloat(f32, x - range.min.x),
+                @intToFloat(f32, y - range.min.y),
+                1.0,
+                1.0,
+            );
+            if (t.flags.construction_blocked) {
+                renderers.r_quad.drawQuad(.{
+                    .dest = dest,
+                    .color = .{ 255, 0, 0, 128 },
+                });
+            }
+        }
+    }
+    renderers.r_quad.end();
 }
 
 fn renderMinimapLayer(

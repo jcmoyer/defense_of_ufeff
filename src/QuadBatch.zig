@@ -6,6 +6,7 @@ const shader = @import("shader.zig");
 const texmod = @import("texture.zig");
 const Texture = texmod.Texture;
 const Rect = @import("Rect.zig");
+const Rectf = @import("Rectf.zig");
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
@@ -15,10 +16,7 @@ const fssrc = @embedFile("QuadBatch.frag");
 const Vertex = extern struct {
     x: f32,
     y: f32,
-    r: u8,
-    g: u8,
-    b: u8,
-    a: u8,
+    rgba: [4]u8,
 };
 
 const Uniforms = struct {
@@ -61,7 +59,7 @@ pub fn create() QuadBatch {
     gl.bindVertexArray(self.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "x")));
-    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "r")));
+    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "rgba")));
     gl.enableVertexAttribArray(0);
     gl.enableVertexAttribArray(1);
 
@@ -169,51 +167,48 @@ fn flush(self: *QuadBatch, remap: bool) void {
     );
 }
 
-pub fn drawQuad(self: *QuadBatch, dest: Rect) void {
-    self.drawQuadRGBA(dest, 255, 255, 255, 255);
-}
+pub const DrawQuadOptions = struct {
+    dest: Rectf,
+    color: [4]u8 = .{ 255, 255, 255, 255 },
+};
 
-pub fn drawQuadRGBA(self: *QuadBatch, dest: Rect, r: u8, g: u8, b: u8, a: u8) void {
-    const left = @intToFloat(f32, dest.left());
-    const right = @intToFloat(f32, dest.right());
-    const top = @intToFloat(f32, dest.top());
-    const bottom = @intToFloat(f32, dest.bottom());
+pub fn drawQuad(self: *QuadBatch, opts: DrawQuadOptions) void {
+    const left = opts.dest.left();
+    const right = opts.dest.right();
+    const top = opts.dest.top();
+    const bottom = opts.dest.bottom();
 
     self.vertices[self.vertex_head + 0] = .{
         .x = left,
         .y = top,
-        .r = r,
-        .g = g,
-        .b = b,
-        .a = a,
+        .rgba = opts.color,
     };
     self.vertices[self.vertex_head + 1] = .{
         .x = left,
         .y = bottom,
-        .r = r,
-        .g = g,
-        .b = b,
-        .a = a,
+        .rgba = opts.color,
     };
     self.vertices[self.vertex_head + 2] = .{
         .x = right,
         .y = top,
-        .r = r,
-        .g = g,
-        .b = b,
-        .a = a,
+        .rgba = opts.color,
     };
     self.vertices[self.vertex_head + 3] = .{
         .x = right,
         .y = bottom,
-        .r = r,
-        .g = g,
-        .b = b,
-        .a = a,
+        .rgba = opts.color,
     };
     self.vertex_head += 4;
 
     if (self.vertex_head == vertex_count) {
         self.flush(true);
     }
+}
+
+/// Deprecated, use `drawQuad`
+pub fn drawQuadRGBA(self: *QuadBatch, dest: Rect, r: u8, g: u8, b: u8, a: u8) void {
+    self.drawQuad(.{
+        .dest = dest.toRectf(),
+        .color = .{ r, g, b, a },
+    });
 }
