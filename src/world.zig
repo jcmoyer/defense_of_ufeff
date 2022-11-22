@@ -160,6 +160,12 @@ pub const m_mole = MonsterSpec{
 
 pub const MonsterId = GenHandle(Monster);
 
+const HurtOptions = struct {
+    amount: u32,
+    direction: [2]f32 = [2]f32{ 0, -1 },
+    damage_type: DamageType,
+};
+
 pub const Monster = struct {
     const PathingState = enum {
         /// Used when there is no goal in the world; monster spawns and does not move
@@ -349,8 +355,12 @@ pub const Monster = struct {
         return Rect.init(@intCast(i32, self.world_x), @intCast(i32, self.world_y), 16, 16);
     }
 
-    pub fn hurt(self: *Monster, amt: u32) void {
-        self.hurtDirectional(amt, [2]f32{ 0, -1 });
+    pub fn hurt(self: *Monster, opts: HurtOptions) void {
+        switch (opts.damage_type) {
+            .generic => self.hurtDirectionalGenericDamage(opts.amount, opts.direction),
+            .slash => self.hurtDirectionalSlashDamage(opts.amount, opts.direction),
+            .fire => self.hurtFireDamage(opts),
+        }
     }
 
     pub fn slow(self: *Monster, amt: u32) void {
@@ -388,13 +398,18 @@ pub const Monster = struct {
         _ = self.world.spawnSpriteEffect(&se_hurt_slash, p[0], p[1]) catch unreachable;
     }
 
-    pub fn hurtDirectionalDelayed(self: *Monster, amt: u32, dir: [2]f32, dtype: DamageType, frame_count: u32) void {
+    pub fn hurtFireDamage(self: *Monster, hopts: HurtOptions) void {
+        const p = self.getWorldCollisionRect().centerPoint();
+        self.world.playPositionalSound("assets/sounds/burn.ogg", p[0], p[1]);
+        self.hurtDirectional(hopts.amount, hopts.direction);
+        _ = self.world.spawnSpriteEffect(&se_hurt_fire, p[0], p[1]) catch unreachable;
+    }
+
+    pub fn hurtDelayed(self: *Monster, hopts: HurtOptions, frame_count: u32) void {
         var dd = self.world.createDelayedDamage();
         dd.* = DelayedDamage{
             .monster = self.id,
-            .amount = amt,
-            .direction = dir,
-            .damage_type = dtype,
+            .hurt_options = hopts,
             .timer = FrameTimer.initFrames(self.world.world_frame, frame_count),
         };
     }
@@ -472,7 +487,12 @@ fn magicianUpdate(self: *Tower, frame: u64) void {
 
         self.world.playPositionalSound("assets/sounds/slash.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
-        self.world.monsters.getPtr(m).hurtDirectionalDelayed(1, [2]f32{ std.math.cos(r), std.math.sin(r) }, .generic, 3);
+        const ho = HurtOptions{
+            .amount = 1,
+            .direction = [2]f32{ std.math.cos(r), std.math.sin(r) },
+            .damage_type = .generic,
+        };
+        self.world.monsters.getPtr(m).hurtDelayed(ho, 3);
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
     }
@@ -510,7 +530,10 @@ fn pyroUpdate(self: *Tower, frame: u64) void {
 }
 
 fn pyroFieldTick(self: *Field) void {
-    self.world.hurtMonstersInRadius(.{ self.world_x, self.world_y }, self.radius, 3);
+    self.world.hurtMonstersInRadius(.{ self.world_x, self.world_y }, self.radius, .{
+        .amount = 3,
+        .damage_type = .fire,
+    });
 }
 
 pub const t_cryomancer = TowerSpec{
@@ -571,7 +594,12 @@ fn soldierUpdate(self: *Tower, frame: u64) void {
 
         self.world.playPositionalSound("assets/sounds/slash.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
-        self.world.monsters.getPtr(m).hurtDirectionalDelayed(3, [2]f32{ std.math.cos(r), std.math.sin(r) }, .slash, 2);
+        const ho = HurtOptions{
+            .amount = 3,
+            .direction = [2]f32{ std.math.cos(r), std.math.sin(r) },
+            .damage_type = .slash,
+        };
+        self.world.monsters.getPtr(m).hurtDelayed(ho, 2);
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
     }
@@ -658,11 +686,17 @@ fn ninjaUpdate(self: *Tower, frame: u64) void {
 
         self.world.playPositionalSound("assets/sounds/stab.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
-        self.world.monsters.getPtr(m).hurtDirectional(2, [2]f32{ std.math.cos(r), std.math.sin(r) });
-        self.world.monsters.getPtr(m).hurtDirectionalDelayed(2, [2]f32{ std.math.cos(r), std.math.sin(r) }, .generic, 5);
-        self.world.monsters.getPtr(m).hurtDirectionalDelayed(2, [2]f32{ std.math.cos(r), std.math.sin(r) }, .generic, 10);
-        self.world.monsters.getPtr(m).hurtDirectionalDelayed(2, [2]f32{ std.math.cos(r), std.math.sin(r) }, .generic, 15);
-        self.world.monsters.getPtr(m).hurtDirectionalDelayed(2, [2]f32{ std.math.cos(r), std.math.sin(r) }, .generic, 20);
+        const ho = HurtOptions{
+            .amount = 2,
+            .direction = [2]f32{ std.math.cos(r), std.math.sin(r) },
+            .damage_type = .generic,
+        };
+
+        self.world.monsters.getPtr(m).hurt(ho);
+        self.world.monsters.getPtr(m).hurtDelayed(ho, 5);
+        self.world.monsters.getPtr(m).hurtDelayed(ho, 10);
+        self.world.monsters.getPtr(m).hurtDelayed(ho, 15);
+        self.world.monsters.getPtr(m).hurtDelayed(ho, 20);
 
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
@@ -1009,6 +1043,10 @@ const se_hurt_slash = SpriteEffectSpec{
     .anim_set = anim.a_hurt_slash.animationSet(),
 };
 
+const se_hurt_fire = SpriteEffectSpec{
+    .anim_set = anim.a_hurt_fire.animationSet(),
+};
+
 pub const SpriteEffectSpec = struct {
     anim_set: ?anim.AnimationSet = null,
     spawnFn: ?*const fn (*SpriteEffect, u64) void = null,
@@ -1353,13 +1391,12 @@ pub const WaveList = struct {
 const DamageType = enum {
     generic,
     slash,
+    fire,
 };
 
 const DelayedDamage = struct {
     monster: MonsterId,
-    amount: u32,
-    direction: [2]f32,
-    damage_type: DamageType,
+    hurt_options: HurtOptions,
     timer: FrameTimer,
 };
 
@@ -1709,21 +1746,21 @@ pub const World = struct {
             }
             const p = m.getWorldCollisionRect().toRectf().centerPoint();
             const d = mu.dist(p, pos);
-            if (d < radius) {
+            if (d <= radius) {
                 m.slow(amt);
             }
         }
     }
 
-    pub fn hurtMonstersInRadius(self: *World, pos: [2]f32, radius: f32, amt: u32) void {
+    pub fn hurtMonstersInRadius(self: *World, pos: [2]f32, radius: f32, hopts: HurtOptions) void {
         for (self.monsters.slice()) |*m| {
             if (m.dead) {
                 continue;
             }
             const p = m.getWorldCollisionRect().toRectf().centerPoint();
             const d = mu.dist(p, pos);
-            if (d < radius) {
-                m.hurt(amt);
+            if (d <= radius) {
+                m.hurt(hopts);
             }
         }
     }
@@ -1735,10 +1772,10 @@ pub const World = struct {
             }
             const p = m.getWorldCollisionRect().toRectf().centerPoint();
             const d = mu.dist(p, pos);
-            if (d < radius) {
+            if (d <= radius) {
                 const V2 = @Vector(2, f32);
                 const r = mu.angleBetween(@as(V2, p), @as(V2, pos));
-                m.hurtDirectionalDelayed(amt, .{ @cos(r), @sin(r) }, dtype, frame_count);
+                m.hurtDelayed(.{ .amount = amt, .direction = .{ @cos(r), @sin(r) }, .damage_type = dtype }, frame_count);
             }
         }
     }
@@ -1920,10 +1957,7 @@ pub const World = struct {
             const dd = self.delayed_damage.items[damage_id];
             if (dd.timer.expired(self.world_frame)) {
                 if (self.monsters.getPtrWeak(dd.monster)) |m| {
-                    switch (dd.damage_type) {
-                        .generic => m.hurtDirectionalGenericDamage(dd.amount, dd.direction),
-                        .slash => m.hurtDirectionalSlashDamage(dd.amount, dd.direction),
-                    }
+                    m.hurt(dd.hurt_options);
                     if (m.dead) {
                         self.monsters.erase(m.id);
                     }
