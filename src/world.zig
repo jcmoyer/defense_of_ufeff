@@ -204,7 +204,7 @@ pub const Monster = struct {
         self.p_world_y = self.world_y;
         self.tile_pos = .{ .x = new_x / 16, .y = new_y / 16 };
         self.last_tile_pos = self.tile_pos;
-        self.moved_amount = 0;
+        self.moved_amount = tile_distance;
     }
 
     pub fn getTilePosition(self: Monster) TileCoord {
