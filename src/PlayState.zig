@@ -29,6 +29,8 @@ const FrameTimer = @import("timing.zig").FrameTimer;
 const GenHandle = @import("slotmap.zig").GenHandle;
 const WorldRenderer = @import("WorldRenderer.zig");
 const mathutil = @import("mathutil.zig");
+const builtin = @import("builtin");
+const is_debug = builtin.mode == .Debug;
 
 const DEFAULT_CAMERA = Camera{
     .view = Rect.init(0, 0, Game.INTERNAL_WIDTH - gui_panel_width, Game.INTERNAL_HEIGHT),
@@ -499,8 +501,7 @@ pub fn update(self: *PlayState) void {
     }
 
     if (self.music_params) |params| {
-        const builtin = @import("builtin");
-        if (builtin.mode == .Debug) {} else {
+        if (is_debug) {} else {
             if (self.sub == .wipe_fadein and !params.loaded.load(.SeqCst)) {
                 self.beginWipe();
             }
@@ -634,6 +635,9 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
     if (ev.type == .SDL_KEYDOWN) {
         switch (ev.key.keysym.sym) {
             sdl.SDLK_F1 => self.deb_render_tile_collision = !self.deb_render_tile_collision,
+            sdl.SDLK_F2 => if (is_debug) {
+                self.world.?.player_gold += 200;
+            },
             sdl.SDLK_ESCAPE => {
                 if (self.interact_state == .none) {
                     self.game.changeState(.playmenu);
