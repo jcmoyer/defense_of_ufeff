@@ -255,7 +255,7 @@ pub fn enter(self: *LevelSelectState, from: ?Game.StateId) void {
         }
     }
 
-    if (from == Game.StateId.menu) {
+    if (from == Game.StateId.menu or from == Game.StateId.levelresult) {
         self.finger = .{};
     }
 
