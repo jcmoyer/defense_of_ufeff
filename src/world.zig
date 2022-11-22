@@ -1609,7 +1609,7 @@ pub const World = struct {
         for (self.monsters.slice()) |*m| {
             m.computePath();
         }
-        std.log.debug("invalidatePathCache took {d}us", .{timer.read() / std.time.ns_per_us});
+        std.log.info("invalidatePathCache took {d}ms", .{timer.read() / std.time.ns_per_ms});
     }
 
     fn spawnTowerWorld(self: *World, spec: *const TowerSpec, world_x: u32, world_y: u32) !TowerId {
@@ -1950,36 +1950,52 @@ const PathingCoords = struct {
 };
 
 const PathfindingCache = struct {
-    allocator: Allocator,
-    entries: std.AutoArrayHashMap(PathingCoords, []TileCoord),
+    arena: std.heap.ArenaAllocator,
+    entries: std.AutoArrayHashMapUnmanaged(PathingCoords, []TileCoord) = .{},
 
     fn init(allocator: Allocator) PathfindingCache {
+        _ = allocator;
+        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         return .{
-            .allocator = allocator,
-            .entries = std.AutoArrayHashMap(PathingCoords, []TileCoord).init(allocator),
+            .arena = arena,
         };
     }
 
     fn deinit(self: *PathfindingCache) void {
-        for (self.entries.values()) |v| {
-            self.allocator.free(v);
-        }
-        self.entries.deinit();
+        self.arena.deinit();
     }
 
     fn reserve(self: *PathfindingCache, coord_count: usize) !void {
-        try self.entries.ensureTotalCapacity(coord_count);
+        var allocator = self.arena.allocator();
+        try self.entries.ensureTotalCapacity(allocator, coord_count);
     }
 
     fn clear(self: *PathfindingCache) void {
-        for (self.entries.values()) |v| {
-            self.allocator.free(v);
-        }
-        self.entries.clearRetainingCapacity();
+        const my_cap = self.entries.capacity();
+        self.arena.deinit();
+        self.arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        var allocator = self.arena.allocator();
+        self.entries = .{};
+        self.entries.ensureTotalCapacity(allocator, my_cap) catch unreachable;
     }
 
-    fn set(self: *PathfindingCache, coords: PathingCoords, path: []TileCoord) void {
-        self.entries.putAssumeCapacityNoClobber(coords, path);
+    fn setExpandPath(self: *PathfindingCache, coords: PathingCoords, path: []TileCoord) void {
+        if (path.len == 0) {
+            self.entries.putAssumeCapacity(coords, &[_]TileCoord{});
+            return;
+        }
+
+        var my_path = self.copyPath(path) catch unreachable;
+        for (my_path) |start, i| {
+            const key = PathingCoords{
+                .start = start,
+                .end = coords.end,
+            };
+            var gop = self.entries.getOrPutAssumeCapacity(key);
+            if (!gop.found_existing) {
+                gop.value_ptr.* = my_path[i..];
+            }
+        }
     }
 
     fn get(self: *PathfindingCache, coords: PathingCoords) ?[]TileCoord {
@@ -1988,6 +2004,11 @@ const PathfindingCache = struct {
 
     fn hasPathFrom(self: *PathfindingCache, coords: PathingCoords) bool {
         return self.entries.contains(coords);
+    }
+
+    fn copyPath(self: *PathfindingCache, path: []TileCoord) ![]TileCoord {
+        var allocator = self.arena.allocator();
+        return try allocator.dupe(TileCoord, path);
     }
 };
 
@@ -2065,29 +2086,29 @@ const PathfindingState = struct {
 
         self.frontier_set.clearRetainingCapacity();
 
-        try self.frontier.add(coords.start);
-        try self.frontier_set.put(self.allocator, coords.start, {});
+        // Micro optimization: we search from end to start rather than start to end
+        // so we don't have to reverse the coord list at the end.
+        try self.frontier.add(coords.end);
+        try self.frontier_set.put(self.allocator, coords.end, {});
         std.mem.set(Score, self.score_map, Score.infinity);
 
-        self.score_map[coords.start.toScalarCoord(map.width)] = .{
+        self.score_map[coords.end.toScalarCoord(map.width)] = .{
             .fscore = 0,
             .gscore = 0,
             .from = undefined,
         };
 
         while (self.frontier.removeOrNull()) |current| {
-            if (std.meta.eql(current, coords.end)) {
-                if (cache != null) {
+            if (std.meta.eql(current, coords.start)) {
+                if (cache) |c| {
                     self.result.clearRetainingCapacity();
-                    var coord = coords.end;
-                    while (!std.meta.eql(coord, coords.start)) {
+                    var coord = coords.start;
+                    while (!std.meta.eql(coord, coords.end)) {
                         try self.result.append(self.allocator, coord);
                         coord = self.score_map[coord.toScalarCoord(width)].from;
                     }
                     try self.result.append(self.allocator, coord);
-                    std.mem.reverse(TileCoord, self.result.items);
-                    // return self.result.items;
-                    cache.?.set(coords, self.result.toOwnedSlice(self.allocator));
+                    c.setExpandPath(coords, self.result.items);
                 }
 
                 return true;
@@ -2106,7 +2127,7 @@ const PathfindingState = struct {
                         self.score_map[neighbor.toScalarCoord(width)] = .{
                             .from = current,
                             .gscore = tentative_score,
-                            .fscore = tentative_score + self.heuristic(neighbor, coords.end),
+                            .fscore = tentative_score + self.heuristic(neighbor, coords.start),
                         };
                         if (!self.frontier_set.contains(neighbor)) {
                             try self.frontier_set.put(self.allocator, neighbor, {});
@@ -2119,7 +2140,7 @@ const PathfindingState = struct {
 
         std.log.debug("no path: {any}", .{coords});
         if (cache) |c| {
-            c.set(coords, &[_]TileCoord{});
+            c.setExpandPath(coords, &[_]TileCoord{});
         }
 
         return false;
