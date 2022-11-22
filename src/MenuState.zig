@@ -44,6 +44,10 @@ fade_timer: FrameTimer = .{},
 
 const tips = [_][]const u8{
     "You can build over top of walls!\nThis lets you maze first, then build towers.",
+    "You can't build towers that would\ntotally block access to the goal.",
+    "Cryomancers can slow monster\nmovement by 33%.",
+    "Monsters warp back to their spawn\npoint if you have no lives at the goal.",
+    "WASD pans the camera, but you can\nalso click the minimap to immediately go there.",
 };
 
 fn createMenuButton(self: *MenuState, comptime text: []const u8, comptime cb: anytype) !*ui.Button {
@@ -110,7 +114,10 @@ pub fn create(game: *Game) !*MenuState {
 }
 
 fn showRandomTip(self: *MenuState) void {
-    self.tip_index = self.rng.random().intRangeLessThan(usize, 0, tips.len);
+    const old_index = self.tip_index;
+    while (self.tip_index == old_index) {
+        self.tip_index = self.rng.random().intRangeLessThan(usize, 0, tips.len);
+    }
 }
 
 fn onPlayGameClick(button: *ui.Button, self: *MenuState) void {
