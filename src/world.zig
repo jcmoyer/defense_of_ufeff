@@ -1587,6 +1587,11 @@ pub const World = struct {
         // (2022-11-02) Q: do we actually need to path from all monsters? it seems spawn points should be enough
         // (2022-11-18) A: Yes, you can wall a monster in that would stray from the spawn->goal path with the newly placed tile.
         if (self.goal) |goal| {
+            for (self.spawns.slice()) |*s| {
+                if (!self.findTheoreticalPath(s.coord, goal.getTilePosition())) {
+                    return false;
+                }
+            }
             for (self.monsters.slice()) |*m| {
                 if (!self.findTheoreticalPath(m.getTilePosition(), goal.getTilePosition())) {
                     return false;
