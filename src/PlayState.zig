@@ -814,26 +814,22 @@ fn renderProjectiles(
     renderers.r_batch.begin(.{
         .texture = t_special,
     });
-    for (world.projectiles.slice()) |t| {
-        var animator = t.animator orelse continue;
-        const dest = t.getInterpWorldPosition(alpha);
-
-        if (t.spec.rotation == .no_rotation) {
-            // TODO: use non-rotated variant
-            renderers.r_batch.drawQuadRotated(
-                animator.getCurrentRect(),
-                @intToFloat(f32, dest[0] - cam.view.left()),
-                @intToFloat(f32, dest[1] - cam.view.top()),
-                0,
-            );
+    for (world.projectiles.slice()) |p| {
+        var animator = p.animator orelse continue;
+        const dest = p.getInterpWorldPosition(alpha);
+        const dx = @intToFloat(f32, dest[0] - cam.view.left());
+        const dy = @intToFloat(f32, dest[1] - cam.view.top());
+        var t: zm.Mat = zm.scaling(p.scale, p.scale, 1);
+        if (p.spec.rotation == .no_rotation) {
+            // do nothing
         } else {
-            renderers.r_batch.drawQuadRotated(
-                animator.getCurrentRect(),
-                @intToFloat(f32, dest[0] - cam.view.left()),
-                @intToFloat(f32, dest[1] - cam.view.top()),
-                t.angle,
-            );
+            t = zm.mul(t, zm.rotationZ(p.angle));
         }
+        t = zm.mul(t, zm.translation(dx, dy, 0));
+        renderers.r_batch.drawQuadTransformed(.{
+            .src = animator.getCurrentRect().toRectf(),
+            .transform = t,
+        });
     }
     renderers.r_batch.end();
 }

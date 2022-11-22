@@ -65,6 +65,7 @@ pub const Projectile = struct {
     vel_x: f32 = 0,
     vel_y: f32 = 0,
     angle: f32 = 0,
+    scale: f32 = 1,
     dead: bool = false,
     damage: u32 = 1,
     // storage that ProjectileSpecs can use
@@ -707,7 +708,7 @@ pub const t_gunner = TowerSpec{
     .updateFn = gunnerUpdate,
     .min_range = 50,
     .max_range = 100,
-    .upgrades = [3]?*const TowerSpec{ null, null, null },
+    .upgrades = [3]?*const TowerSpec{ &t_shotgunner, null, null },
 };
 
 fn gunnerUpdate(self: *Tower, frame: u64) void {
@@ -723,6 +724,50 @@ fn gunnerUpdate(self: *Tower, frame: u64) void {
         self.setAssocEffectAimed(&se_gun, target[0], target[1], 6, 1);
         var proj = self.fireProjectileTowards(&proj_bullet, target[0], target[1]);
         proj.damage = 5;
+        self.lookTowards(target[0], target[1]);
+        self.cooldown.restart(frame);
+    }
+}
+
+pub const t_shotgunner = TowerSpec{
+    .cooldown = 8,
+    .gold_cost = 35,
+    .tooltip = "Upgrade to Shotgunner\n$%gold_cost%\n\nAoE projectile spread.\nHigh cooldown.",
+
+    .anim_set = anim.a_human4.animationSet(),
+    .updateFn = shotgunnerUpdate,
+    .min_range = 25,
+    .max_range = 65,
+    .upgrades = [3]?*const TowerSpec{ null, null, null },
+};
+
+fn shotgunnerUpdate(self: *Tower, frame: u64) void {
+    if (self.cooldown.expired(frame)) {
+        var random = self.world.rng.random();
+
+        const m = self.pickMonsterGeneric() orelse {
+            self.killAssocEffect();
+            return;
+        };
+        const target = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
+        const r = self.angleTo(target[0], target[1]);
+
+        self.world.playPositionalSound("assets/sounds/gun.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
+        self.setAssocEffectAimed(&se_gun, target[0], target[1], 6, 1);
+
+        var i: u8 = 0;
+        while (i < 8) : (i += 1) {
+            const angle_diff = (random.float(f32) * std.math.pi / 4.0) - std.math.pi / 8.0;
+            var proj = self.world.spawnProjectile(&proj_bullet, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8)) catch unreachable;
+            proj.scale = 0.5 + random.float(f32) * 0.5;
+            const cos_r = std.math.cos(r + angle_diff);
+            const sin_r = std.math.sin(r + angle_diff);
+            const mag = 2 + random.float(f32);
+            proj.vel_x = cos_r * mag;
+            proj.vel_y = sin_r * mag;
+            proj.damage = 2;
+        }
+
         self.lookTowards(target[0], target[1]);
         self.cooldown.restart(frame);
     }
