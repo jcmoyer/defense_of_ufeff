@@ -75,6 +75,10 @@ pub const Projectile = struct {
     scale: f32 = 1,
     dead: bool = false,
     damage: u32 = 1,
+    /// For delayed projectiles, a timer that must expire before the effect plays.
+    delay: ?FrameTimer = null,
+    activated: bool = false,
+    activate_sound: SoundId = .none,
     // storage that ProjectileSpecs can use
     userbuf: [16]u8 align(16) = undefined,
 
@@ -88,6 +92,15 @@ pub const Projectile = struct {
     }
 
     fn update(self: *Projectile, frame: u64) void {
+        if (self.delay) |delay| {
+            if (!delay.expired(frame)) {
+                return;
+            }
+        }
+        if (!self.activated) {
+            self.world.playPositionalSoundId(self.activate_sound, @floatToInt(i32, self.world_x), @floatToInt(i32, self.world_y));
+            self.activated = true;
+        }
         self.p_world_x = self.world_x;
         self.p_world_y = self.world_y;
         self.world_x += self.vel_x;
@@ -686,12 +699,12 @@ fn ninjaUpdate(self: *Tower, frame: u64) void {
         const target = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         const r = self.angleTo(target[0], target[1]);
 
-        self.world.playPositionalSound("assets/sounds/bow.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
-
         var i: i8 = -1;
+        var num: u8 = 0;
         while (i <= 1) : (i += 1) {
             const angle_diff = (std.math.pi / 8.0) * @intToFloat(f32, i);
-            var proj = self.world.spawnProjectile(&proj_star, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8)) catch unreachable;
+            var proj = self.world.spawnProjectileDelayed(&proj_star, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8), 3 * num) catch unreachable;
+            proj.activate_sound = .bow;
             const cos_r = std.math.cos(r + angle_diff);
             const sin_r = std.math.sin(r + angle_diff);
             const mag = 2;
@@ -699,6 +712,7 @@ fn ninjaUpdate(self: *Tower, frame: u64) void {
             proj.vel_y = sin_r * mag;
             proj.damage = 4;
             proj.angle_vel = std.math.pi / 16.0;
+            num += 1;
         }
 
         self.lookTowards(target[0], target[1]);
@@ -1111,6 +1125,7 @@ const SoundId = enum {
     frost,
     warp,
     shotgun,
+    bow,
 };
 
 pub const SpriteEffect = struct {
@@ -1793,6 +1808,22 @@ pub const World = struct {
         return ptr;
     }
 
+    pub fn spawnProjectileDelayed(self: *World, spec: *const ProjectileSpec, world_x: i32, world_y: i32, frames: u32) !*Projectile {
+        var ptr = try self.pending_projectiles.addOne(self.allocator);
+        ptr.* = Projectile{
+            .world = self,
+            .spec = spec,
+            .world_x = @intToFloat(f32, world_x),
+            .world_y = @intToFloat(f32, world_y),
+            .p_world_x = @intToFloat(f32, world_x),
+            .p_world_y = @intToFloat(f32, world_y),
+            .vel_x = @intToFloat(f32, 0),
+            .vel_y = @intToFloat(f32, 0),
+            .delay = FrameTimer.initFrames(self.world_frame, frames),
+        };
+        return ptr;
+    }
+
     pub fn slowMonstersInRadius(self: *World, pos: [2]f32, radius: f32, amt: u32) void {
         for (self.monsters.slice()) |*m| {
             if (m.dead) {
@@ -2190,6 +2221,7 @@ pub const World = struct {
             .frost => self.playPositionalSound("assets/sounds/frost.ogg", world_x, world_y),
             .warp => self.playPositionalSound("assets/sounds/warp.ogg", world_x, world_y),
             .shotgun => self.playPositionalSound("assets/sounds/shotgun.ogg", world_x, world_y),
+            .bow => self.playPositionalSound("assets/sounds/bow.ogg", world_x, world_y),
         }
     }
 };
