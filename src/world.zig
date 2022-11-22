@@ -555,7 +555,7 @@ pub const t_soldier = TowerSpec{
     .cooldown = 2,
     .gold_cost = 5,
     .tooltip = "Upgrade to Soldier\n$%gold_cost%\n\nMelee attack.",
-    .upgrades = [3]?*const TowerSpec{ null, null, null },
+    .upgrades = [3]?*const TowerSpec{ &t_berserker, null, null },
     .anim_set = anim.a_human2.animationSet(),
     .updateFn = soldierUpdate,
     .max_range = 24,
@@ -571,6 +571,32 @@ fn soldierUpdate(self: *Tower, frame: u64) void {
         self.world.playPositionalSound("assets/sounds/slash.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
         self.world.monsters.getPtr(m).hurtDirectionalDelayed(3, [2]f32{ std.math.cos(r), std.math.sin(r) }, .slash, 2);
+        self.lookTowards(p[0], p[1]);
+        self.cooldown.restart(frame);
+    }
+}
+
+pub const t_berserker = TowerSpec{
+    .cooldown = 2,
+    .gold_cost = 20,
+    .tooltip = "Upgrade to Berserker\n$%gold_cost%\n\nAoE melee attack.",
+    .upgrades = [3]?*const TowerSpec{ null, null, null },
+    .anim_set = anim.a_human2.animationSet(),
+    .updateFn = berserkerUpdate,
+    .max_range = 28,
+    .tint_rgba = .{ 255, 120, 120, 255 },
+};
+
+fn berserkerUpdate(self: *Tower, frame: u64) void {
+    if (self.cooldown.expired(frame)) {
+        const m = self.pickMonsterGeneric() orelse return;
+        const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
+        const r = self.angleTo(p[0], p[1]);
+        self.swingEffect(&se_battleaxe, r, 10, 0.4);
+
+        self.world.playPositionalSound("assets/sounds/slash.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
+
+        self.world.hurtMonstersInRadiusDelay(.{ @intToFloat(f32, p[0]), @intToFloat(f32, p[1]) }, 16, 5, .slash, 4);
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
     }
@@ -908,6 +934,14 @@ const se_gun = SpriteEffectSpec{
 
 const se_sword = SpriteEffectSpec{
     .anim_set = anim.a_sword.animationSet(),
+};
+
+const se_battleaxe = SpriteEffectSpec{
+    .anim_set = anim.a_battleaxe.animationSet(),
+};
+
+const se_spear = SpriteEffectSpec{
+    .anim_set = anim.a_spear.animationSet(),
 };
 
 const se_staff = SpriteEffectSpec{
@@ -1635,6 +1669,21 @@ pub const World = struct {
             const d = mu.dist(p, pos);
             if (d < radius) {
                 m.hurt(amt);
+            }
+        }
+    }
+
+    pub fn hurtMonstersInRadiusDelay(self: *World, pos: [2]f32, radius: f32, amt: u32, dtype: DamageType, frame_count: u32) void {
+        for (self.monsters.slice()) |*m| {
+            if (m.dead) {
+                continue;
+            }
+            const p = m.getWorldCollisionRect().toRectf().centerPoint();
+            const d = mu.dist(p, pos);
+            if (d < radius) {
+                const V2 = @Vector(2, f32);
+                const r = mu.angleBetween(@as(V2, p), @as(V2, pos));
+                m.hurtDirectionalDelayed(amt, .{ @cos(r), @sin(r) }, dtype, frame_count);
             }
         }
     }
