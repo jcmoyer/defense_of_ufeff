@@ -418,6 +418,7 @@ pub fn destroy(self: *PlayState) void {
 }
 
 pub fn enter(self: *PlayState, from: ?Game.StateId) void {
+    self.interact_state = .none;
     if (from != Game.StateId.playmenu) {
         self.setInitialUIState();
         self.beginWipe();
