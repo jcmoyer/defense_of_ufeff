@@ -752,8 +752,8 @@ fn shotgunnerUpdate(self: *Tower, frame: u64) void {
         const target = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         const r = self.angleTo(target[0], target[1]);
 
-        self.world.playPositionalSound("assets/sounds/gun.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
-        self.setAssocEffectAimed(&se_gun, target[0], target[1], 6, 1);
+        self.world.playPositionalSoundId(.shotgun, @intCast(i32, self.world_x), @intCast(i32, self.world_y));
+        self.setAssocEffectAimed(&se_biggun, target[0], target[1], 6, 1);
 
         var i: u8 = 0;
         while (i < 8) : (i += 1) {
@@ -977,6 +977,10 @@ const se_gun = SpriteEffectSpec{
     .anim_set = anim.a_gun.animationSet(),
 };
 
+const se_biggun = SpriteEffectSpec{
+    .anim_set = anim.a_biggun.animationSet(),
+};
+
 const se_sword = SpriteEffectSpec{
     .anim_set = anim.a_sword.animationSet(),
 };
@@ -1019,6 +1023,7 @@ const SoundId = enum {
     flame,
     frost,
     warp,
+    shotgun,
 };
 
 pub const SpriteEffect = struct {
@@ -2091,6 +2096,7 @@ pub const World = struct {
             .flame => self.playPositionalSound("assets/sounds/flame.ogg", world_x, world_y),
             .frost => self.playPositionalSound("assets/sounds/frost.ogg", world_x, world_y),
             .warp => self.playPositionalSound("assets/sounds/warp.ogg", world_x, world_y),
+            .shotgun => self.playPositionalSound("assets/sounds/shotgun.ogg", world_x, world_y),
         }
     }
 };

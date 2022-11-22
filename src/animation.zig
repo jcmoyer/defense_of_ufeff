@@ -372,6 +372,18 @@ pub const a_gun = StaticAnimationSet(&[1]StaticAnimationDef{.{
     },
 }}){};
 
+pub const a_biggun = StaticAnimationSet(&[1]StaticAnimationDef{.{
+    .name = "default",
+    .animation = Animation{
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(176, 128, 16, 16),
+                .time = 8,
+            },
+        },
+    },
+}}){};
+
 pub const a_hurt_generic = StaticAnimationSet(&[1]StaticAnimationDef{.{
     .name = "default",
     .animation = Animation{
