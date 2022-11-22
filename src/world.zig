@@ -1589,6 +1589,11 @@ pub const World = struct {
         if (collision_flags.all()) {
             return false;
         }
+        if (self.goal) |goal| {
+            if (std.meta.eql(coord, goal.getTilePosition())) {
+                return false;
+            }
+        }
         const tile_flags = self.map.at2DPtr(.base, coord.x, coord.y).flags;
         if (tile_flags.construction_blocked) {
             return false;
