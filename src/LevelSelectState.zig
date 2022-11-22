@@ -207,7 +207,7 @@ fn createButtonForRect(self: *LevelSelectState, rect: Rect, mapid: u32) !void {
     var has_title: bool = false;
     if (world.getProperty("title")) |title| {
         if (title.isString()) {
-            btn.tooltip_text = try std.fmt.allocPrint(allocator, "Map {d}: {s}", .{ mapid + 1, title.value });
+            btn.tooltip_text = try std.fmt.allocPrint(allocator, "Map {d}: {s}", .{ mapid + 1, title.toString() });
             has_title = true;
         } else {
             std.log.warn("World `{s}` has non-string title", .{filename});

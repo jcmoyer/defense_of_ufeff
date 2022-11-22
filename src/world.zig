@@ -2520,7 +2520,7 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !*World {
             std.log.err("wave_file must have type `file`", .{});
             std.process.exit(1);
         }
-        const wave_filename = try std.fs.path.resolve(arena_allocator, &[_][]const u8{ map_dirname, wave_file.value });
+        const wave_filename = try std.fs.path.resolve(arena_allocator, &[_][]const u8{ map_dirname, wave_file.toString() });
         std.log.debug("Load wave_file from `{s}`", .{wave_filename});
         world.waves = try loadWavesFromJson(allocator, wave_filename, world);
     }
@@ -2530,9 +2530,17 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !*World {
             std.log.err("music must have type `file`", .{});
             std.process.exit(1);
         }
-        const music_filename = try std.fs.path.resolve(arena_allocator, &[_][]const u8{ map_dirname, music.value });
+        const music_filename = try std.fs.path.resolve(arena_allocator, &[_][]const u8{ map_dirname, music.toString() });
         std.log.debug("music_filename is `{s}`", .{music_filename});
         world.music_filename = try allocator.dupeZ(u8, music_filename);
+    }
+
+    if (doc.getProperty("starting_gold")) |g| {
+        if (!g.isInt()) {
+            std.log.err("starting_gold must have type `int`", .{});
+            std.process.exit(1);
+        }
+        world.player_gold = @intCast(u32, g.toInt());
     }
 
     world.finalizeInit();
@@ -2773,12 +2781,22 @@ const TiledDoc = struct {
 const TiledMapPropertyType = enum {
     file,
     string,
+    int,
+};
+
+const TiledMapPropertyValue = union(enum) {
+    string: []const u8,
+    integer: i64,
 };
 
 const TiledMapProperty = struct {
     name: []const u8,
     type: TiledMapPropertyType,
-    value: []const u8,
+    value: TiledMapPropertyValue,
+
+    pub fn isInt(self: TiledMapProperty) bool {
+        return self.type == .int;
+    }
 
     pub fn isString(self: TiledMapProperty) bool {
         return self.type == .string;
@@ -2786,6 +2804,13 @@ const TiledMapProperty = struct {
 
     pub fn isFile(self: TiledMapProperty) bool {
         return self.type == .file;
+    }
+
+    pub fn toString(self: TiledMapProperty) []const u8 {
+        return self.value.string;
+    }
+    pub fn toInt(self: TiledMapProperty) i64 {
+        return self.value.integer;
     }
 };
 
