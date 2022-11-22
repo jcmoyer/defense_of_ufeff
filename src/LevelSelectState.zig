@@ -245,8 +245,8 @@ pub fn enter(self: *LevelSelectState, from: ?Game.StateId) void {
     }
     self.beginFadeIn();
 
-    if (from == Game.StateId.play) {
-        if (self.game.st_play.world.?.player_won) {
+    if (from == Game.StateId.levelresult) {
+        if (self.game.st_levelresult.result_kind == .win) {
             self.prog_state.setMapComplete(self.prog_state.last_map_entered);
             self.saveProgression() catch |err| {
                 std.log.err("Failed to save progression: {!}", .{err});
