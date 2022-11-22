@@ -711,6 +711,7 @@ const particle_rects = [@typeInfo(particle.ParticleKind).Enum.fields.len]Rectf{
     Rectf.init(0, 240, 16, 16),
     Rect.init(11 * 16, 0, 16, 16).toRectf(),
     Rectf.init(0, 240, 4, 4),
+    Rect.init(13 * 16, 0, 16, 16).toRectf(),
 };
 
 fn renderFields(
@@ -926,12 +927,19 @@ fn renderMonsters(
         .texture = t_chara,
     });
     for (world.monsters.slice()) |m| {
+        const animator = m.animator orelse continue;
+        // TODO: grab this from monsterspec
+        var color: [4]u8 = .{ 255, 255, 255, 255 };
+        if (m.slow_frames > 0) {
+            color = mathutil.colorMulU8(4, color, .{ 0x80, 0x80, 0xFF, 0xFF });
+        }
         const w = m.getInterpWorldPosition(a);
-        renderers.r_batch.drawQuadFlash(
-            m.animator.?.getCurrentRect(),
-            Rect.init(@intCast(i32, w[0]) - cam.view.left(), @intCast(i32, w[1]) - cam.view.top(), 16, 16),
-            m.flash_frames > 0,
-        );
+        renderers.r_batch.drawQuad(.{
+            .src = animator.getCurrentRect().toRectf(),
+            .dest = Rect.init(@intCast(i32, w[0]) - cam.view.left(), @intCast(i32, w[1]) - cam.view.top(), 16, 16).toRectf(),
+            .flash = m.flash_frames > 0,
+            .color = color,
+        });
     }
     renderers.r_batch.end();
 }

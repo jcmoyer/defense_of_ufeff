@@ -31,6 +31,7 @@ pub const ParticleKind = enum(u8) {
     color,
     fire,
     warp,
+    frost,
 };
 
 pub const EmissionParams = struct {

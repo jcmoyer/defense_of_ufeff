@@ -126,30 +126,35 @@ pub const MonsterSpec = struct {
     updateFn: ?*const fn (*Monster, u64) void = null,
     max_hp: u32,
     gold: u32,
+    speed: u32 = 625,
 };
 
 pub const m_human = MonsterSpec{
     .anim_set = anim.a_human1.animationSet(),
     .max_hp = 5,
     .gold = 1,
+    .speed = 625,
 };
 
 pub const m_slime = MonsterSpec{
     .anim_set = anim.a_slime.animationSet(),
     .max_hp = 5,
     .gold = 1,
+    .speed = 625,
 };
 
 pub const m_skeleton = MonsterSpec{
     .anim_set = anim.a_skeleton.animationSet(),
     .max_hp = 10,
     .gold = 3,
+    .speed = 625,
 };
 
 pub const m_mole = MonsterSpec{
     .anim_set = anim.a_mole.animationSet(),
     .max_hp = 20,
     .gold = 5,
+    .speed = 300,
 };
 
 pub const MonsterId = GenHandle(Monster);
@@ -172,8 +177,7 @@ pub const Monster = struct {
     world_y: u32 = 0,
     /// Updated immediately on move
     tile_pos: TileCoord = .{ .x = 0, .y = 0 },
-    mspeed: u32 = 1,
-    mstate: MoveState = .idle,
+    last_tile_pos: TileCoord = .{ .x = 0, .y = 0 },
     face: Direction = .down,
     animator: ?anim.Animator = null,
     path: []TileCoord = &[_]TileCoord{},
@@ -183,6 +187,10 @@ pub const Monster = struct {
     dead: bool = false,
     pathing_state: PathingState = .to_goal,
     carrying_life: bool = false,
+    slow_frames: u32 = 0,
+    moved_amount: u32 = 0,
+
+    const tile_distance = 10000;
 
     pub fn setTilePosition(self: *Monster, coord: TileCoord) void {
         self.setWorldPosition(@intCast(u32, coord.x * 16), @intCast(u32, coord.y * 16));
@@ -194,6 +202,8 @@ pub const Monster = struct {
         self.p_world_x = self.world_x;
         self.p_world_y = self.world_y;
         self.tile_pos = .{ .x = new_x / 16, .y = new_y / 16 };
+        self.last_tile_pos = self.tile_pos;
+        self.moved_amount = 0;
     }
 
     pub fn getTilePosition(self: Monster) TileCoord {
@@ -223,6 +233,7 @@ pub const Monster = struct {
 
     fn warpToSpawn(self: *Monster) void {
         self.world.goal.?.emitWarpParticles();
+        self.world.playPositionalSoundId(.warp, @intCast(i32, self.world.goal.?.world_x), @intCast(i32, self.world.goal.?.world_y));
         self.setTilePosition(self.world.getSpawnPosition(self.spawn_id));
         self.computePath();
         self.path_index = 0;
@@ -241,9 +252,8 @@ pub const Monster = struct {
                     } else {
                         self.warpToSpawn();
                     }
-                } else {
-                    self.beginPathingMove();
                 }
+                self.beginPathingMove();
             },
             .to_spawn => {
                 if (self.atEndOfPath()) {
@@ -251,9 +261,8 @@ pub const Monster = struct {
                     self.world.recoverable_lives -= 1;
                     self.pathing_state = .to_goal;
                     self.computePath();
-                } else {
-                    self.beginPathingMove();
                 }
+                self.beginPathingMove();
             },
         }
     }
@@ -269,36 +278,32 @@ pub const Monster = struct {
     }
 
     fn doMovement(self: *Monster) void {
-        switch (self.mstate) {
-            .idle => {},
-            .left => self.world_x -= self.mspeed,
-            .right => self.world_x += self.mspeed,
-            .up => self.world_y -= self.mspeed,
-            .down => self.world_y += self.mspeed,
-        }
+        const move_amount = if (self.slow_frames > 0)
+            self.spec.speed - (self.spec.speed / 3)
+        else
+            self.spec.speed;
 
-        switch (self.mstate) {
-            .idle => {},
-            .left, .right => {
-                if (self.world_x % 16 == 0) {
-                    self.mstate = .idle;
-                }
-            },
-            .up, .down => {
-                if (self.world_y % 16 == 0) {
-                    self.mstate = .idle;
-                }
-            },
-        }
+        const progress_f = @intToFloat(f32, self.moved_amount) / @intToFloat(f32, tile_distance);
+
+        const x0 = @intToFloat(f32, self.last_tile_pos.worldX());
+        const x1 = @intToFloat(f32, self.tile_pos.worldX());
+        const y0 = @intToFloat(f32, self.last_tile_pos.worldY());
+        const y1 = @intToFloat(f32, self.tile_pos.worldY());
+
+        self.world_x = @floatToInt(u32, zm.lerpV(x0, x1, progress_f));
+        self.world_y = @floatToInt(u32, zm.lerpV(y0, y1, progress_f));
+
+        self.moved_amount += move_amount;
     }
 
     pub fn update(self: *Monster, frame: u64) void {
+        self.slow_frames -|= 1;
         self.flash_frames -|= 1;
         self.p_world_x = self.world_x;
         self.p_world_y = self.world_y;
 
-        // only do pathing related stuff while not moving
-        if (self.mstate == .idle) {
+        if (self.moved_amount >= tile_distance) {
+            self.moved_amount -= tile_distance;
             self.updatePathingState();
         }
 
@@ -314,12 +319,7 @@ pub const Monster = struct {
     }
 
     pub fn beginMove(self: *Monster, f: Direction) void {
-        self.mstate = switch (f) {
-            .left => .left,
-            .up => .up,
-            .right => .right,
-            .down => .down,
-        };
+        self.last_tile_pos = self.tile_pos;
         self.tile_pos = self.tile_pos.offset(f);
         self.setFacing(f);
     }
@@ -350,6 +350,10 @@ pub const Monster = struct {
 
     pub fn hurt(self: *Monster, amt: u32) void {
         self.hurtDirectional(amt, [2]f32{ 0, -1 });
+    }
+
+    pub fn slow(self: *Monster, amt: u32) void {
+        self.slow_frames = std.math.max(self.slow_frames, amt);
     }
 
     pub fn hurtDirectional(self: *Monster, amt: u32, dir: [2]f32) void {
@@ -452,7 +456,7 @@ pub const t_magician = TowerSpec{
     .cooldown = 2,
     .gold_cost = 5,
     .tooltip = "Upgrade to Magician\n$%gold_cost%\n\nMelee attack.\nElemental specializations.",
-    .upgrades = [3]?*const TowerSpec{ &t_pyromancer, null, null },
+    .upgrades = [3]?*const TowerSpec{ &t_pyromancer, &t_cryomancer, null },
     .anim_set = anim.a_human3.animationSet(),
     .updateFn = magicianUpdate,
     .max_range = 24,
@@ -498,6 +502,7 @@ fn pyroUpdate(self: *Tower, frame: u64) void {
             .duration_sec = 5,
             .tick_rate_sec = 1,
             .tickFn = pyroFieldTick,
+            .particle_kind = .fire,
         }) catch unreachable;
         self.world.playPositionalSoundId(.flame, p[0], p[1]);
     }
@@ -505,6 +510,45 @@ fn pyroUpdate(self: *Tower, frame: u64) void {
 
 fn pyroFieldTick(self: *Field) void {
     self.world.hurtMonstersInRadius(.{ self.world_x, self.world_y }, self.radius, 3);
+}
+
+pub const t_cryomancer = TowerSpec{
+    .cooldown = 8,
+    .gold_cost = 25,
+    .tooltip = "Upgrade to Cryomancer\n$%gold_cost%\n\nAoE slow effect\ncentered on caster.",
+    .upgrades = [3]?*const TowerSpec{ null, null, null },
+    .anim_set = anim.a_human3.animationSet(),
+    .updateFn = cryoUpdate,
+    .max_range = 50,
+    .tint_rgba = .{ 100, 100, 255, 255 },
+};
+
+fn cryoUpdate(self: *Tower, frame: u64) void {
+    if (self.cooldown.expired(frame)) {
+        const m = self.pickMonsterGeneric() orelse return;
+        const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
+        const r = self.angleTo(p[0], p[1]);
+        self.stabEffect(&se_staff, r, 10, 5, 1);
+        self.lookTowards(p[0], p[1]);
+        self.cooldown.restart(frame);
+
+        const q = self.getWorldCollisionRect().centerPoint();
+
+        _ = self.world.spawnField(.{
+            .position = .{ @intToFloat(f32, q[0]), @intToFloat(f32, q[1]) },
+            .radius = 50,
+            .duration_sec = 5,
+            .tick_rate_sec = 1,
+            .tickFn = cryoFieldTick,
+            .particle_kind = .frost,
+        }) catch unreachable;
+
+        self.world.playPositionalSoundId(.frost, q[0], q[1]);
+    }
+}
+
+fn cryoFieldTick(self: *Field) void {
+    self.world.slowMonstersInRadius(.{ self.world_x, self.world_y }, self.radius, 30);
 }
 
 pub const t_soldier = TowerSpec{
@@ -894,6 +938,8 @@ const SoundId = enum {
     none,
     stab,
     flame,
+    frost,
+    warp,
 };
 
 pub const SpriteEffect = struct {
@@ -1258,10 +1304,11 @@ const Field = struct {
     tickFn: *const fn (*Field) void,
     life_timer: FrameTimer,
     tick_timer: FrameTimer,
+    kind: particle.ParticleKind,
     emitter: particle.CircleEmitter,
 
     fn update(self: *Field) void {
-        self.emitter.emit(.fire, self.world.world_frame);
+        self.emitter.emit(self.kind, self.world.world_frame);
         if (self.tick_timer.expired(self.world.world_frame)) {
             self.tickFn(self);
             self.tick_timer.restart(self.world.world_frame);
@@ -1566,6 +1613,19 @@ pub const World = struct {
         return ptr;
     }
 
+    pub fn slowMonstersInRadius(self: *World, pos: [2]f32, radius: f32, amt: u32) void {
+        for (self.monsters.slice()) |*m| {
+            if (m.dead) {
+                continue;
+            }
+            const p = m.getWorldCollisionRect().toRectf().centerPoint();
+            const d = mu.dist(p, pos);
+            if (d < radius) {
+                m.slow(amt);
+            }
+        }
+    }
+
     pub fn hurtMonstersInRadius(self: *World, pos: [2]f32, radius: f32, amt: u32) void {
         for (self.monsters.slice()) |*m| {
             if (m.dead) {
@@ -1628,6 +1688,7 @@ pub const World = struct {
         radius: f32,
         duration_sec: f32,
         tick_rate_sec: f32,
+        particle_kind: particle.ParticleKind,
         tickFn: *const fn (*Field) void,
     };
 
@@ -1640,6 +1701,7 @@ pub const World = struct {
             .life_timer = FrameTimer.initSeconds(self.world_frame, opts.duration_sec),
             .tick_timer = FrameTimer.initSeconds(self.world_frame, opts.tick_rate_sec),
             .tickFn = opts.tickFn,
+            .kind = opts.particle_kind,
             .emitter = .{ .parent = &self.particle_sys, .pos = opts.position, .radius = opts.radius },
         });
     }
@@ -1880,7 +1942,7 @@ pub const World = struct {
         m.setFacing(dir);
 
         // cannot interrupt an object that is already moving
-        if (m.mstate != .idle) {
+        if (self.move_frames > 0) {
             return false;
         }
 
@@ -1933,6 +1995,8 @@ pub const World = struct {
             .none => {},
             .stab => self.playPositionalSound("assets/sounds/stab.ogg", world_x, world_y),
             .flame => self.playPositionalSound("assets/sounds/flame.ogg", world_x, world_y),
+            .frost => self.playPositionalSound("assets/sounds/frost.ogg", world_x, world_y),
+            .warp => self.playPositionalSound("assets/sounds/warp.ogg", world_x, world_y),
         }
     }
 };
