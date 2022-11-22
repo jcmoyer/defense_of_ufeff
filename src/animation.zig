@@ -288,6 +288,18 @@ pub const a_proj_bullet = StaticAnimationSet(&[1]StaticAnimationDef{.{
     },
 }}){};
 
+pub const a_proj_star = StaticAnimationSet(&[1]StaticAnimationDef{.{
+    .name = "default",
+    .animation = Animation{
+        .frames = &[_]Frame{
+            .{
+                .rect = Rect.init(192, 128, 16, 16),
+                .time = 8,
+            },
+        },
+    },
+}}){};
+
 pub const a_sword = StaticAnimationSet(&[1]StaticAnimationDef{.{
     .name = "default",
     .animation = Animation{

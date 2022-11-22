@@ -35,6 +35,7 @@ pub const MoveState = enum {
 pub const RotationBehavior = enum {
     no_rotation,
     rotation_from_velocity,
+    angular_velocity,
 };
 
 pub const ProjectileSpec = struct {
@@ -53,6 +54,11 @@ pub const proj_bullet = ProjectileSpec{
     .anim_set = anim.a_proj_bullet.animationSet(),
 };
 
+pub const proj_star = ProjectileSpec{
+    .anim_set = anim.a_proj_star.animationSet(),
+    .rotation = .angular_velocity,
+};
+
 pub const Projectile = struct {
     id: u32 = undefined,
     world: *World,
@@ -65,6 +71,7 @@ pub const Projectile = struct {
     vel_x: f32 = 0,
     vel_y: f32 = 0,
     angle: f32 = 0,
+    angle_vel: f32 = 0,
     scale: f32 = 1,
     dead: bool = false,
     damage: u32 = 1,
@@ -93,6 +100,8 @@ pub const Projectile = struct {
         }
         if (self.spec.rotation == .rotation_from_velocity) {
             self.angle = std.math.atan2(f32, self.vel_y, self.vel_x);
+        } else if (self.spec.rotation == .angular_velocity) {
+            self.angle += self.angle_vel;
         }
         if (!self.world.safe_zone.containsRect(self.getWorldCollisionRect())) {
             self.dead = true;
@@ -579,7 +588,7 @@ pub const t_soldier = TowerSpec{
     .cooldown = 2,
     .gold_cost = 5,
     .tooltip = "Upgrade to Soldier\n$%gold_cost%\n\nMelee attack.",
-    .upgrades = [3]?*const TowerSpec{ &t_berserker, null, null },
+    .upgrades = [3]?*const TowerSpec{ &t_berserker, &t_lancer, null },
     .anim_set = anim.a_human2.animationSet(),
     .updateFn = soldierUpdate,
     .max_range = 24,
@@ -658,31 +667,71 @@ fn rogueUpdate(self: *Tower, frame: u64) void {
 }
 
 pub const t_ninja = TowerSpec{
-    .cooldown = 0.75,
+    .cooldown = 1,
     .gold_cost = 25,
-    .tooltip = "Upgrade to Ninja\n$%gold_cost%\n\nMelee multi-hit attack.\nExcels at single target.",
+    .tooltip = "Upgrade to Ninja\n$%gold_cost%\n\nFan projectile attack.",
 
     .anim_set = anim.a_human4.animationSet(),
     .updateFn = ninjaUpdate,
-    .max_range = 24,
+    .max_range = 90,
     .upgrades = [3]?*const TowerSpec{ null, null, null },
     .tint_rgba = .{ 128, 128, 128, 255 },
 };
 
 fn ninjaUpdate(self: *Tower, frame: u64) void {
     if (self.cooldown.expired(frame)) {
+        const m = self.pickMonsterGeneric() orelse {
+            return;
+        };
+        const target = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
+        const r = self.angleTo(target[0], target[1]);
+
+        self.world.playPositionalSound("assets/sounds/bow.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
+
+        var i: i8 = -1;
+        while (i <= 1) : (i += 1) {
+            const angle_diff = (std.math.pi / 8.0) * @intToFloat(f32, i);
+            var proj = self.world.spawnProjectile(&proj_star, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8)) catch unreachable;
+            const cos_r = std.math.cos(r + angle_diff);
+            const sin_r = std.math.sin(r + angle_diff);
+            const mag = 2;
+            proj.vel_x = cos_r * mag;
+            proj.vel_y = sin_r * mag;
+            proj.damage = 4;
+            proj.angle_vel = std.math.pi / 16.0;
+        }
+
+        self.lookTowards(target[0], target[1]);
+        self.cooldown.restart(frame);
+    }
+}
+
+pub const t_lancer = TowerSpec{
+    .cooldown = 1.2,
+    .gold_cost = 25,
+    .tooltip = "Upgrade to Lancer\n$%gold_cost%\n\nMelee multi-hit attack.\nExcels at single target.",
+
+    .anim_set = anim.a_human2.animationSet(),
+    .updateFn = lancerUpdate,
+    .max_range = 24,
+    .upgrades = [3]?*const TowerSpec{ null, null, null },
+    .tint_rgba = .{ 255, 255, 80, 255 },
+};
+
+fn lancerUpdate(self: *Tower, frame: u64) void {
+    if (self.cooldown.expired(frame)) {
         const m = self.pickMonsterGeneric() orelse return;
         const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         const r = self.angleTo(p[0], p[1]);
-        self.stabEffect(&se_dagger, r, 10, 0.3, 0.9);
+        self.stabEffect(&se_spear, r, 10, 0.3, 0.9);
 
         var random = self.world.rng.random();
         const random_angle = std.math.pi / 8.0;
 
-        self.stabEffectDelayed(&se_dagger, r + random.float(f32) * random_angle, 9, 0.25, 5);
-        self.stabEffectDelayed(&se_dagger, r + random.float(f32) * random_angle, 8, 0.20, 10);
-        self.stabEffectDelayed(&se_dagger, r + random.float(f32) * random_angle, 7, 0.15, 15);
-        self.stabEffectDelayed(&se_dagger, r + random.float(f32) * random_angle, 6, 0.10, 20);
+        self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 9, 0.25, 5);
+        self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 8, 0.20, 10);
+        self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 7, 0.15, 15);
+        self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 6, 0.10, 20);
 
         self.world.playPositionalSound("assets/sounds/stab.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
