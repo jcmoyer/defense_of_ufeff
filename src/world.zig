@@ -79,8 +79,10 @@ pub const Projectile = struct {
     delay: ?FrameTimer = null,
     activated: bool = false,
     activate_sound: SoundId = .none,
-    // storage that ProjectileSpecs can use
-    userbuf: [16]u8 align(16) = undefined,
+    spawn_x: f32 = 0,
+    spawn_y: f32 = 0,
+    max_distance: ?f32 = null,
+    fadeout_timer: ?FrameTimer = null,
 
     fn spawn(self: *Projectile, frame: u64) void {
         if (self.spec.anim_set) |as| {
@@ -118,6 +120,18 @@ pub const Projectile = struct {
         }
         if (!self.world.safe_zone.containsRect(self.getWorldCollisionRect())) {
             self.dead = true;
+        }
+        if (self.fadeout_timer) |timer| {
+            if (timer.expired(self.world.world_frame)) {
+                self.dead = true;
+            }
+        } else {
+            if (self.max_distance) |max_dist| {
+                const dist = mu.dist(.{ self.world_x, self.world_y }, .{ self.spawn_x, self.spawn_y });
+                if (dist > max_dist) {
+                    self.fadeout_timer = FrameTimer.initSeconds(self.world.world_frame, 1);
+                }
+            }
         }
     }
 
@@ -712,6 +726,7 @@ fn ninjaUpdate(self: *Tower, frame: u64) void {
             proj.vel_y = sin_r * mag;
             proj.damage = 4;
             proj.angle_vel = std.math.pi / 16.0;
+            proj.max_distance = self.spec.max_range;
             num += 1;
         }
 
@@ -863,6 +878,7 @@ fn shotgunnerUpdate(self: *Tower, frame: u64) void {
             proj.vel_x = cos_r * mag;
             proj.vel_y = sin_r * mag;
             proj.damage = 2;
+            proj.max_distance = self.spec.max_range;
         }
 
         self.lookTowards(target[0], target[1]);
@@ -982,6 +998,7 @@ pub const Tower = struct {
 
         proj.vel_x = cos_r * 2;
         proj.vel_y = sin_r * 2;
+        proj.max_distance = self.spec.max_range;
 
         return proj;
     }
@@ -1809,6 +1826,8 @@ pub const World = struct {
             .p_world_y = @intToFloat(f32, world_y),
             .vel_x = @intToFloat(f32, 0),
             .vel_y = @intToFloat(f32, 0),
+            .spawn_x = @intToFloat(f32, world_x),
+            .spawn_y = @intToFloat(f32, world_y),
         };
         return ptr;
     }
@@ -1825,6 +1844,8 @@ pub const World = struct {
             .vel_x = @intToFloat(f32, 0),
             .vel_y = @intToFloat(f32, 0),
             .delay = FrameTimer.initFrames(self.world_frame, frames),
+            .spawn_x = @intToFloat(f32, world_x),
+            .spawn_y = @intToFloat(f32, world_y),
         };
         return ptr;
     }

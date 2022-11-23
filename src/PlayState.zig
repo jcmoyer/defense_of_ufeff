@@ -827,9 +827,11 @@ fn renderProjectiles(
             t = zm.mul(t, zm.rotationZ(p.angle));
         }
         t = zm.mul(t, zm.translation(dx, dy, 0));
+        var color_a = if (p.fadeout_timer) |timer| @floatToInt(u8, timer.invProgressClamped(world.world_frame) * 255) else 255;
         renderers.r_batch.drawQuadTransformed(.{
             .src = animator.getCurrentRect().toRectf(),
             .transform = t,
+            .color = .{ 255, 255, 255, color_a },
         });
     }
     renderers.r_batch.end();
