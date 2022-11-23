@@ -1541,6 +1541,7 @@ pub const World = struct {
     rng: std.rand.DefaultPrng,
     particle_sys: particle.ParticleSystem,
     safe_zone: Rect = Rect.init(0, 0, 0, 0),
+    fast_tpathing: bool = true,
 
     pub fn destroy(self: *World) void {
         self.particle_sys.deinit();
@@ -1692,6 +1693,8 @@ pub const World = struct {
 
         // (2022-11-02) Q: do we actually need to path from all monsters? it seems spawn points should be enough
         // (2022-11-18) A: Yes, you can wall a monster in that would stray from the spawn->goal path with the newly placed tile.
+        var timer = std.time.Timer.start() catch unreachable;
+
         if (self.goal) |goal| {
             for (self.spawns.slice()) |*s| {
                 if (!self.findTheoreticalPath(s.coord, goal.getTilePosition())) {
@@ -1704,6 +1707,8 @@ pub const World = struct {
                 }
             }
         }
+
+        std.debug.print("canBuildAt took {d}ms\n", .{timer.read() / std.time.ns_per_ms});
 
         return true;
     }
@@ -2200,11 +2205,17 @@ pub const World = struct {
         if (self.scratch_cache.hasPathFrom(pc)) {
             return true;
         }
-        const has_path = self.pathfinder.findPath(pc, &self.scratch_map, &self.scratch_cache) catch |err| {
-            std.log.err("findTheoreticalPath failed: {!}", .{err});
-            std.process.exit(1);
-        };
-        return has_path;
+        if (self.fast_tpathing) {
+            return self.pathfinder.findAnyPathFast(pc, &self.scratch_map, &self.scratch_cache) catch |err| {
+                std.log.err("findTheoreticalPath failed: {!}", .{err});
+                std.process.exit(1);
+            };
+        } else {
+            return self.pathfinder.findPath(pc, &self.scratch_map, &self.scratch_cache) catch |err| {
+                std.log.err("findTheoreticalPath failed: {!}", .{err});
+                std.process.exit(1);
+            };
+        }
     }
 
     fn playPositionalSound(self: World, sound: [:0]const u8, world_x: i32, world_y: i32) void {
@@ -2417,6 +2428,91 @@ const PathfindingState = struct {
                             .from = current,
                             .gscore = tentative_score,
                             .fscore = tentative_score + self.heuristic(neighbor, coords.start),
+                        };
+                        if (!self.frontier_set.contains(neighbor)) {
+                            try self.frontier_set.put(self.allocator, neighbor, {});
+                            try self.frontier.add(neighbor);
+                        }
+                    }
+                }
+            }
+        }
+
+        std.log.debug("no path: {any}", .{coords});
+        if (cache) |c| {
+            c.setExpandPath(coords, &[_]TileCoord{});
+        }
+
+        return false;
+    }
+
+    fn findAnyPathFast(self: *PathfindingState, coords: PathingCoords, map: *const Tilemap, cache: ?*PathfindingCache) !bool {
+        const width = map.width;
+
+        // sus, upstream interface needs some love
+        self.frontier.len = 0;
+        self.frontier.context = Context{
+            .map = map,
+            .score_map = self.score_map,
+        };
+
+        self.frontier_set.clearRetainingCapacity();
+
+        try self.frontier.add(coords.start);
+        try self.frontier_set.put(self.allocator, coords.start, {});
+        std.mem.set(Score, self.score_map, Score.infinity);
+
+        self.score_map[coords.start.toScalarCoord(map.width)] = .{
+            .fscore = 0,
+            .gscore = 0,
+            .from = undefined,
+        };
+
+        while (self.frontier.removeOrNull()) |current| {
+            if (cache) |c| {
+                const fast_path = PathingCoords{ .start = current, .end = coords.end };
+                if (c.get(fast_path)) |following_path| {
+                    self.result.clearRetainingCapacity();
+                    var coord = current;
+                    while (!std.meta.eql(coord, coords.start)) {
+                        try self.result.append(self.allocator, coord);
+                        coord = self.score_map[coord.toScalarCoord(width)].from;
+                    }
+                    try self.result.append(self.allocator, coord);
+                    std.mem.reverse(TileCoord, self.result.items);
+                    try self.result.appendSlice(self.allocator, following_path[1..]);
+                    c.setExpandPath(coords, self.result.items);
+                    return true;
+                }
+
+                if (std.meta.eql(current, coords.end)) {
+                    self.result.clearRetainingCapacity();
+                    var coord = coords.end;
+                    while (!std.meta.eql(coord, coords.start)) {
+                        try self.result.append(self.allocator, coord);
+                        coord = self.score_map[coord.toScalarCoord(width)].from;
+                    }
+                    try self.result.append(self.allocator, coord);
+                    std.mem.reverse(TileCoord, self.result.items);
+                    c.setExpandPath(coords, self.result.items);
+                    return true;
+                }
+            }
+
+            // examine neighbors
+            var d_int: u8 = 0;
+            while (d_int < 4) : (d_int += 1) {
+                const dir = @intToEnum(Direction, d_int);
+                if (map.isValidMove(current, dir)) {
+                    // 1 here is the graph edge weight, basically hardcoding manhattan distance
+                    const tentative_score = self.score_map[current.toScalarCoord(width)].gscore + 1;
+                    const neighbor = current.offset(dir);
+                    const neighbor_score = self.score_map[neighbor.toScalarCoord(width)].gscore;
+                    if (tentative_score < neighbor_score) {
+                        self.score_map[neighbor.toScalarCoord(width)] = .{
+                            .from = current,
+                            .gscore = tentative_score,
+                            .fscore = tentative_score + self.heuristic(neighbor, coords.end),
                         };
                         if (!self.frontier_set.contains(neighbor)) {
                             try self.frontier_set.put(self.allocator, neighbor, {});

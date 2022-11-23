@@ -638,6 +638,7 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
             sdl.SDLK_F2 => if (is_debug) {
                 self.world.?.player_gold += 200;
             },
+            sdl.SDLK_F3 => self.world.?.fast_tpathing = !self.world.?.fast_tpathing,
             sdl.SDLK_ESCAPE => {
                 if (self.interact_state == .none) {
                     self.game.changeState(.playmenu);
@@ -1231,7 +1232,7 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
     const t0 = self.world.?.map.at2DPtr(.base, tile_coord.x, tile_coord.y);
     const t1 = self.world.?.map.at2DPtr(.detail, tile_coord.x, tile_coord.y);
     var textbuf: [256]u8 = undefined;
-    const slice = std.fmt.bufPrint(&textbuf, "base: {d}\ndetail: {d}", .{ t0.id, t1.id }) catch unreachable;
+    const slice = std.fmt.bufPrint(&textbuf, "coord: {d},{d}\nbase: {d}\ndetail: {d}", .{ tile_coord.x, tile_coord.y, t0.id, t1.id }) catch unreachable;
     self.game.renderers.r_font.begin(.{
         .texture = self.game.texman.getNamedTexture("CommonCase.png"),
         .spec = &self.fontspec,
