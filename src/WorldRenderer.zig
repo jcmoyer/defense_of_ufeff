@@ -187,8 +187,8 @@ pub fn renderTilemap(self: *WorldRenderer, cam: Camera, map: *const Tilemap, fra
         1 + @intCast(usize, cam.view.bottom()) / 16,
     );
     const range = TileRange{
-        .min = TileCoord{ .x = min_tile_x, .y = min_tile_y },
-        .max = TileCoord{ .x = max_tile_x, .y = max_tile_y },
+        .min = TileCoord{ .x = @intCast(u16, min_tile_x), .y = @intCast(u16, min_tile_y) },
+        .max = TileCoord{ .x = @intCast(u16, max_tile_x), .y = @intCast(u16, max_tile_y) },
     };
 
     self.renderers.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);

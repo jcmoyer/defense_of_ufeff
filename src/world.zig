@@ -230,7 +230,7 @@ pub const Monster = struct {
         self.world_y = new_y;
         self.p_world_x = self.world_x;
         self.p_world_y = self.world_y;
-        self.tile_pos = .{ .x = new_x / 16, .y = new_y / 16 };
+        self.tile_pos = TileCoord.initWorld(new_x, new_y);
         self.last_tile_pos = self.tile_pos;
         self.moved_amount = tile_distance;
     }
@@ -1620,7 +1620,7 @@ pub const World = struct {
         } else {
             return TileRange{
                 .min = TileCoord{ .x = 0, .y = 0 },
-                .max = TileCoord{ .x = self.getWidth() - 1, .y = self.getHeight() - 1 },
+                .max = TileCoord{ .x = @intCast(u16, self.getWidth() - 1), .y = @intCast(u16, self.getHeight() - 1) },
             };
         }
     }

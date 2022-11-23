@@ -3,13 +3,13 @@ const Allocator = std.mem.Allocator;
 const Direction = @import("direction.zig").Direction;
 
 pub const TileCoord = struct {
-    x: usize,
-    y: usize,
+    x: u16,
+    y: u16,
 
     pub fn initWorld(world_x: u32, world_y: u32) TileCoord {
         return .{
-            .x = world_x / 16,
-            .y = world_y / 16,
+            .x = @intCast(u16, world_x / 16),
+            .y = @intCast(u16, world_y / 16),
         };
     }
 
