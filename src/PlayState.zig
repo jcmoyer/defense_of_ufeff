@@ -255,7 +255,6 @@ pub fn create(game: *Game) !*PlayState {
     self.ui_minimap.setPanCallback(self, onMinimapPan);
     try ui_panel.addChild(self.ui_minimap.control());
 
-    // TODO: replace with label-type control
     self.ui_gold = try self.ui_root.createLabel();
     self.ui_gold.rect = Rect.init(16, 96, 4 * 16, 16);
     self.ui_gold.text = "$0";
