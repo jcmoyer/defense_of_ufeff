@@ -136,7 +136,11 @@ pub const Projectile = struct {
     }
 
     fn hit(self: *Projectile, monster: *Monster) void {
-        monster.hurtDirectionalGenericDamage(self.damage, [2]f32{ self.vel_x, self.vel_y });
+        monster.hurt(.{
+            .amount = self.damage,
+            .direction = [2]f32{ self.vel_x, self.vel_y },
+            .damage_type = .generic,
+        });
         self.dead = true;
     }
 
@@ -265,6 +269,7 @@ const HurtOptions = struct {
     amount: u32,
     direction: [2]f32 = [2]f32{ 0, -1 },
     damage_type: DamageType,
+    silent: bool = false,
 };
 
 pub const Monster = struct {
@@ -458,8 +463,8 @@ pub const Monster = struct {
 
     pub fn hurt(self: *Monster, opts: HurtOptions) void {
         switch (opts.damage_type) {
-            .generic => self.hurtDirectionalGenericDamage(opts.amount, opts.direction),
-            .slash => self.hurtDirectionalSlashDamage(opts.amount, opts.direction),
+            .generic => self.hurtDirectionalGenericDamage(opts),
+            .slash => self.hurtDirectionalSlashDamage(opts),
             .fire => self.hurtFireDamage(opts),
         }
     }
@@ -482,26 +487,32 @@ pub const Monster = struct {
         text.vel_y = dir[1];
     }
 
-    pub fn hurtDirectionalGenericDamage(self: *Monster, amt: u32, dir: [2]f32) void {
+    pub fn hurtDirectionalGenericDamage(self: *Monster, hopts: HurtOptions) void {
         const p = self.getWorldCollisionRect().centerPoint();
-        self.world.playPositionalSound("assets/sounds/hit.ogg", p[0], p[1]);
-        self.hurtDirectional(amt, dir);
+        if (!hopts.silent) {
+            self.world.playPositionalSound("assets/sounds/hit.ogg", p[0], p[1]);
+        }
+        self.hurtDirectional(hopts.amount, hopts.direction);
         const se_id = self.world.spawnSpriteEffect(&se_hurt_generic, p[0], p[1]) catch unreachable;
-        self.world.sprite_effects.getPtr(se_id).angle = std.math.atan2(f32, dir[1], dir[0]);
+        self.world.sprite_effects.getPtr(se_id).angle = std.math.atan2(f32, hopts.direction[1], hopts.direction[0]);
         self.world.sprite_effects.getPtr(se_id).world_x -= std.math.cos(self.world.sprite_effects.getPtr(se_id).angle) * 8.0;
         self.world.sprite_effects.getPtr(se_id).world_y -= std.math.sin(self.world.sprite_effects.getPtr(se_id).angle) * 8.0;
     }
 
-    pub fn hurtDirectionalSlashDamage(self: *Monster, amt: u32, dir: [2]f32) void {
+    pub fn hurtDirectionalSlashDamage(self: *Monster, hopts: HurtOptions) void {
         const p = self.getWorldCollisionRect().centerPoint();
-        self.world.playPositionalSound("assets/sounds/slash_hit.ogg", p[0], p[1]);
-        self.hurtDirectional(amt, dir);
+        if (!hopts.silent) {
+            self.world.playPositionalSound("assets/sounds/slash_hit.ogg", p[0], p[1]);
+        }
+        self.hurtDirectional(hopts.amount, hopts.direction);
         _ = self.world.spawnSpriteEffect(&se_hurt_slash, p[0], p[1]) catch unreachable;
     }
 
     pub fn hurtFireDamage(self: *Monster, hopts: HurtOptions) void {
         const p = self.getWorldCollisionRect().centerPoint();
-        self.world.playPositionalSoundId(.burn, p[0], p[1]);
+        if (!hopts.silent) {
+            self.world.playPositionalSoundId(.burn, p[0], p[1]);
+        }
         self.hurtDirectional(hopts.amount, hopts.direction);
         _ = self.world.spawnSpriteEffect(&se_hurt_fire, p[0], p[1]) catch unreachable;
     }
@@ -562,7 +573,11 @@ fn recruitUpdate(self: *Tower, frame: u64) void {
         const p = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         const r = self.angleTo(p[0], p[1]);
 
-        self.world.monsters.getPtr(m).hurtDirectionalGenericDamage(1, [2]f32{ std.math.cos(r), std.math.sin(r) });
+        self.world.monsters.getPtr(m).hurt(.{
+            .damage_type = .generic,
+            .amount = 1,
+            .direction = [2]f32{ std.math.cos(r), std.math.sin(r) },
+        });
         const target = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         self.lookTowards(target[0], target[1]);
         self.cooldown.restart(frame);
