@@ -327,35 +327,26 @@ pub fn create(game: *Game) !*PlayState {
 
 fn onWallClick(button: *ui.Button, self: *PlayState) void {
     _ = button;
-    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
-    self.interact_state = .{ .build = InteractStateBuild{
-        .tower_spec = &wo.t_wall,
-    } };
+    self.enterBuildWallMode();
 }
 
 fn onTowerClick(button: *ui.Button, self: *PlayState) void {
     _ = button;
-    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
-    self.interact_state = .{ .build = InteractStateBuild{
-        .tower_spec = &wo.t_recruit,
-    } };
+    self.enterBuildTowerMode();
 }
 
 fn onCallWaveClick(button: *ui.Button, self: *PlayState) void {
     _ = button;
-    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.callWave();
 }
 
 fn onPauseClick(button: *ui.Button, self: *PlayState) void {
     _ = button;
-    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.togglePause();
 }
 
 fn onFastForwardClick(button: *ui.Button, self: *PlayState) void {
     _ = button;
-    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.toggleFast();
 }
 
@@ -383,7 +374,6 @@ fn onUpgradeDemolishClick(button: *ui.Button, self: *PlayState) void {
 
 fn onDemolishClick(button: *ui.Button, self: *PlayState) void {
     _ = button;
-    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.enterDemolishMode();
 }
 
@@ -590,7 +580,7 @@ fn addMinimapElement(self: *PlayState, world_x: u32, world_y: u32, color: [4]u8)
 pub fn render(self: *PlayState, alpha: f64) void {
     var world = self.world orelse @panic("render with no world");
 
-    const world_interp = if (self.paused) @as(f64, 0) else alpha;
+    const world_interp = if (self.paused or self.sub != .none) @as(f64, 0) else alpha;
 
     self.game.renderers.r_quad.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
     self.game.renderers.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
@@ -678,8 +668,8 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
                     self.interact_state = .none;
                 }
             },
-            sdl.SDLK_1 => self.upgradeSelectedTower(0),
-            sdl.SDLK_2 => self.upgradeSelectedTower(1),
+            sdl.SDLK_1 => if (self.interact_state == .select) self.upgradeSelectedTower(0) else self.enterBuildWallMode(),
+            sdl.SDLK_2 => if (self.interact_state == .select) self.upgradeSelectedTower(1) else self.enterBuildTowerMode(),
             sdl.SDLK_3 => self.upgradeSelectedTower(2),
             sdl.SDLK_4 => self.sellSelectedTower(),
             sdl.SDLK_SPACE => self.togglePause(),
@@ -1762,13 +1752,16 @@ fn setInitialUIState(self: *PlayState) void {
 
 fn callWave(self: *PlayState) void {
     if (self.world) |world| {
-        _ = world.startNextWave();
+        if (world.startNextWave()) {
+            self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
+        }
     } else {
         std.log.warn("Attempted to call wave with no world loaded", .{});
     }
 }
 
 fn togglePause(self: *PlayState) void {
+    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.paused = !self.paused;
     if (!self.paused) {
         self.btn_pause_resume.tooltip_text = "Pause (Space)";
@@ -1780,6 +1773,7 @@ fn togglePause(self: *PlayState) void {
 }
 
 fn toggleFast(self: *PlayState) void {
+    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.fast = !self.fast;
     if (!self.fast) {
         self.btn_fastforward.setTexture(self.t_fast_off);
@@ -1811,5 +1805,16 @@ fn sellSelectedTower(self: *PlayState) void {
 }
 
 fn enterDemolishMode(self: *PlayState) void {
+    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.interact_state = .demolish;
+}
+
+fn enterBuildWallMode(self: *PlayState) void {
+    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
+    self.interact_state = .{ .build = InteractStateBuild{ .tower_spec = &wo.t_wall } };
+}
+
+fn enterBuildTowerMode(self: *PlayState) void {
+    self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
+    self.interact_state = .{ .build = InteractStateBuild{ .tower_spec = &wo.t_recruit } };
 }

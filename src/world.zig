@@ -501,7 +501,7 @@ pub const Monster = struct {
 
     pub fn hurtFireDamage(self: *Monster, hopts: HurtOptions) void {
         const p = self.getWorldCollisionRect().centerPoint();
-        self.world.playPositionalSound("assets/sounds/burn.ogg", p[0], p[1]);
+        self.world.playPositionalSoundId(.burn, p[0], p[1]);
         self.hurtDirectional(hopts.amount, hopts.direction);
         _ = self.world.spawnSpriteEffect(&se_hurt_fire, p[0], p[1]) catch unreachable;
     }
@@ -1208,6 +1208,7 @@ const SoundId = enum {
     warp,
     shotgun,
     bow,
+    burn,
 };
 
 pub const SpriteEffect = struct {
@@ -2298,13 +2299,13 @@ pub const World = struct {
         }
     }
 
-    fn playPositionalSound(self: World, sound: [:0]const u8, world_x: i32, world_y: i32) void {
+    fn playPositionalSound(self: *World, sound: [:0]const u8, world_x: i32, world_y: i32) void {
         const sound_position = [2]i32{ world_x, world_y };
         var params = audio.AudioSystem.instance.playSound(sound, audio.computePositionalOptions(self.view, sound_position));
         defer params.release();
     }
 
-    fn playPositionalSoundId(self: World, sound: SoundId, world_x: i32, world_y: i32) void {
+    fn playPositionalSoundId(self: *World, sound: SoundId, world_x: i32, world_y: i32) void {
         switch (sound) {
             .none => {},
             .stab => self.playPositionalSound("assets/sounds/stab.ogg", world_x, world_y),
@@ -2313,6 +2314,7 @@ pub const World = struct {
             .warp => self.playPositionalSound("assets/sounds/warp.ogg", world_x, world_y),
             .shotgun => self.playPositionalSound("assets/sounds/shotgun.ogg", world_x, world_y),
             .bow => self.playPositionalSound("assets/sounds/bow.ogg", world_x, world_y),
+            .burn => self.playPositionalSound("assets/sounds/burn.ogg", world_x, world_y),
         }
     }
 };
