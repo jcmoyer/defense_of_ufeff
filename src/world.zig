@@ -490,7 +490,7 @@ pub const Monster = struct {
     pub fn hurtDirectionalGenericDamage(self: *Monster, hopts: HurtOptions) void {
         const p = self.getWorldCollisionRect().centerPoint();
         if (!hopts.silent) {
-            self.world.playPositionalSound("assets/sounds/hit.ogg", p[0], p[1]);
+            self.world.playPositionalSoundId(hopts.damage_type.getHurtSound(), p[0], p[1]);
         }
         self.hurtDirectional(hopts.amount, hopts.direction);
         const se_id = self.world.spawnSpriteEffect(&se_hurt_generic, p[0], p[1]) catch unreachable;
@@ -502,7 +502,7 @@ pub const Monster = struct {
     pub fn hurtDirectionalSlashDamage(self: *Monster, hopts: HurtOptions) void {
         const p = self.getWorldCollisionRect().centerPoint();
         if (!hopts.silent) {
-            self.world.playPositionalSound("assets/sounds/slash_hit.ogg", p[0], p[1]);
+            self.world.playPositionalSoundId(hopts.damage_type.getHurtSound(), p[0], p[1]);
         }
         self.hurtDirectional(hopts.amount, hopts.direction);
         _ = self.world.spawnSpriteEffect(&se_hurt_slash, p[0], p[1]) catch unreachable;
@@ -511,7 +511,7 @@ pub const Monster = struct {
     pub fn hurtFireDamage(self: *Monster, hopts: HurtOptions) void {
         const p = self.getWorldCollisionRect().centerPoint();
         if (!hopts.silent) {
-            self.world.playPositionalSoundId(.burn, p[0], p[1]);
+            self.world.playPositionalSoundId(hopts.damage_type.getHurtSound(), p[0], p[1]);
         }
         self.hurtDirectional(hopts.amount, hopts.direction);
         _ = self.world.spawnSpriteEffect(&se_hurt_fire, p[0], p[1]) catch unreachable;
@@ -1224,6 +1224,8 @@ const SoundId = enum {
     shotgun,
     bow,
     burn,
+    hit_generic,
+    hit_slash,
 };
 
 pub const SpriteEffect = struct {
@@ -1554,6 +1556,14 @@ const DamageType = enum {
     generic,
     slash,
     fire,
+
+    fn getHurtSound(self: DamageType) SoundId {
+        return switch (self) {
+            .generic => .hit_generic,
+            .slash => .hit_slash,
+            .fire => .burn,
+        };
+    }
 };
 
 const DelayedDamage = struct {
@@ -1939,6 +1949,10 @@ pub const World = struct {
     }
 
     pub fn hurtMonstersInRadius(self: *World, pos: [2]f32, radius: f32, hopts: HurtOptions) void {
+        // make hurt silent so player doesn't get earblasted, we'll play one sfx at the end instead of once per monster
+        var num_hit: u16 = 0;
+        var silent_hopts = hopts;
+        silent_hopts.silent = true;
         for (self.monsters.slice()) |*m| {
             if (m.dead) {
                 continue;
@@ -1946,8 +1960,12 @@ pub const World = struct {
             const p = m.getWorldCollisionRect().toRectf().centerPoint();
             const d = mu.dist(p, pos);
             if (d <= radius) {
-                m.hurt(hopts);
+                m.hurt(silent_hopts);
+                num_hit += 1;
             }
+        }
+        if (num_hit != 0) {
+            self.playPositionalSoundId(hopts.damage_type.getHurtSound(), @floatToInt(i32, pos[0]), @floatToInt(i32, pos[1]));
         }
     }
 
@@ -2330,6 +2348,8 @@ pub const World = struct {
             .shotgun => self.playPositionalSound("assets/sounds/shotgun.ogg", world_x, world_y),
             .bow => self.playPositionalSound("assets/sounds/bow.ogg", world_x, world_y),
             .burn => self.playPositionalSound("assets/sounds/burn.ogg", world_x, world_y),
+            .hit_generic => self.playPositionalSound("assets/sounds/hit.ogg", world_x, world_y),
+            .hit_slash => self.playPositionalSound("assets/sounds/slash_hit.ogg", world_x, world_y),
         }
     }
 };
