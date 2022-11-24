@@ -2640,7 +2640,7 @@ const JsonSpawnPointSpawnEvent = struct {
     /// Seconds
     time: f32,
     name: []const u8,
-    repeat: ?u32 = 1,
+    repeat: ?u32 = 0,
 };
 const JsonSpawnPointWaitEvent = struct {
     type: []const u8,
