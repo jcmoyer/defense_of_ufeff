@@ -161,6 +161,7 @@ pub const MonsterSpec = struct {
     anim_set: ?anim.AnimationSet = null,
     spawnFn: ?*const fn (*Monster, u64) void = null,
     updateFn: ?*const fn (*Monster, u64) void = null,
+    color: [4]u8 = .{ 255, 255, 255, 255 },
     max_hp: u32,
     gold: u32,
     speed: u32 = 625,
@@ -178,6 +179,30 @@ pub const m_slime = MonsterSpec{
     .max_hp = 5,
     .gold = 1,
     .speed = 625,
+};
+
+pub const m_blue_slime = MonsterSpec{
+    .anim_set = anim.a_slime.animationSet(),
+    .color = .{ 100, 100, 255, 255 },
+    .max_hp = 15,
+    .gold = 3,
+    .speed = 500,
+};
+
+pub const m_red_slime = MonsterSpec{
+    .anim_set = anim.a_slime.animationSet(),
+    .color = .{ 255, 100, 100, 255 },
+    .max_hp = 25,
+    .gold = 5,
+    .speed = 500,
+};
+
+pub const m_black_slime = MonsterSpec{
+    .anim_set = anim.a_slime.animationSet(),
+    .color = .{ 80, 80, 80, 255 },
+    .max_hp = 50,
+    .gold = 15,
+    .speed = 400,
 };
 
 pub const m_skeleton = MonsterSpec{
@@ -3018,6 +3043,15 @@ fn nameToMonsterSpec(name: []const u8) ?*const MonsterSpec {
     }
     if (std.mem.eql(u8, "m_slime", name)) {
         return &m_slime;
+    }
+    if (std.mem.eql(u8, "m_blue_slime", name)) {
+        return &m_blue_slime;
+    }
+    if (std.mem.eql(u8, "m_red_slime", name)) {
+        return &m_red_slime;
+    }
+    if (std.mem.eql(u8, "m_black_slime", name)) {
+        return &m_black_slime;
     }
     if (std.mem.eql(u8, "m_skeleton", name)) {
         return &m_skeleton;

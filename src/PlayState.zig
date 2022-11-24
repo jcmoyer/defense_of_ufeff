@@ -961,10 +961,9 @@ fn renderMonsters(
     renderers.r_batch.begin(.{
         .texture = t_chara,
     });
-    for (world.monsters.slice()) |m| {
+    for (world.monsters.slice()) |*m| {
         const animator = m.animator orelse continue;
-        // TODO: grab this from monsterspec
-        var color: [4]u8 = .{ 255, 255, 255, 255 };
+        var color: [4]u8 = m.spec.color;
         if (m.slow_frames > 0) {
             color = mathutil.colorMulU8(4, color, .{ 0x80, 0x80, 0xFF, 0xFF });
         }
