@@ -1,0 +1,533 @@
+{
+    "waves": [
+        {
+            "spawn_points": [
+                {
+                    "spawn_point": "s_sw",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 1
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 2,
+                            "name": "m_slime",
+                            "repeat": 15
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_n",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 2
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 2,
+                            "name": "m_slime",
+                            "repeat": 15
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_ne",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 3
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 2,
+                            "name": "m_slime",
+                            "repeat": 15
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_e",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 4
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 2,
+                            "name": "m_slime",
+                            "repeat": 15
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_se",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 5
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 2,
+                            "name": "m_slime",
+                            "repeat": 15
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "spawn_points": [
+                {
+                    "spawn_point": "s_sw",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 1
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 2,
+                            "name": "m_skeleton",
+                            "repeat": 15
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_turboskeleton",
+                            "repeat": 0
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_n",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 2
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 2,
+                            "name": "m_skeleton",
+                            "repeat": 15
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_turboskeleton",
+                            "repeat": 0
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_ne",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 3
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 2,
+                            "name": "m_skeleton",
+                            "repeat": 15
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_turboskeleton",
+                            "repeat": 0
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_e",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 4
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 2,
+                            "name": "m_skeleton",
+                            "repeat": 15
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_turboskeleton",
+                            "repeat": 0
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_se",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 5
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 2,
+                            "name": "m_skeleton",
+                            "repeat": 15
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_turboskeleton",
+                            "repeat": 0
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "spawn_points": [
+                {
+                    "spawn_point": "s_sw",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 1
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_mole",
+                            "repeat": 15
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_n",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 2
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_mole",
+                            "repeat": 15
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_ne",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 3
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_mole",
+                            "repeat": 15
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_e",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 4
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_mole",
+                            "repeat": 15
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_se",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 5
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_mole",
+                            "repeat": 15
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "spawn_points": [
+                {
+                    "spawn_point": "s_sw",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 1
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_red_slime",
+                            "repeat": 15
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_n",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 2
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 5,
+                            "name": "m_dark_skeleton",
+                            "repeat": 15
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_ne",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 3
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_skeleton",
+                            "repeat": 30
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_e",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 4
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_red_slime",
+                            "repeat": 15
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_se",
+                    "events": [
+                        {
+                            "type": "wait",
+                            "time": 5
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_blue_slime",
+                            "repeat": 30
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "spawn_points": [
+                {
+                    "spawn_point": "s_sw",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_boss_ragworm",
+                            "repeat": 0
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_n",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_boss_ragworm",
+                            "repeat": 0
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_ne",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_boss_ragworm",
+                            "repeat": 0
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_e",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_boss_ragworm",
+                            "repeat": 0
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_se",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_boss_ragworm",
+                            "repeat": 0
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "spawn_points": [
+                {
+                    "spawn_point": "s_sw",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 0.5,
+                            "name": "m_red_slime",
+                            "repeat": 25
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_n",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 0.5,
+                            "name": "m_red_slime",
+                            "repeat": 25
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_ne",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 0.5,
+                            "name": "m_red_slime",
+                            "repeat": 25
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_e",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 0.5,
+                            "name": "m_red_slime",
+                            "repeat": 25
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_se",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 0.5,
+                            "name": "m_red_slime",
+                            "repeat": 25
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "spawn_points": [
+                {
+                    "spawn_point": "s_sw",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_red_mole",
+                            "repeat": 25
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_n",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 2,
+                            "name": "m_red_mole",
+                            "repeat": 25
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_ne",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_red_mole",
+                            "repeat": 25
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_e",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 0.5,
+                            "name": "m_red_mole",
+                            "repeat": 25
+                        },
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_dark_skeleton",
+                            "repeat": 10
+                        }
+                    ]
+                },
+                {
+                    "spawn_point": "s_se",
+                    "events": [
+                        {
+                            "type": "spawn",
+                            "time": 1,
+                            "name": "m_red_mole",
+                            "repeat": 25
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
