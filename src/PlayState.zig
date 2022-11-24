@@ -59,7 +59,7 @@ const InteractState = union(enum) {
 const UpgradeButtonState = struct {
     play_state: *PlayState,
     tower_id: wo.TowerId,
-    tower_spec: *const wo.TowerSpec,
+    tower_spec: ?*const wo.TowerSpec,
     slot: u8,
 };
 
@@ -365,16 +365,12 @@ fn onUpgradeClick(button: *ui.Button, upgrade: *UpgradeButtonState) void {
 }
 
 fn onUpgradeMouseEnter(button: *ui.Button, upgrade: *UpgradeButtonState) void {
-    if (button.state == .disabled) {
-        return;
-    }
+    _ = button;
     upgrade.play_state.interact_state.select.hovered_spec = upgrade.tower_spec;
 }
 
 fn onUpgradeMouseLeave(button: *ui.Button, upgrade: *UpgradeButtonState) void {
-    if (button.state == .disabled) {
-        return;
-    }
+    _ = button;
     upgrade.play_state.interact_state.select.hovered_spec = null;
 }
 
