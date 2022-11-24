@@ -212,6 +212,14 @@ pub const m_skeleton = MonsterSpec{
     .speed = 625,
 };
 
+pub const m_dark_skeleton = MonsterSpec{
+    .anim_set = anim.a_skeleton.animationSet(),
+    .color = .{ 80, 80, 80, 255 },
+    .max_hp = 125,
+    .gold = 20,
+    .speed = 500,
+};
+
 pub const m_mole = MonsterSpec{
     .anim_set = anim.a_mole.animationSet(),
     .max_hp = 20,
@@ -3053,6 +3061,9 @@ fn nameToMonsterSpec(name: []const u8) ?*const MonsterSpec {
     }
     if (std.mem.eql(u8, "m_skeleton", name)) {
         return &m_skeleton;
+    }
+    if (std.mem.eql(u8, "m_dark_skeleton", name)) {
+        return &m_dark_skeleton;
     }
     if (std.mem.eql(u8, "m_mole", name)) {
         return &m_mole;
