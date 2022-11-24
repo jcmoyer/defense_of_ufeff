@@ -552,11 +552,6 @@ fn updateUI(self: *PlayState) void {
 pub fn render(self: *PlayState, alpha: f64) void {
     var world = self.world orelse @panic("render with no world");
 
-    const mouse_p = self.game.unproject(
-        self.game.input.mouse.client_x,
-        self.game.input.mouse.client_y,
-    );
-
     self.game.renderers.r_quad.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
     self.game.renderers.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
     self.game.renderers.r_imm.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
@@ -577,30 +572,26 @@ pub fn render(self: *PlayState, alpha: f64) void {
         .texture = self.game.texman.getNamedTexture("floating_text.png"),
         .spec = &self.fontspec_numbers,
     });
-    if (self.interact_state == .build) {
-        renderBlockedConstructionRects(&self.game.renderers, world, cam_interp);
-        renderGrid(&self.game.renderers, cam_interp);
-    }
-    if (!self.ui_root.isMouseOnElement(mouse_p[0], mouse_p[1])) {
-        switch (self.interact_state) {
-            .build => |b| {
-                const tile_coord = self.mouseToTile();
-                const tower_center_x = @intCast(i32, tile_coord.worldX() + 8);
-                const tower_center_y = @intCast(i32, tile_coord.worldY() + 8);
-                renderPlacementIndicator(&self.game.renderers, world, cam_interp, tile_coord);
-                renderRangeIndicatorForTower(&self.game.renderers, cam_interp, b.tower_spec, tower_center_x, tower_center_y);
-            },
-            .demolish => {
-                self.renderDemolishIndicator(cam_interp);
-            },
-            .select => |s| {
-                const selected_tower = world.towers.getPtr(s.selected_tower);
-                const selected_spec = if (s.hovered_spec) |hovered| hovered else selected_tower.spec;
-                const p = selected_tower.getWorldCollisionRect().centerPoint();
-                renderRangeIndicatorForTower(&self.game.renderers, cam_interp, selected_spec, p[0], p[1]);
-            },
-            else => {},
-        }
+    switch (self.interact_state) {
+        .build => |b| {
+            renderBlockedConstructionRects(&self.game.renderers, world, cam_interp);
+            renderGrid(&self.game.renderers, cam_interp);
+            const tile_coord = self.mouseToTile();
+            const tower_center_x = @intCast(i32, tile_coord.worldX() + 8);
+            const tower_center_y = @intCast(i32, tile_coord.worldY() + 8);
+            renderPlacementIndicator(&self.game.renderers, world, cam_interp, tile_coord);
+            renderRangeIndicatorForTower(&self.game.renderers, cam_interp, b.tower_spec, tower_center_x, tower_center_y);
+        },
+        .demolish => {
+            self.renderDemolishIndicator(cam_interp);
+        },
+        .select => |s| {
+            const selected_tower = world.towers.getPtr(s.selected_tower);
+            const selected_spec = if (s.hovered_spec) |hovered| hovered else selected_tower.spec;
+            const p = selected_tower.getWorldCollisionRect().centerPoint();
+            renderRangeIndicatorForTower(&self.game.renderers, cam_interp, selected_spec, p[0], p[1]);
+        },
+        else => {},
     }
     self.renderWaveTimer(alpha);
 
