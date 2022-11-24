@@ -251,6 +251,14 @@ pub const m_red_mole = MonsterSpec{
     .speed = 1000,
 };
 
+pub const m_boss_ragworm = MonsterSpec{
+    .anim_set = anim.a_human1.animationSet(),
+    .color = .{ 0, 0, 0, 255 },
+    .max_hp = 4000,
+    .gold = 500,
+    .speed = 500,
+};
+
 pub const MonsterId = GenHandle(Monster);
 
 const HurtOptions = struct {
@@ -3098,6 +3106,9 @@ fn nameToMonsterSpec(name: []const u8) ?*const MonsterSpec {
     }
     if (std.mem.eql(u8, "m_red_mole", name)) {
         return &m_red_mole;
+    }
+    if (std.mem.eql(u8, "m_boss_ragworm", name)) {
+        return &m_boss_ragworm;
     }
     return null;
 }
