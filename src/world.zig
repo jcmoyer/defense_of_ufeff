@@ -1723,11 +1723,9 @@ pub const World = struct {
             if (m.getWorldCollisionRect().intersect(tile_world_rect, null)) {
                 return false;
             }
-            // old behavior, do we need this?
-            // const blocked_coord = m.getTilePosition();
-            // if (std.meta.eql(coord, blocked_coord)) {
-            //     return false;
-            // }
+            if (std.meta.eql(coord, m.getTilePosition())) {
+                return false;
+            }
         }
         self.map.copyInto(&self.scratch_map);
         self.scratch_map.at2DPtr(.base, coord.x, coord.y).flags.contains_tower = true;
