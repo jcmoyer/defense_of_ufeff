@@ -5,6 +5,8 @@
  </editorsettings>
  <properties>
   <property name="music" type="file" value="../music/Flight of the Fox.ogg"/>
+  <property name="starting_gold" type="int" value="50"/>
+  <property name="title" value="Port Ufeffaria"/>
   <property name="wave_file" type="file" value="../tables/map01_waves.json"/>
  </properties>
  <tileset firstgid="1" source="terrain.tsx"/>
@@ -19,7 +21,7 @@
    eJy9lF9qwkAQxndDLtAD5AwFvYl9a5/tg+ABJGfwJZD0HC0NeI0qiudQIj66S3bIdDqbncStH3xsyJ/ZX76ZRClee63Ue/o4H3Rrnxpz7RLJW8G7hXjeUv+1kF7TbrWWZO3jWTAc8/T32id6j+VpejICjlA+MUUz2pFeDuUZkg9mwMLzeNXdPQ3h4nTP7Ei1QntAfv/VL0mONL8YPKV5/sP4W1gHvrcVwxuDpzbPPydKHYV1lknHBI7FY7P50u23ch5Qh/KAYa7HCrLZoBrS78/HRGdKKkk2trbtD3e+jyl3BuXMOaj7afauHAvNhlM2ggnvjVkok9WP+29ZllA2+Dhze60F8xFioDq5uZP2Cd67cNlW7h/hWyUcIUaqjPSjcD1+Sv56YjxFlrBIs8OCnhVo3jiemfELct9+XC/LQN50pbnQ/e/lqbW/dui8hOcGpxutag==
   </data>
  </layer>
- <objectgroup id="3" name="info" locked="1">
+ <objectgroup id="3" name="info">
   <object id="1" name="s_right" class="spawn_point" x="560" y="192">
    <point/>
   </object>
