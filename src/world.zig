@@ -212,6 +212,14 @@ pub const m_skeleton = MonsterSpec{
     .speed = 625,
 };
 
+pub const m_turboskeleton = MonsterSpec{
+    .anim_set = anim.a_skeleton.animationSet(),
+    .color = .{ 255, 0, 0, 255 },
+    .max_hp = 25,
+    .gold = 15,
+    .speed = 2500,
+};
+
 pub const m_dark_skeleton = MonsterSpec{
     .anim_set = anim.a_skeleton.animationSet(),
     .color = .{ 80, 80, 80, 255 },
@@ -225,6 +233,13 @@ pub const m_mole = MonsterSpec{
     .max_hp = 20,
     .gold = 5,
     .speed = 300,
+};
+
+pub const m_blue_mole = MonsterSpec{
+    .anim_set = anim.a_mole.animationSet(),
+    .max_hp = 50,
+    .gold = 12,
+    .speed = 350,
 };
 
 pub const MonsterId = GenHandle(Monster);
@@ -1352,12 +1367,12 @@ pub const Goal = struct {
 
 const EventSpawn = struct {
     monster_spec: *const MonsterSpec,
-    time: u32,
+    time_sec: f32,
     repeat: u32,
 };
 
 const EventWait = struct {
-    time: u32,
+    time_sec: f32,
 };
 
 pub const WaveEvent = union(enum) {
@@ -1384,10 +1399,10 @@ pub const WaveEventList = struct {
     fn setTimerFromEvent(self: *WaveEventList, frame: u64, ev: WaveEvent) void {
         switch (ev) {
             .spawn => |s| {
-                self.next_event_timer = FrameTimer.initSeconds(frame, @intToFloat(f32, s.time));
+                self.next_event_timer = FrameTimer.initSeconds(frame, s.time_sec);
             },
             .wait => |w| {
-                self.next_event_timer = FrameTimer.initSeconds(frame, @intToFloat(f32, w.time));
+                self.next_event_timer = FrameTimer.initSeconds(frame, w.time_sec);
             },
         }
     }
@@ -1428,10 +1443,10 @@ pub const WaveEventList = struct {
         for (self.events) |e| {
             switch (e) {
                 .spawn => |s| {
-                    total += @intToFloat(f32, s.repeat * s.time);
+                    total += @intToFloat(f32, s.repeat) * s.time_sec;
                 },
                 .wait => |w| {
-                    total += @intToFloat(f32, w.time);
+                    total += w.time_sec;
                 },
             }
         }
@@ -2609,13 +2624,15 @@ const JsonSpawnPointEvent = union(JsonSpawnPointEventType) {
 };
 const JsonSpawnPointSpawnEvent = struct {
     type: []const u8,
-    time: u32,
+    /// Seconds
+    time: f32,
     name: []const u8,
     repeat: ?u32 = 1,
 };
 const JsonSpawnPointWaitEvent = struct {
     type: []const u8,
-    time: u32,
+    /// Seconds
+    time: f32,
 };
 
 pub fn loadWavesFromJson(allocator: Allocator, filename: []const u8, world: *World) !WaveList {
@@ -2647,13 +2664,13 @@ pub fn loadWavesFromJson(allocator: Allocator, filename: []const u8, world: *Wor
                     .spawn => |spawn| {
                         event_list[event_index] = .{ .spawn = EventSpawn{
                             .monster_spec = nameToMonsterSpec(spawn.name) orelse return error.InvalidMonsterName,
-                            .time = spawn.time,
+                            .time_sec = spawn.time,
                             .repeat = spawn.repeat.?,
                         } };
                     },
                     .wait => |wait| {
                         event_list[event_index] = .{ .wait = EventWait{
-                            .time = wait.time,
+                            .time_sec = wait.time,
                         } };
                     },
                 }
@@ -3062,11 +3079,17 @@ fn nameToMonsterSpec(name: []const u8) ?*const MonsterSpec {
     if (std.mem.eql(u8, "m_skeleton", name)) {
         return &m_skeleton;
     }
+    if (std.mem.eql(u8, "m_turboskeleton", name)) {
+        return &m_turboskeleton;
+    }
     if (std.mem.eql(u8, "m_dark_skeleton", name)) {
         return &m_dark_skeleton;
     }
     if (std.mem.eql(u8, "m_mole", name)) {
         return &m_mole;
+    }
+    if (std.mem.eql(u8, "m_blue_mole", name)) {
+        return &m_blue_mole;
     }
     return null;
 }
