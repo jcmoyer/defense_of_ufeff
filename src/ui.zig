@@ -536,10 +536,7 @@ pub const Minimap = struct {
         const bottom_f = ((vf.bottom() - bf.top()) / bf.h) * crf.h + crf.y;
         const right_f = ((vf.right() - bf.left()) / bf.w) * crf.w + crf.x;
 
-        ctx.drawLine(left_f, top_f, left_f, bottom_f);
-        ctx.drawLine(right_f, top_f, right_f, bottom_f);
-        ctx.drawLine(left_f, top_f, right_f, top_f);
-        ctx.drawLine(left_f, bottom_f, right_f, bottom_f);
+        ctx.drawRectangle(left_f, top_f, right_f, bottom_f);
     }
 };
 
@@ -1181,6 +1178,7 @@ const CustomRenderContext = struct {
     const VTable = struct {
         drawPointRectFn: *const fn (*anyopaque, opts: PointRectOptions) void,
         drawLineFn: *const fn (*anyopaque, x0: f32, y0: f32, x1: f32, y1: f32) void,
+        drawRectangleFn: *const fn (*anyopaque, x0: f32, y0: f32, x1: f32, y1: f32) void,
         drawTextureFn: *const fn (ptr: *anyopaque, texture: *const Texture, dest: Rect) void,
     };
 
@@ -1190,6 +1188,10 @@ const CustomRenderContext = struct {
 
     fn drawLine(self: CustomRenderContext, x0: f32, y0: f32, x1: f32, y1: f32) void {
         self.vtable.drawLineFn(self.instance, x0, y0, x1, y1);
+    }
+
+    fn drawRectangle(self: CustomRenderContext, x0: f32, y0: f32, x1: f32, y1: f32) void {
+        self.vtable.drawRectangleFn(self.instance, x0, y0, x1, y1);
     }
 
     fn drawTexture(self: CustomRenderContext, texture: *const Texture, dest: Rect) void {
@@ -1360,6 +1362,18 @@ fn drawLineImpl(ptr: *anyopaque, x0: f32, y0: f32, x1: f32, y1: f32) void {
     );
 }
 
+fn drawRectangleImpl(ptr: *anyopaque, x0: f32, y0: f32, x1: f32, y1: f32) void {
+    var state = @ptrCast(*ControlRenderState, @alignCast(@alignOf(ControlRenderState), ptr));
+    if (state.last_draw != .immediate) {
+        state.finishLastDrawType();
+        state.opts.r_imm.beginUntextured();
+        state.last_draw = .immediate;
+    }
+    const tx = @intToFloat(f32, state.translate_x);
+    const ty = @intToFloat(f32, state.translate_y);
+    state.opts.r_imm.drawRectangle(.{ tx + x0, ty + y0, 0, 1 }, .{ tx + x1, ty + y1, 0, 1 }, .{ 1, 1, 1, 1 });
+}
+
 fn drawTextureImpl(ptr: *anyopaque, texture: *const Texture, dest: Rect) void {
     var state = @ptrCast(*ControlRenderState, @alignCast(@alignOf(ControlRenderState), ptr));
     if (state.last_draw != .spritebatch or (state.last_draw == .spritebatch and state.last_draw.spritebatch != texture)) {
@@ -1379,6 +1393,7 @@ fn drawTextureImpl(ptr: *anyopaque, texture: *const Texture, dest: Rect) void {
 const CRVTable = CustomRenderContext.VTable{
     .drawPointRectFn = drawPointRectImpl,
     .drawLineFn = drawLineImpl,
+    .drawRectangleFn = drawRectangleImpl,
     .drawTextureFn = drawTextureImpl,
 };
 
