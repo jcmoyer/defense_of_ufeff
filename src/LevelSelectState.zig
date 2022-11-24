@@ -73,11 +73,20 @@ const Finger = struct {
         self.world_y = zm.lerpV(self.start_y, self.target_y, k);
         if (!self.move_finished and t == 1) {
             if (self.unlocking_button) |b| {
+                audio.AudioSystem.instance.playSound("assets/sounds/blip.ogg", .{}).release();
                 b.state = .normal;
             }
-            audio.AudioSystem.instance.playSound("assets/sounds/blip.ogg", .{}).release();
             self.move_finished = true;
         }
+    }
+
+    fn warpTo(self: *Finger, target_x: f32, target_y: f32) void {
+        self.world_x = target_x;
+        self.world_y = target_y;
+        self.p_world_x = self.world_x;
+        self.p_world_y = self.world_y;
+        self.start_x = self.world_x;
+        self.start_y = self.world_y;
     }
 
     fn moveTo(self: *Finger, target_x: f32, target_y: f32, timer: FrameTimer) void {
@@ -255,11 +264,16 @@ pub fn enter(self: *LevelSelectState, from: ?Game.StateId) void {
         }
     }
 
-    if (from == Game.StateId.menu or from == Game.StateId.levelresult) {
+    if (from == Game.StateId.menu) {
         self.finger = .{};
+        self.moveFingerToRecommendedMap();
     }
 
-    self.moveFingerToRecommendedMap();
+    if (from == Game.StateId.levelresult) {
+        self.finger = .{};
+        self.warpFingerToLastMap();
+        self.moveFingerToRecommendedMap();
+    }
 }
 
 pub fn leave(self: *LevelSelectState, to: ?Game.StateId) void {
@@ -397,4 +411,10 @@ fn moveFingerToRecommendedMap(self: *LevelSelectState) void {
             FrameTimer.initSeconds(self.game.frame_counter, 3),
         );
     }
+}
+
+fn warpFingerToLastMap(self: *LevelSelectState) void {
+    const b = self.buttons[self.prog_state.last_map_entered];
+    const p = b.rect.centerPoint();
+    self.finger.warpTo(@intToFloat(f32, p[0]), @intToFloat(f32, p[1]));
 }
