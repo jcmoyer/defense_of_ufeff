@@ -591,6 +591,8 @@ fn addMinimapElement(self: *PlayState, world_x: u32, world_y: u32, color: [4]u8)
 pub fn render(self: *PlayState, alpha: f64) void {
     var world = self.world orelse @panic("render with no world");
 
+    const world_interp = if (self.paused) @as(f64, 0) else alpha;
+
     self.game.renderers.r_quad.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
     self.game.renderers.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
     self.game.renderers.r_imm.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
@@ -599,15 +601,15 @@ pub fn render(self: *PlayState, alpha: f64) void {
     cam_interp.clampToBounds();
 
     self.r_world.renderTilemap(cam_interp, &self.world.?.map, self.game.frame_counter);
-    renderGoal(&self.game.renderers, world, cam_interp, alpha);
-    renderMonsters(&self.game.renderers, world, cam_interp, alpha);
-    renderStolenHearts(&self.game.renderers, world, cam_interp, alpha, self.r_world.heart_anim);
+    renderGoal(&self.game.renderers, world, cam_interp, world_interp);
+    renderMonsters(&self.game.renderers, world, cam_interp, world_interp);
+    renderStolenHearts(&self.game.renderers, world, cam_interp, world_interp, self.r_world.heart_anim);
     renderTowers(&self.game.renderers, world, cam_interp, if (self.interact_state == .select) self.interact_state.select.selected_tower else null);
-    renderFields(&self.game.renderers, world, cam_interp, alpha);
-    renderSpriteEffects(&self.game.renderers, world, cam_interp, alpha);
-    renderProjectiles(&self.game.renderers, world, cam_interp, alpha);
-    renderHealthBars(&self.game.renderers, world, cam_interp, alpha);
-    renderFloatingText(&self.game.renderers, world, cam_interp, alpha, .{
+    renderFields(&self.game.renderers, world, cam_interp, world_interp);
+    renderSpriteEffects(&self.game.renderers, world, cam_interp, world_interp);
+    renderProjectiles(&self.game.renderers, world, cam_interp, world_interp);
+    renderHealthBars(&self.game.renderers, world, cam_interp, world_interp);
+    renderFloatingText(&self.game.renderers, world, cam_interp, world_interp, .{
         .texture = self.game.texman.getNamedTexture("floating_text.png"),
         .spec = &self.fontspec_numbers,
     });
@@ -632,7 +634,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
         },
         else => {},
     }
-    self.renderWaveTimer(alpha);
+    self.renderWaveTimer(world_interp);
 
     if (self.deb_render_tile_collision) {
         self.debugRenderTileCollision(cam_interp);

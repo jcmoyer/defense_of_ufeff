@@ -237,9 +237,18 @@ pub const m_mole = MonsterSpec{
 
 pub const m_blue_mole = MonsterSpec{
     .anim_set = anim.a_mole.animationSet(),
+    .color = .{ 80, 80, 255, 255 },
     .max_hp = 50,
     .gold = 12,
     .speed = 350,
+};
+
+pub const m_red_mole = MonsterSpec{
+    .anim_set = anim.a_mole.animationSet(),
+    .color = .{ 255, 0, 0, 255 },
+    .max_hp = 100,
+    .gold = 12,
+    .speed = 1000,
 };
 
 pub const MonsterId = GenHandle(Monster);
@@ -808,7 +817,7 @@ fn lancerUpdate(self: *Tower, frame: u64) void {
         self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 9, 0.25, 5);
         self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 8, 0.20, 10);
         self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 7, 0.15, 15);
-        self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 6, 0.10, 20);
+        // self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 6, 0.10, 20);
 
         self.world.playPositionalSound("assets/sounds/stab.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
@@ -1756,8 +1765,6 @@ pub const World = struct {
 
         // (2022-11-02) Q: do we actually need to path from all monsters? it seems spawn points should be enough
         // (2022-11-18) A: Yes, you can wall a monster in that would stray from the spawn->goal path with the newly placed tile.
-        var timer = std.time.Timer.start() catch unreachable;
-
         if (self.goal) |goal| {
             for (self.spawns.slice()) |*s| {
                 if (!self.findTheoreticalPath(s.coord, goal.getTilePosition())) {
@@ -1770,8 +1777,6 @@ pub const World = struct {
                 }
             }
         }
-
-        std.debug.print("canBuildAt took {d}ms\n", .{timer.read() / std.time.ns_per_ms});
 
         return true;
     }
@@ -3090,6 +3095,9 @@ fn nameToMonsterSpec(name: []const u8) ?*const MonsterSpec {
     }
     if (std.mem.eql(u8, "m_blue_mole", name)) {
         return &m_blue_mole;
+    }
+    if (std.mem.eql(u8, "m_red_mole", name)) {
+        return &m_red_mole;
     }
     return null;
 }
