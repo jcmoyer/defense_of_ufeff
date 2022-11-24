@@ -36,7 +36,7 @@ ui_root: ui.Root,
 ui_tip: *ui.Button,
 rng: std.rand.DefaultPrng,
 tip_index: usize = 0,
-menu_start: i32 = 80,
+menu_start: i32 = 76,
 p_scroll_offset: f32 = 0,
 scroll_offset: f32 = 0,
 sub: Substate = .none,
@@ -48,6 +48,8 @@ const tips = [_][]const u8{
     "Cryomancers can slow monster\nmovement by 33%.",
     "Monsters warp back to their spawn\npoint if you have no lives at the goal.",
     "WASD pans the camera, but you can\nalso click the minimap to immediately go there.",
+    "You can sell towers and replace them while\npaused so that monsters don't move into that space.",
+    "Pause frequently to spend gold while under pressure!",
 };
 
 fn createMenuButton(self: *MenuState, comptime text: []const u8, comptime cb: anytype) !*ui.Button {
@@ -56,7 +58,7 @@ fn createMenuButton(self: *MenuState, comptime text: []const u8, comptime cb: an
     btn.rect = Rect.init(0, 0, 128, 32);
     btn.rect.centerOn(Game.INTERNAL_WIDTH / 2, 0);
     btn.rect.y = self.menu_start;
-    self.menu_start += btn.rect.h;
+    self.menu_start += btn.rect.h + 4;
     btn.background = ui.Background{
         .texture = .{ .texture = self.game.texman.getNamedTexture("menu_button.png") },
     };
@@ -184,6 +186,8 @@ pub fn render(self: *MenuState, alpha: f64) void {
         .texture = self.game.texman.getNamedTexture("CommonCase.png"),
         .spec = &self.fontspec,
     });
+
+    self.game.renderers.r_font.drawText("Defense of Ufeff", .{ .dest = Rect.init(0, 0, Game.INTERNAL_WIDTH, 50), .h_alignment = .center });
 
     var measured = self.fontspec.measureText(tips[self.tip_index]);
     measured.centerOn(Game.INTERNAL_WIDTH / 2, @floatToInt(i32, 0.8 * Game.INTERNAL_HEIGHT));
