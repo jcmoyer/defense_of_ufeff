@@ -1197,16 +1197,33 @@ const CustomRenderContext = struct {
     }
 };
 
+const LastDrawType = union(enum) {
+    none,
+    quadbatch,
+    spritebatch: *const Texture,
+    immediate,
+};
+
 const ControlRenderState = struct {
     translate_x: i32 = 0,
     translate_y: i32 = 0,
     opts: *const UIRenderOptions,
+    last_draw: LastDrawType = .none,
 
     fn createRenderContext(self: *ControlRenderState) CustomRenderContext {
         return CustomRenderContext{
             .instance = self,
             .vtable = &CRVTable,
         };
+    }
+
+    fn finishLastDrawType(self: *ControlRenderState) void {
+        switch (self.last_draw) {
+            .none => {},
+            .quadbatch => self.opts.r_quad.end(),
+            .spritebatch => self.opts.r_batch.end(),
+            .immediate => {},
+        }
     }
 };
 
@@ -1234,6 +1251,7 @@ fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRe
         }
 
         control.customRender(rs.createRenderContext());
+        rs.finishLastDrawType();
     } else {
         if (control.interactRect()) |rect| {
             var render_dest = rect;
@@ -1317,17 +1335,24 @@ fn drawPointRectImpl(ptr: *anyopaque, opts: PointRectOptions) void {
     var state = @ptrCast(*ControlRenderState, @alignCast(@alignOf(ControlRenderState), ptr));
     var dest = Rectf.init(@intToFloat(f32, state.translate_x) + opts.x, @intToFloat(f32, state.translate_y) + opts.y, 0, 0);
     dest.inflate(opts.radius, opts.radius);
-    state.opts.r_quad.begin(.{});
+    if (state.last_draw != .quadbatch) {
+        state.finishLastDrawType();
+        state.opts.r_quad.begin(.{});
+        state.last_draw = .quadbatch;
+    }
     state.opts.r_quad.drawQuad(.{
         .dest = dest,
         .color = opts.color,
     });
-    state.opts.r_quad.end();
 }
 
 fn drawLineImpl(ptr: *anyopaque, x0: f32, y0: f32, x1: f32, y1: f32) void {
     var state = @ptrCast(*ControlRenderState, @alignCast(@alignOf(ControlRenderState), ptr));
-    state.opts.r_imm.beginUntextured();
+    if (state.last_draw != .immediate) {
+        state.finishLastDrawType();
+        state.opts.r_imm.beginUntextured();
+        state.last_draw = .immediate;
+    }
     state.opts.r_imm.drawLine(
         @Vector(4, f32){ @intToFloat(f32, state.translate_x) + x0, @intToFloat(f32, state.translate_y) + y0, 0, 1 },
         @Vector(4, f32){ @intToFloat(f32, state.translate_x) + x1, @intToFloat(f32, state.translate_y) + y1, 0, 1 },
@@ -1337,7 +1362,11 @@ fn drawLineImpl(ptr: *anyopaque, x0: f32, y0: f32, x1: f32, y1: f32) void {
 
 fn drawTextureImpl(ptr: *anyopaque, texture: *const Texture, dest: Rect) void {
     var state = @ptrCast(*ControlRenderState, @alignCast(@alignOf(ControlRenderState), ptr));
-    state.opts.r_batch.begin(.{ .texture = texture });
+    if (state.last_draw != .spritebatch or (state.last_draw == .spritebatch and state.last_draw.spritebatch != texture)) {
+        state.finishLastDrawType();
+        state.opts.r_batch.begin(.{ .texture = texture });
+        state.last_draw = .{ .spritebatch = texture };
+    }
     const src = Rect.init(0, 0, @intCast(i32, texture.width), @intCast(i32, texture.height));
     var t_dest = dest;
     t_dest.translate(state.translate_x, state.translate_y);
@@ -1345,7 +1374,6 @@ fn drawTextureImpl(ptr: *anyopaque, texture: *const Texture, dest: Rect) void {
         .src = src.toRectf(),
         .dest = t_dest.toRectf(),
     });
-    state.opts.r_batch.end();
 }
 
 const CRVTable = CustomRenderContext.VTable{
