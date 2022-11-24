@@ -152,6 +152,8 @@ deb_render_tile_collision: bool = false,
 rng: std.rand.DefaultPrng = std.rand.DefaultPrng.init(0),
 current_mapid: ?u32 = null,
 
+minimap_elements: std.ArrayListUnmanaged(ui.MinimapElement) = .{},
+
 const wipe_scanline_width = Game.INTERNAL_WIDTH / 4;
 
 fn makeStandardButtonRects(x: i32, y: i32) [4]Rect {
@@ -412,6 +414,7 @@ pub fn destroy(self: *PlayState) void {
         self.world = null;
     }
     self.ui_root.deinit();
+    self.minimap_elements.deinit(self.game.allocator);
     self.game.allocator.destroy(self);
 }
 
@@ -543,6 +546,46 @@ fn updateUI(self: *PlayState) void {
             self.b_call_wave.state = .normal;
         }
     }
+
+    self.minimap_elements.clearRetainingCapacity();
+    for (world.monsters.slice()) |*m| {
+        var p = m.getWorldCollisionRect().centerPoint();
+        self.addMinimapElement(@intCast(u32, p[0]), @intCast(u32, p[1]), .{ 255, 0, 0, 255 });
+    }
+    for (world.towers.slice()) |*t| {
+        var p = t.getWorldCollisionRect().centerPoint();
+        self.addMinimapElement(@intCast(u32, p[0]), @intCast(u32, p[1]), .{ 0, 255, 0, 255 });
+    }
+    self.ui_minimap.elements = self.minimap_elements.items;
+}
+
+fn addMinimapElement(self: *PlayState, world_x: u32, world_y: u32, color: [4]u8) void {
+    var world = self.world orelse unreachable;
+
+    const tile_pos = tilemap.TileCoord.initWorld(world_x, world_y);
+
+    const range = world.getPlayableRange();
+    if (!range.contains(tile_pos)) {
+        return;
+    }
+
+    const tx = @intToFloat(f32, range.min.x * 16);
+    const ty = @intToFloat(f32, range.min.y * 16);
+    const ox = @intToFloat(f32, world_x) - tx;
+    const oy = @intToFloat(f32, world_y) - ty;
+    const ww = @intToFloat(f32, range.getWidth() * 16);
+    const wh = @intToFloat(f32, range.getHeight() * 16);
+    const nx = ox / ww;
+    const ny = oy / wh;
+
+    var element = self.minimap_elements.addOne(self.game.allocator) catch |err| {
+        std.log.err("Failed to allocate minimap_elements: {!}\n", .{err});
+        std.process.exit(1);
+    };
+    element.* = ui.MinimapElement{
+        .normalized_pos = .{ nx, ny },
+        .color = color,
+    };
 }
 
 pub fn render(self: *PlayState, alpha: f64) void {
@@ -599,6 +642,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
         .r_batch = &self.game.renderers.r_batch,
         .r_font = &self.game.renderers.r_font,
         .r_imm = &self.game.renderers.r_imm,
+        .r_quad = &self.game.renderers.r_quad,
         .font_texture = self.game.texman.getNamedTexture("CommonCase.png"),
         .font_spec = &self.fontspec,
     }, self.ui_root);

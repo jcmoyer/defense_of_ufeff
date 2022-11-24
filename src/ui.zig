@@ -374,6 +374,11 @@ pub const Trackbar = struct {
     }
 };
 
+pub const MinimapElement = struct {
+    normalized_pos: [2]f32,
+    color: [4]u8,
+};
+
 pub const Minimap = struct {
     root: *Root,
     rect: Rect,
@@ -382,6 +387,7 @@ pub const Minimap = struct {
     pan_callback: ?*const fn (*Minimap, ?*anyopaque, f32, f32) void = null,
     view: Rect,
     bounds: Rect,
+    elements: []MinimapElement = &[_]MinimapElement{},
 
     pub fn deinit(self: *Minimap) void {
         self.root.allocator.destroy(self);
@@ -512,6 +518,15 @@ pub const Minimap = struct {
 
         // we draw lines onto this
         const crf = cr.toRectf();
+
+        for (self.elements) |element| {
+            ctx.drawPointRect(.{
+                .x = crf.x + element.normalized_pos[0] * crf.w,
+                .y = crf.y + element.normalized_pos[1] * crf.h,
+                .radius = 1,
+                .color = element.color,
+            });
+        }
 
         const vf = self.view.toRectf();
         const bf = self.bounds.toRectf();
@@ -1149,15 +1164,29 @@ const SpriteBatch = @import("SpriteBatch.zig");
 const font = @import("bmfont.zig");
 const ImmRenderer = @import("ImmRenderer.zig");
 const zm = @import("zmath");
+const QuadBatch = @import("QuadBatch.zig");
+const Rectf = @import("Rectf.zig");
+
+const PointRectOptions = struct {
+    x: f32,
+    y: f32,
+    radius: f32,
+    color: [4]u8 = .{ 255, 255, 255, 255 },
+};
 
 const CustomRenderContext = struct {
     instance: *anyopaque,
     vtable: *const VTable,
 
     const VTable = struct {
+        drawPointRectFn: *const fn (*anyopaque, opts: PointRectOptions) void,
         drawLineFn: *const fn (*anyopaque, x0: f32, y0: f32, x1: f32, y1: f32) void,
         drawTextureFn: *const fn (ptr: *anyopaque, texture: *const Texture, dest: Rect) void,
     };
+
+    fn drawPointRect(self: CustomRenderContext, opts: PointRectOptions) void {
+        self.vtable.drawPointRectFn(self.instance, opts);
+    }
 
     fn drawLine(self: CustomRenderContext, x0: f32, y0: f32, x1: f32, y1: f32) void {
         self.vtable.drawLineFn(self.instance, x0, y0, x1, y1);
@@ -1185,6 +1214,7 @@ const UIRenderOptions = struct {
     r_batch: *SpriteBatch,
     r_font: *font.BitmapFont,
     r_imm: *ImmRenderer,
+    r_quad: *QuadBatch,
     font_texture: *const Texture,
     font_spec: *const font.BitmapFontSpec,
 };
@@ -1283,6 +1313,18 @@ fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRe
     }
 }
 
+fn drawPointRectImpl(ptr: *anyopaque, opts: PointRectOptions) void {
+    var state = @ptrCast(*ControlRenderState, @alignCast(@alignOf(ControlRenderState), ptr));
+    var dest = Rectf.init(@intToFloat(f32, state.translate_x) + opts.x, @intToFloat(f32, state.translate_y) + opts.y, 0, 0);
+    dest.inflate(opts.radius, opts.radius);
+    state.opts.r_quad.begin(.{});
+    state.opts.r_quad.drawQuad(.{
+        .dest = dest,
+        .color = opts.color,
+    });
+    state.opts.r_quad.end();
+}
+
 fn drawLineImpl(ptr: *anyopaque, x0: f32, y0: f32, x1: f32, y1: f32) void {
     var state = @ptrCast(*ControlRenderState, @alignCast(@alignOf(ControlRenderState), ptr));
     state.opts.r_imm.beginUntextured();
@@ -1307,6 +1349,7 @@ fn drawTextureImpl(ptr: *anyopaque, texture: *const Texture, dest: Rect) void {
 }
 
 const CRVTable = CustomRenderContext.VTable{
+    .drawPointRectFn = drawPointRectImpl,
     .drawLineFn = drawLineImpl,
     .drawTextureFn = drawTextureImpl,
 };

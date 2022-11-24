@@ -241,6 +241,7 @@ pub fn render(self: *OptionsState, alpha: f64) void {
         .r_batch = &self.game.renderers.r_batch,
         .r_font = &self.game.renderers.r_font,
         .r_imm = &self.game.renderers.r_imm,
+        .r_quad = &self.game.renderers.r_quad,
         .font_texture = self.game.texman.getNamedTexture("CommonCase.png"),
         .font_spec = &self.fontspec,
     }, self.ui_root);

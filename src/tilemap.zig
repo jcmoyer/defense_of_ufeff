@@ -83,11 +83,11 @@ pub const TileRange = struct {
     }
 
     pub fn getWidth(self: TileRange) usize {
-        return self.max.x - self.min.x;
+        return 1 + self.max.x - self.min.x;
     }
 
     pub fn getHeight(self: TileRange) usize {
-        return self.max.y - self.min.y;
+        return 1 + self.max.y - self.min.y;
     }
 };
 

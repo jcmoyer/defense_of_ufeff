@@ -1632,7 +1632,7 @@ pub const World = struct {
         if (self.play_area) |area| {
             return TileRange{
                 .min = TileCoord.initSignedWorld(area.left(), area.top()),
-                .max = TileCoord.initSignedWorld(area.right(), area.bottom()),
+                .max = TileCoord.initSignedWorld(area.right() - 16, area.bottom() - 16),
             };
         } else {
             return TileRange{
