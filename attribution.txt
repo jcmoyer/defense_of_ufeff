@@ -2,26 +2,26 @@
 = Graphics
 ===============================================================================
 
-- Versatile 255-Tile Pixel Art Pack
-  https://warsong.pages.dev/art/ufeff/
-  CC0 1.0 Universal
+Versatile 255-Tile Pixel Art Pack
+URL: https://warsong.pages.dev/art/ufeff/
+License: CC0 1.0 Universal
+Files:
 
-  Files:
-  - All files under assets/textures/ not specified below
+- All files under assets/textures/ not specified below
 
-- CommonCase
-  https://gryyre.itch.io/common-case
-  CC0 1.0 Universal
+CommonCase
+URL: https://gryyre.itch.io/common-case
+License: CC0 1.0 Universal
+Files:
 
-  Files:
-  - assets/textures/CommonCase.png, except for the rectangle at x=16, y=48,
-    width=16, height=16 which is from Versatile 255-Tile Pixel Art Pack
+- assets/textures/CommonCase.png, except for the rectangle at x=16, y=48,
+  width=16, height=16 which is from Versatile 255-Tile Pixel Art Pack
 
 ===============================================================================
 = Music
 ===============================================================================
 
-Title: Orchestral Midi Pack
+Orchestral Midi Pack
 Author: Stuart Rynn (stewboy)
 URL: https://opengameart.org/content/orchestral-midi-pack
 License: OGA-BY 3.0 (https://static.opengameart.org/OGA-BY-3.0.txt)
@@ -36,54 +36,80 @@ Files:
 = Sound
 ===============================================================================
 
-https://freesound.org/people/beerbelly38/sounds/362350/
-Attribution 4.0 International (CC BY 4.0)
-bow.ogg
+knife slash 1.wav
+Author: beerbelly38
+URL: https://freesound.org/people/beerbelly38/sounds/362350/
+License: Attribution 4.0 International (CC BY 4.0)
+File: assets/sounds/bow.ogg
 
-https://freesound.org/people/IENBA/sounds/545476/
-Attribution 4.0 International (CC BY 4.0)
-build.ogg
+Heavy bag drop
+Author: IENBA
+URL: https://freesound.org/people/IENBA/sounds/545476/
+License: Attribution 4.0 International (CC BY 4.0)
+File: assets/sounds/build.ogg
 
-https://freesound.org/people/raficacosta/sounds/576113/
-CC0 1.0 Universal (CC0 1.0)
-click.ogg
+ClickClack.WAV
+Author: raficacosta
+URL: https://freesound.org/people/raficacosta/sounds/576113/
+License: CC0 1.0 Universal (CC0 1.0)
+File: assets/sounds/click.ogg
 
-https://freesound.org/people/FractalStudios/sounds/363090/
-CC0 1.0 Universal (CC0 1.0)
-coindrop.ogg
+Coins Being Dropped-Assorted
+Author: FractalStudios
+URL: https://freesound.org/people/FractalStudios/sounds/363090/
+License: CC0 1.0 Universal (CC0 1.0)
+File: assets/sounds/coindrop.ogg
 
-https://freesound.org/people/kev_durr/sounds/426206/
-Attribution 4.0 International (CC BY 4.0)
-flame.ogg
+Torch_Swinging Quickly 1.wav
+Author: kev_durr
+URL: https://freesound.org/people/kev_durr/sounds/426206/
+License: Attribution 4.0 International (CC BY 4.0)
+File: assets/sounds/flame.ogg
 
-https://freesound.org/people/InspectorJ/sounds/420875/
-Attribution 4.0 International (CC BY 4.0)
-frost.ogg
+Gathering, Ice, A.wav
+Author: InspectorJ
+URL: https://freesound.org/people/InspectorJ/sounds/420875/
+License: Attribution 4.0 International (CC BY 4.0)
+File: assets/sounds/frost.ogg
 
-https://freesound.org/people/Lubini/sounds/338323/
-Attribution 3.0 Unported (CC BY 3.0)
-gun.ogg
+PPSh-41 - Soviet Submachine Gun.wav
+Author: Lubini
+URL: https://freesound.org/people/Lubini/sounds/338323/
+License: Attribution 3.0 Unported (CC BY 3.0)
+File: assets/sounds/gun.ogg
 
-https://freesound.org/people/TheFilmLook/sounds/365572/
-CC0 1.0 Universal (CC0 1.0)
-hit.ogg
+Melon Stabs (Clean)
+Author: TheFilmLook
+URL: https://freesound.org/people/TheFilmLook/sounds/365572/
+License: CC0 1.0 Universal (CC0 1.0)
+File: assets/sounds/hit.ogg
 
-https://freesound.org/people/qubodup/sounds/442903/
-CC0 1.0 Universal (CC0 1.0)
-slash_hit.ogg
+Slash
+Author: qubodup
+URL: https://freesound.org/people/qubodup/sounds/442903/
+License: CC0 1.0 Universal (CC0 1.0)
+File: assets/sounds/slash_hit.ogg
 
-https://freesound.org/people/PorkMuncher/sounds/263595/
-CC0 1.0 Universal (CC0 1.0)
-slash.ogg
+swoosh.wav
+Author: PorkMuncher
+URL: https://freesound.org/people/PorkMuncher/sounds/263595/
+License: CC0 1.0 Universal (CC0 1.0)
+File: assets/sounds/slash.ogg
 
-https://freesound.org/people/Mixedupmoviestuff/sounds/179222/
-CC0 1.0 Universal (CC0 1.0)
-stab.ogg
+Knife Stab.wav
+Author: Mixedupmoviestuff
+URL: https://freesound.org/people/Mixedupmoviestuff/sounds/179222/
+License: CC0 1.0 Universal (CC0 1.0)
+File: assets/sounds/stab.ogg
 
-https://freesound.org/people/AbuNijmeh/sounds/318973/
-CC0 1.0 Universal (CC0 1.0)
-shotgun.ogg
+Shotgun - Fire.wav
+Author: AbuNijmeh
+URL: https://freesound.org/people/AbuNijmeh/sounds/318973/
+License: CC0 1.0 Universal (CC0 1.0)
+File: assets/sounds/shotgun.ogg
 
-https://freesound.org/people/Vurca/sounds/189212/
-CC0 1.0 Universal (CC0 1.0)
-burn.ogg
+Burning Fire
+Author: Vurca
+URL: https://freesound.org/people/Vurca/sounds/189212/
+License: CC0 1.0 Universal (CC0 1.0)
+File: assets/sounds/burn.ogg
