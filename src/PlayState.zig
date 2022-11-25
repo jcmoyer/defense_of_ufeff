@@ -660,7 +660,6 @@ pub fn handleEvent(self: *PlayState, ev: sdl.SDL_Event) void {
             sdl.SDLK_F2 => if (is_debug) {
                 self.world.?.player_gold += 200;
             },
-            sdl.SDLK_F3 => self.world.?.fast_tpathing = !self.world.?.fast_tpathing,
             sdl.SDLK_ESCAPE => {
                 if (self.interact_state == .none) {
                     self.game.changeState(.playmenu);
