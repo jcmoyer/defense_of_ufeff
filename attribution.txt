@@ -1,0 +1,89 @@
+===============================================================================
+= Graphics
+===============================================================================
+
+- Versatile 255-Tile Pixel Art Pack
+  https://warsong.pages.dev/art/ufeff/
+  CC0 1.0 Universal
+
+  Files:
+  - All files under assets/textures/ not specified below
+
+- CommonCase
+  https://gryyre.itch.io/common-case
+  CC0 1.0 Universal
+
+  Files:
+  - assets/textures/CommonCase.png, except for the rectangle at x=16, y=48,
+    width=16, height=16 which is from Versatile 255-Tile Pixel Art Pack
+
+===============================================================================
+= Music
+===============================================================================
+
+Title: Orchestral Midi Pack
+Author: Stuart Rynn (stewboy)
+URL: https://opengameart.org/content/orchestral-midi-pack
+License: OGA-BY 3.0 (https://static.opengameart.org/OGA-BY-3.0.txt)
+Files:
+
+- assets/music/Daybreak.ogg
+- assets/music/Flight of the Fox.ogg
+- assets/music/The Demon's Serenade.ogg
+- assets/music/Opposing Tribes.ogg
+
+===============================================================================
+= Sound
+===============================================================================
+
+https://freesound.org/people/beerbelly38/sounds/362350/
+Attribution 4.0 International (CC BY 4.0)
+bow.ogg
+
+https://freesound.org/people/IENBA/sounds/545476/
+Attribution 4.0 International (CC BY 4.0)
+build.ogg
+
+https://freesound.org/people/raficacosta/sounds/576113/
+CC0 1.0 Universal (CC0 1.0)
+click.ogg
+
+https://freesound.org/people/FractalStudios/sounds/363090/
+CC0 1.0 Universal (CC0 1.0)
+coindrop.ogg
+
+https://freesound.org/people/kev_durr/sounds/426206/
+Attribution 4.0 International (CC BY 4.0)
+flame.ogg
+
+https://freesound.org/people/InspectorJ/sounds/420875/
+Attribution 4.0 International (CC BY 4.0)
+frost.ogg
+
+https://freesound.org/people/Lubini/sounds/338323/
+Attribution 3.0 Unported (CC BY 3.0)
+gun.ogg
+
+https://freesound.org/people/TheFilmLook/sounds/365572/
+CC0 1.0 Universal (CC0 1.0)
+hit.ogg
+
+https://freesound.org/people/qubodup/sounds/442903/
+CC0 1.0 Universal (CC0 1.0)
+slash_hit.ogg
+
+https://freesound.org/people/PorkMuncher/sounds/263595/
+CC0 1.0 Universal (CC0 1.0)
+slash.ogg
+
+https://freesound.org/people/Mixedupmoviestuff/sounds/179222/
+CC0 1.0 Universal (CC0 1.0)
+stab.ogg
+
+https://freesound.org/people/AbuNijmeh/sounds/318973/
+CC0 1.0 Universal (CC0 1.0)
+shotgun.ogg
+
+https://freesound.org/people/Vurca/sounds/189212/
+CC0 1.0 Universal (CC0 1.0)
+burn.ogg
