@@ -31,6 +31,7 @@ const ProgressionState = extern struct {
     maps: [256]bool = .{false} ** 256,
     num_complete: u32 = 0,
     last_map_entered: u32 = 0,
+    have_seen_ending: bool = false,
 
     fn setMapComplete(self: *ProgressionState, mapid: u32) void {
         self.maps[mapid] = true;
@@ -261,6 +262,15 @@ pub fn enter(self: *LevelSelectState, from: ?Game.StateId) void {
                 std.log.err("Failed to save progression: {!}", .{err});
             };
             self.updateButtonStates();
+            if (self.allMapsComplete()) {
+                if (!self.prog_state.have_seen_ending) {
+                    self.prog_state.have_seen_ending = true;
+                    self.saveProgression() catch |err| {
+                        std.log.err("Failed to save progression: {!}", .{err});
+                    };
+                    self.game.changeState(.end);
+                }
+            }
         }
     }
 
@@ -391,7 +401,19 @@ fn loadProgression(self: *LevelSelectState) !void {
         }
     };
     defer f.close();
-    self.prog_state = try f.reader().readStruct(ProgressionState);
+    self.prog_state = f.reader().readStruct(ProgressionState) catch |err| {
+        if (err == error.EndOfStream) {
+            std.log.info("Failed to load progression (probably version mismatch): {!}", .{err});
+            return;
+        } else {
+            return err;
+        }
+    };
+}
+
+fn allMapsComplete(self: *LevelSelectState) bool {
+    std.debug.print("{any}, {any}, seen ={any}\n", .{ self.prog_state.num_complete, self.num_buttons, self.prog_state.have_seen_ending });
+    return self.prog_state.num_complete == self.num_buttons;
 }
 
 fn moveFingerToRecommendedMap(self: *LevelSelectState) void {

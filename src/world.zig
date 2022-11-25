@@ -268,7 +268,7 @@ pub const MonsterId = GenHandle(Monster);
 const HurtOptions = struct {
     amount: u32,
     direction: [2]f32 = [2]f32{ 0, -1 },
-    damage_type: DamageType,
+    damage_type: DamageType = .generic,
     silent: bool = false,
 };
 

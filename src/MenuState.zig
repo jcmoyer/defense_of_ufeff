@@ -45,11 +45,13 @@ fade_timer: FrameTimer = .{},
 const tips = [_][]const u8{
     "You can build over top of walls!\nThis lets you maze first, then build towers.",
     "You can't build towers that would\ntotally block access to the goal.",
-    "Cryomancers can slow monster\nmovement by 33%.",
+    "Cryomancers can slow monster movement by 33%.\nThis effect does not stack.",
     "Monsters warp back to their spawn\npoint if you have no lives at the goal.",
     "WASD pans the camera, but you can\nalso click the minimap to immediately go there.",
     "You can sell towers and replace them while\npaused so that monsters don't move into that space.",
     "Pause frequently to spend gold while under pressure!",
+    "AoE units are much more effective when\nmonsters are stacked.",
+    "Get an idea of the lay of the land before building\ntowers. Walls are essential to force monsters down certain paths.",
 };
 
 fn createMenuButton(self: *MenuState, comptime text: []const u8, comptime cb: anytype) !*ui.Button {
@@ -110,6 +112,8 @@ pub fn create(game: *Game) !*MenuState {
     self.ui_tip.rect.alignBottom(Game.INTERNAL_HEIGHT);
     self.ui_tip.rect.translate(-8, -8);
     try self.ui_root.addChild(self.ui_tip.control());
+
+    self.showRandomTip();
 
     self.fontspec = try bmfont.BitmapFontSpec.loadFromFile(self.game.allocator, "assets/tables/CommonCase.json");
     return self;
