@@ -97,6 +97,11 @@ const NextWaveTimer = struct {
     }
 };
 
+const DrawQuadCommand = struct {
+    opts: SpriteBatch.DrawQuadOptions,
+};
+const DrawQueue = std.ArrayListUnmanaged(DrawQuadCommand);
+
 game: *Game,
 camera: Camera = DEFAULT_CAMERA,
 prev_camera: Camera = DEFAULT_CAMERA,
@@ -125,6 +130,7 @@ ui_upgrade_states: [3]UpgradeButtonState,
 fast: bool = false,
 music_params: ?*audio.AudioParameters = null,
 wave_timer: NextWaveTimer,
+draw_queue: DrawQueue = .{},
 
 paused: bool = false,
 
@@ -402,6 +408,7 @@ pub fn destroy(self: *PlayState) void {
         world.destroy();
         self.world = null;
     }
+    self.draw_queue.deinit(self.game.allocator);
     self.ui_root.deinit();
     self.minimap_elements.deinit(self.game.allocator);
     self.game.allocator.destroy(self);
@@ -577,8 +584,36 @@ fn addMinimapElement(self: *PlayState, world_x: u32, world_y: u32, color: [4]u8)
     };
 }
 
+fn sortDrawQueueY(q: DrawQueue) void {
+    const SortImpl = struct {
+        fn less(_: void, a: DrawQuadCommand, b: DrawQuadCommand) bool {
+            return a.opts.dest.y < b.opts.dest.y;
+        }
+    };
+    std.sort.sort(DrawQuadCommand, q.items, {}, SortImpl.less);
+}
+
+fn execDrawQueue(renderers: *RenderServices, q: DrawQueue) void {
+    // TODO: make this configurable
+    renderers.r_batch.begin(.{
+        .texture = renderers.texman.getNamedTexture("characters.png"),
+    });
+    for (q.items) |cmd| {
+        renderers.r_batch.drawQuad(cmd.opts);
+    }
+    renderers.r_batch.end();
+}
+
 pub fn render(self: *PlayState, alpha: f64) void {
     var world = self.world orelse @panic("render with no world");
+
+    // TODO: should probably replace this with an arena at some point, but it seems like the stdlib arena doesn't reuse memory?
+    // https://github.com/ziglang/zig/pull/12590
+    self.draw_queue.ensureTotalCapacity(self.game.allocator, world.monsters.slice().len) catch |err| {
+        std.log.err("Failed to allocate draw_queue storage: {!}", .{err});
+        std.process.exit(1);
+    };
+    self.draw_queue.clearRetainingCapacity();
 
     const world_interp = if (self.paused or self.sub != .none) @as(f64, 0) else alpha;
 
@@ -591,9 +626,14 @@ pub fn render(self: *PlayState, alpha: f64) void {
 
     self.r_world.renderTilemap(cam_interp, &self.world.?.map, self.game.frame_counter);
     renderGoal(&self.game.renderers, world, cam_interp, world_interp);
-    renderMonsters(&self.game.renderers, world, cam_interp, world_interp);
-    renderStolenHearts(&self.game.renderers, world, cam_interp, world_interp, self.r_world.heart_anim);
+    renderTowerBases(&self.game.renderers, world, cam_interp, if (self.interact_state == .select) self.interact_state.select.selected_tower else null);
+
+    renderMonsters(world, cam_interp, world_interp, &self.draw_queue);
+    sortDrawQueueY(self.draw_queue);
+    execDrawQueue(&self.game.renderers, self.draw_queue);
+
     renderTowers(&self.game.renderers, world, cam_interp, if (self.interact_state == .select) self.interact_state.select.selected_tower else null);
+    renderStolenHearts(&self.game.renderers, world, cam_interp, world_interp, self.r_world.heart_anim);
     renderFields(&self.game.renderers, world, cam_interp, world_interp);
     renderSpriteEffects(&self.game.renderers, world, cam_interp, world_interp);
     renderProjectiles(&self.game.renderers, world, cam_interp, world_interp);
@@ -891,15 +931,13 @@ fn renderFloatingText(
     renderers.r_font.end();
 }
 
-fn renderTowers(
+fn renderTowerBases(
     renderers: *RenderServices,
     world: *World,
     cam: Camera,
     selected_tower: ?wo.TowerId,
 ) void {
     const t_special = renderers.texman.getNamedTexture("special.png");
-    const t_characters = renderers.texman.getNamedTexture("characters.png");
-
     var highlight_mag = @floatCast(f32, 0.5 * (1.0 + std.math.sin(@intToFloat(f64, std.time.milliTimestamp()) / 500.0)));
 
     // render tower bases
@@ -918,6 +956,17 @@ fn renderTowers(
         });
     }
     renderers.r_batch.end();
+}
+
+fn renderTowers(
+    renderers: *RenderServices,
+    world: *World,
+    cam: Camera,
+    selected_tower: ?wo.TowerId,
+) void {
+    const t_characters = renderers.texman.getNamedTexture("characters.png");
+
+    var highlight_mag = @floatCast(f32, 0.5 * (1.0 + std.math.sin(@intToFloat(f64, std.time.milliTimestamp()) / 500.0)));
 
     // render tower characters
     renderers.r_batch.begin(.{
@@ -942,15 +991,11 @@ fn renderTowers(
 }
 
 fn renderMonsters(
-    renderers: *RenderServices,
     world: *World,
     cam: Camera,
     a: f64,
+    buf: *DrawQueue,
 ) void {
-    const t_chara = renderers.texman.getNamedTexture("characters.png");
-    renderers.r_batch.begin(.{
-        .texture = t_chara,
-    });
     for (world.monsters.slice()) |*m| {
         const animator = m.animator orelse continue;
         var color: [4]u8 = m.spec.color;
@@ -958,14 +1003,13 @@ fn renderMonsters(
             color = mathutil.colorMulU8(4, color, .{ 0x80, 0x80, 0xFF, 0xFF });
         }
         const w = m.getInterpWorldPosition(a);
-        renderers.r_batch.drawQuad(.{
+        buf.appendAssumeCapacity(.{ .opts = .{
             .src = animator.getCurrentRect().toRectf(),
             .dest = Rect.init(@intCast(i32, w[0]) - cam.view.left(), @intCast(i32, w[1]) - cam.view.top(), 16, 16).toRectf(),
             .flash = m.flash_frames > 0,
             .color = color,
-        });
+        } });
     }
-    renderers.r_batch.end();
 }
 
 fn renderGoal(
