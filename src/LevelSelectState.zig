@@ -412,7 +412,6 @@ fn loadProgression(self: *LevelSelectState) !void {
 }
 
 fn allMapsComplete(self: *LevelSelectState) bool {
-    std.debug.print("{any}, {any}, seen ={any}\n", .{ self.prog_state.num_complete, self.num_buttons, self.prog_state.have_seen_ending });
     return self.prog_state.num_complete == self.num_buttons;
 }
 
