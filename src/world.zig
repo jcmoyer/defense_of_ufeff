@@ -840,7 +840,7 @@ fn lancerUpdate(self: *Tower, frame: u64) void {
         self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 9, 0.25, 5);
         self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 8, 0.20, 10);
         self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 7, 0.15, 15);
-        // self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 6, 0.10, 20);
+        self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 6, 0.10, 20);
 
         self.world.playPositionalSound("assets/sounds/stab.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
