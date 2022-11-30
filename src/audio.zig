@@ -454,12 +454,10 @@ const mathutil = @import("mathutil.zig");
 const zm = @import("zmath");
 
 pub fn computePositionalOptions(view: Rect, audio_position: [2]i32) AudioOptions {
-    const V2 = @Vector(2, f32);
-
     const view_center = view.centerPoint();
     const theta = mathutil.angleBetween(
-        V2{ @intToFloat(f32, view_center[0]), @intToFloat(f32, view_center[1]) },
-        V2{ @intToFloat(f32, audio_position[0]), @intToFloat(f32, audio_position[1]) },
+        .{ @intToFloat(f32, view_center[0]), @intToFloat(f32, view_center[1]) },
+        .{ @intToFloat(f32, audio_position[0]), @intToFloat(f32, audio_position[1]) },
     );
 
     // cosine except shifted from -1..1 to 0..1

@@ -25,8 +25,9 @@ pub fn dist(v0: anytype, v1: anytype) f32 {
 }
 
 pub fn angleBetween(v0: anytype, v1: anytype) f32 {
-    const d = v1 - v0;
-    return std.math.atan2(f32, d[1], d[0]);
+    const dy = v1[1] - v0[1];
+    const dx = v1[0] - v0[0];
+    return std.math.atan2(f32, dy, dx);
 }
 
 pub fn colorMulU8Scalar(a: u8, b: u8) u8 {

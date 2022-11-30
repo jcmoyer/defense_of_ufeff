@@ -171,7 +171,7 @@ pub const BitmapFont = struct {
 
     pub const DrawTextOptions = struct {
         dest: Rect,
-        color: @Vector(4, u8) = @splat(4, @as(u8, 255)),
+        color: [4]u8 = .{ 255, 255, 255, 255 },
         h_alignment: HTextAlignment = .left,
         v_alignment: VTextAlignment = .middle,
     };

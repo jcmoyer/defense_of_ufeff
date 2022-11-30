@@ -253,7 +253,7 @@ pub fn renderBackground(self: *MenuState, alpha: f64) void {
                     src.w,
                     src.h,
                 ),
-                .color = @Vector(4, u8){ 100, 100, 100, 255 },
+                .color = .{ 100, 100, 100, 255 },
             });
         }
     }

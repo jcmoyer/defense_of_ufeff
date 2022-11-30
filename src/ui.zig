@@ -11,11 +11,10 @@ pub const ControlTexture = struct {
 };
 
 pub const ControlColor = struct {
-    const Vec4b = @Vector(4, u8);
-    color: Vec4b,
+    color: [4]u8,
 
-    pub const white = ControlColor{ .color = Vec4b{ 255, 255, 255, 255 } };
-    pub const black = ControlColor{ .color = Vec4b{ 0, 0, 0, 255 } };
+    pub const white = ControlColor{ .color = .{ 255, 255, 255, 255 } };
+    pub const black = ControlColor{ .color = .{ 0, 0, 0, 255 } };
 };
 
 pub const MouseButtons = struct {
@@ -1356,9 +1355,9 @@ fn drawLineImpl(ptr: *anyopaque, x0: f32, y0: f32, x1: f32, y1: f32) void {
         state.last_draw = .immediate;
     }
     state.opts.r_imm.drawLine(
-        @Vector(4, f32){ @intToFloat(f32, state.translate_x) + x0, @intToFloat(f32, state.translate_y) + y0, 0, 1 },
-        @Vector(4, f32){ @intToFloat(f32, state.translate_x) + x1, @intToFloat(f32, state.translate_y) + y1, 0, 1 },
-        @Vector(4, f32){ 1, 1, 1, 1 },
+        .{ @intToFloat(f32, state.translate_x) + x0, @intToFloat(f32, state.translate_y) + y0, 0, 1 },
+        .{ @intToFloat(f32, state.translate_x) + x1, @intToFloat(f32, state.translate_y) + y1, 0, 1 },
+        .{ 1, 1, 1, 1 },
     );
 }
 
@@ -1434,7 +1433,7 @@ pub fn renderUI(opts: UIRenderOptions, ui_root: Root) void {
         text_rect.alignTop(frame_rect.top() + tooltip_padding);
 
         opts.r_imm.beginUntextured();
-        opts.r_imm.drawQuadRGBA(frame_rect, @Vector(4, f32){ 0, 0, 0, 0.6 });
+        opts.r_imm.drawQuadRGBA(frame_rect, .{ 0, 0, 0, 0.6 });
 
         opts.r_font.begin(.{
             .texture = opts.font_texture,

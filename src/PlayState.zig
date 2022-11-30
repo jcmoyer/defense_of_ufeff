@@ -925,7 +925,7 @@ fn renderFloatingText(
             t.textSlice(),
             .{
                 .dest = dest,
-                .color = @Vector(4, u8){
+                .color = .{
                     t.color[0],
                     t.color[1],
                     t.color[2],
@@ -1552,7 +1552,7 @@ fn renderWipe(self: *PlayState, alpha: f64) void {
     const text_alpha = @floatToInt(u8, a * 255);
     self.game.renderers.r_font.drawText("Loading...", .{
         .dest = Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT),
-        .color = @Vector(4, u8){ 255, 255, 255, text_alpha },
+        .color = .{ 255, 255, 255, text_alpha },
         .h_alignment = .center,
         .v_alignment = .middle,
     });
@@ -1784,7 +1784,7 @@ fn renderWaveTimer(self: *PlayState, alpha: f64) void {
     });
     self.game.renderers.r_font.drawText(self.wave_timer.wave_timer_text, .{
         .dest = box_rect,
-        .color = @Vector(4, u8){ 255, 255, 255, @floatToInt(u8, total_alpha * @intToFloat(f32, text_alpha)) },
+        .color = .{ 255, 255, 255, @floatToInt(u8, total_alpha * @intToFloat(f32, text_alpha)) },
         .h_alignment = .center,
         .v_alignment = .middle,
     });

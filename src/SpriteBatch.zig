@@ -15,7 +15,7 @@ const fssrc = @embedFile("SpriteBatch.frag");
 
 const Vertex = extern struct {
     xyuv: zm.F32x4,
-    rgba: @Vector(4, u8),
+    rgba: [4]u8,
     flash: u8,
     pad: [3]u8 = undefined,
 };
@@ -252,7 +252,7 @@ pub fn drawQuad(self: *SpriteBatch, opts: DrawQuadOptions) void {
 
 pub const DrawQuadTransformedOptions = struct {
     src: Rectf,
-    color: @Vector(4, u8) = @splat(4, @as(u8, 255)),
+    color: [4]u8 = .{ 255, 255, 255, 255 },
     flash: bool = false,
     transform: zm.Mat,
 };

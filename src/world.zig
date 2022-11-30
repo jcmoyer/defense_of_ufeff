@@ -1085,8 +1085,8 @@ pub const Tower = struct {
 
     pub fn angleTo(self: *Tower, world_x: i32, world_y: i32) f32 {
         var r = mu.angleBetween(
-            @Vector(2, f32){ @intToFloat(f32, self.world_x + 8), @intToFloat(f32, self.world_y + 8) },
-            @Vector(2, f32){ @intToFloat(f32, world_x), @intToFloat(f32, world_y) },
+            .{ @intToFloat(f32, self.world_x + 8), @intToFloat(f32, self.world_y + 8) },
+            .{ @intToFloat(f32, world_x), @intToFloat(f32, world_y) },
         );
         return r;
     }
@@ -1329,7 +1329,7 @@ pub const FloatingText = struct {
     max_life: u32 = 30,
     life: u32 = 30,
     dead: bool = false,
-    color: @Vector(4, u8) = @splat(4, @as(u8, 255)),
+    color: [4]u8 = .{ 255, 255, 255, 255 },
 
     fn update(self: *FloatingText) void {
         self.p_world_x = self.world_x;
@@ -1850,7 +1850,7 @@ pub const World = struct {
     pub fn spawnGoldGain(self: *World, amt: u32, world_x: i32, world_y: i32) !void {
         const text_id = try self.spawnPrintFloatingText("+{d}", .{amt}, world_x, world_y);
         var text_obj = self.floating_text.getPtr(text_id);
-        text_obj.color = @Vector(4, u8){ 255, 255, 0, 255 };
+        text_obj.color = .{ 255, 255, 0, 255 };
         text_obj.vel_y = -1;
         self.player_gold += amt;
     }
@@ -1977,8 +1977,7 @@ pub const World = struct {
             const p = m.getWorldCollisionRect().toRectf().centerPoint();
             const d = mu.dist(p, pos);
             if (d <= radius) {
-                const V2 = @Vector(2, f32);
-                const r = mu.angleBetween(@as(V2, p), @as(V2, pos));
+                const r = mu.angleBetween(p, pos);
                 m.hurtDelayed(.{ .amount = amt, .direction = .{ @cos(r), @sin(r) }, .damage_type = dtype }, frame_count);
             }
         }
