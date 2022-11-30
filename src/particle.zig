@@ -192,7 +192,7 @@ pub const ParticleSystem = struct {
                     rgba[0],
                     rgba[1],
                     rgba[2],
-                    mu.colorMulU8Scalar(rgba[3], @floatToInt(u8, a)),
+                    @floatToInt(u8, a),
                 };
                 const s = self.particles.items(.life)[i].invProgressClamped(frame);
                 self.particles.items(.scale)[i] = s;
