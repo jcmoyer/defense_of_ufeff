@@ -1098,7 +1098,7 @@ fn renderGrid(
     const width = @intToFloat(f32, renderers.output_width);
     const height = @intToFloat(f32, renderers.output_height);
 
-    const grid_color = zm.f32x4(0, 0, 0, 0.2);
+    const grid_color = [4]u8{ 0, 0, 0, 50 };
 
     renderers.r_imm.beginUntextured();
     var y: f32 = 16;
@@ -1179,18 +1179,18 @@ fn renderRangeIndicatorForTower(renderers: *RenderServices, cam: Camera, spec: *
         32,
         zm.f32x4(@intToFloat(f32, world_x - cam.view.left()), @intToFloat(f32, world_y - cam.view.top()), 0, 0),
         spec.min_range,
-        zm.f32x4(1, 0, 0, 1),
+        .{ 255, 0, 0, 255 },
     );
     renderers.r_imm.drawCircle(
         32,
         zm.f32x4(@intToFloat(f32, world_x - cam.view.left()), @intToFloat(f32, world_y - cam.view.top()), 0, 0),
         spec.max_range,
-        zm.f32x4(0, 1, 0, 1),
+        .{ 0, 255, 0, 255 },
     );
 }
 
 fn renderPlacementIndicator(renderers: *RenderServices, world: *World, cam: Camera, tile_coord: tilemap.TileCoord) void {
-    const color = if (world.canBuildAt(tile_coord)) [4]f32{ 0, 1, 0, 0.5 } else [4]f32{ 1, 0, 0, 0.5 };
+    const color: [4]u8 = if (world.canBuildAt(tile_coord)) .{ 0, 255, 0, 128 } else .{ 255, 0, 0, 128 };
     const dest = Rect.init(
         @intCast(i32, tile_coord.worldX()) - cam.view.left(),
         @intCast(i32, tile_coord.worldY()) - cam.view.top(),
@@ -1215,7 +1215,7 @@ fn renderDemolishIndicator(self: *PlayState, cam: Camera) void {
             16,
         );
         self.game.renderers.r_imm.beginUntextured();
-        self.game.renderers.r_imm.drawQuadRGBA(dest, [4]f32{ 1, 0, 0, 0.5 });
+        self.game.renderers.r_imm.drawQuadRGBA(dest, .{ 255, 0, 0, 128 });
     }
 }
 
@@ -1533,10 +1533,10 @@ fn renderWipe(self: *PlayState, alpha: f64) void {
     const tx = zm.lerpV(t0, t1, @floatCast(f32, alpha));
 
     const right = @floatToInt(i32, zm.lerpV(-wipe_scanline_width, Game.INTERNAL_WIDTH, tx));
-    const a = tx;
+    const a = @floatToInt(u8, 255.0 * tx);
 
     self.game.renderers.r_imm.beginUntextured();
-    self.game.renderers.r_imm.drawQuadRGBA(Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT), zm.f32x4(0, 0, 0, a));
+    self.game.renderers.r_imm.drawQuadRGBA(Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT), .{ 0, 0, 0, a });
 
     self.game.renderers.r_quad.begin(.{});
     for (self.wipe_scanlines) |*sc, i| {
@@ -1549,10 +1549,9 @@ fn renderWipe(self: *PlayState, alpha: f64) void {
         .texture = self.game.texman.getNamedTexture("CommonCase.png"),
         .spec = &self.fontspec,
     });
-    const text_alpha = @floatToInt(u8, a * 255);
     self.game.renderers.r_font.drawText("Loading...", .{
         .dest = Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT),
-        .color = .{ 255, 255, 255, text_alpha },
+        .color = .{ 255, 255, 255, a },
         .h_alignment = .center,
         .v_alignment = .middle,
     });

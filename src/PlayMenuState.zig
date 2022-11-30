@@ -115,7 +115,7 @@ pub fn render(self: *PlayMenuState, alpha: f64) void {
     // darken
     self.game.renderers.r_imm.setOutputDimensions(1, 1);
     self.game.renderers.r_imm.beginUntextured();
-    self.game.renderers.r_imm.drawQuadRGBA(Rect.init(0, 0, 1, 1), .{ 0, 0, 0, 0.5 });
+    self.game.renderers.r_imm.drawQuadRGBA(Rect.init(0, 0, 1, 1), .{ 0, 0, 0, 128 });
 
     ui.renderUI(.{
         .r_batch = &self.game.renderers.r_batch,

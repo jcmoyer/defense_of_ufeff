@@ -291,9 +291,9 @@ pub fn render(self: *Game, alpha: f64) void {
         self.output_rect.y,
         @intCast(u32, self.output_rect.w),
         @intCast(u32, self.output_rect.h),
-        1,
-        1,
-        1,
+        255,
+        255,
+        255,
     );
 
     sdl.SDL_GL_SwapWindow(self.window);

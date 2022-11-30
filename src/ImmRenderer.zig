@@ -21,7 +21,7 @@ pub const TexturedParams = struct {
 // Shared between textured/untextured; wastes 2 floats per vertex but it should be fine
 const Vertex = extern struct {
     xyuv: zm.F32x4,
-    rgba: zm.F32x4,
+    rgba: [4]u8,
 };
 
 const TexturedUniforms = struct {
@@ -58,7 +58,7 @@ pub fn create() ImmRenderer {
     gl.bindVertexArray(self.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, self.buffer);
     gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "xyuv")));
-    gl.vertexAttribPointer(1, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "rgba")));
+    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "rgba")));
     gl.enableVertexAttribArray(0);
     gl.enableVertexAttribArray(1);
 
@@ -91,12 +91,12 @@ pub fn beginUntextured(self: ImmRenderer) void {
     gl.uniformMatrix4fv(self.untex_uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
 }
 
-pub fn drawQuad(self: ImmRenderer, x: i32, y: i32, w: u32, h: u32, r: f32, g: f32, b: f32) void {
+pub fn drawQuad(self: ImmRenderer, x: i32, y: i32, w: u32, h: u32, r: u8, g: u8, b: u8) void {
     const left = @intToFloat(f32, x);
     const right = @intToFloat(f32, x + @intCast(i32, w));
     const top = @intToFloat(f32, y);
     const bottom = @intToFloat(f32, y + @intCast(i32, h));
-    const rgba = zm.f32x4(r, g, b, 1);
+    const rgba = .{ r, g, b, 255 };
 
     const vertices = [4]Vertex{
         Vertex{ .xyuv = zm.f32x4(left, top, 0, 1), .rgba = rgba },
@@ -110,7 +110,7 @@ pub fn drawQuad(self: ImmRenderer, x: i32, y: i32, w: u32, h: u32, r: f32, g: f3
     gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
 }
 
-pub fn drawLine(self: ImmRenderer, p0: zm.Vec, p1: zm.Vec, rgba: zm.Vec) void {
+pub fn drawLine(self: ImmRenderer, p0: zm.Vec, p1: zm.Vec, rgba: [4]u8) void {
     const vertices = [2]Vertex{
         Vertex{ .xyuv = p0, .rgba = rgba },
         Vertex{ .xyuv = p1, .rgba = rgba },
@@ -121,7 +121,7 @@ pub fn drawLine(self: ImmRenderer, p0: zm.Vec, p1: zm.Vec, rgba: zm.Vec) void {
     gl.drawArrays(gl.LINES, 0, 2);
 }
 
-pub fn drawRectangle(self: ImmRenderer, p0: zm.Vec, p1: zm.Vec, rgba: zm.Vec) void {
+pub fn drawRectangle(self: ImmRenderer, p0: zm.Vec, p1: zm.Vec, rgba: [4]u8) void {
     const vertices = [4]Vertex{
         Vertex{ .xyuv = zm.f32x4(p0[0], p0[1], 0, 0), .rgba = rgba },
         Vertex{ .xyuv = zm.f32x4(p0[0], p1[1], 0, 0), .rgba = rgba },
@@ -134,7 +134,7 @@ pub fn drawRectangle(self: ImmRenderer, p0: zm.Vec, p1: zm.Vec, rgba: zm.Vec) vo
     gl.drawArrays(gl.LINE_LOOP, 0, vertices.len);
 }
 
-pub fn drawCircle(self: ImmRenderer, comptime segs: comptime_int, p0: zm.Vec, r: f32, rgba: zm.Vec) void {
+pub fn drawCircle(self: ImmRenderer, comptime segs: comptime_int, p0: zm.Vec, r: f32, rgba: [4]u8) void {
     var vertices: [segs]Vertex = undefined;
     inline for (vertices) |*v, i| {
         const f = @intToFloat(f32, i) + 1.0;
@@ -152,7 +152,7 @@ pub fn drawCircle(self: ImmRenderer, comptime segs: comptime_int, p0: zm.Vec, r:
     gl.drawArrays(gl.LINE_LOOP, 0, vertices.len);
 }
 
-pub fn drawQuadRGBA(self: ImmRenderer, dest: Rect, rgba: zm.Vec) void {
+pub fn drawQuadRGBA(self: ImmRenderer, dest: Rect, rgba: [4]u8) void {
     const left = @intToFloat(f32, dest.left());
     const right = @intToFloat(f32, dest.right());
     const top = @intToFloat(f32, dest.top());
@@ -187,7 +187,7 @@ pub fn drawQuadTextured(self: ImmRenderer, src: Rect, dest: Rect) void {
     const right = @intToFloat(f32, dest.right());
     const top = @intToFloat(f32, dest.y);
     const bottom = @intToFloat(f32, dest.bottom());
-    const rgba = zm.f32x4(1, 1, 1, 1);
+    const rgba = .{ 255, 255, 255, 255 };
 
     const vertices = [4]Vertex{
         Vertex{ .xyuv = zm.f32x4(left, top, uv_left, uv_top), .rgba = rgba },

@@ -1296,12 +1296,7 @@ fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRe
                 },
                 .color => |c| {
                     opts.r_imm.beginUntextured();
-                    opts.r_imm.drawQuadRGBA(render_dest, zm.Vec{
-                        @intToFloat(f32, c.color[0]),
-                        @intToFloat(f32, c.color[1]),
-                        @intToFloat(f32, c.color[2]),
-                        @intToFloat(f32, c.color[3]),
-                    });
+                    opts.r_imm.drawQuadRGBA(render_dest, c.color);
                 },
                 .none => {},
             }
@@ -1357,7 +1352,7 @@ fn drawLineImpl(ptr: *anyopaque, x0: f32, y0: f32, x1: f32, y1: f32) void {
     state.opts.r_imm.drawLine(
         .{ @intToFloat(f32, state.translate_x) + x0, @intToFloat(f32, state.translate_y) + y0, 0, 1 },
         .{ @intToFloat(f32, state.translate_x) + x1, @intToFloat(f32, state.translate_y) + y1, 0, 1 },
-        .{ 1, 1, 1, 1 },
+        .{ 255, 255, 255, 255 },
     );
 }
 
@@ -1370,7 +1365,7 @@ fn drawRectangleImpl(ptr: *anyopaque, x0: f32, y0: f32, x1: f32, y1: f32) void {
     }
     const tx = @intToFloat(f32, state.translate_x);
     const ty = @intToFloat(f32, state.translate_y);
-    state.opts.r_imm.drawRectangle(.{ tx + x0, ty + y0, 0, 1 }, .{ tx + x1, ty + y1, 0, 1 }, .{ 1, 1, 1, 1 });
+    state.opts.r_imm.drawRectangle(.{ tx + x0, ty + y0, 0, 1 }, .{ tx + x1, ty + y1, 0, 1 }, .{ 255, 255, 255, 255 });
 }
 
 fn drawTextureImpl(ptr: *anyopaque, texture: *const Texture, dest: Rect) void {
@@ -1433,7 +1428,7 @@ pub fn renderUI(opts: UIRenderOptions, ui_root: Root) void {
         text_rect.alignTop(frame_rect.top() + tooltip_padding);
 
         opts.r_imm.beginUntextured();
-        opts.r_imm.drawQuadRGBA(frame_rect, .{ 0, 0, 0, 0.6 });
+        opts.r_imm.drawQuadRGBA(frame_rect, .{ 0, 0, 0, 150 });
 
         opts.r_font.begin(.{
             .texture = opts.font_texture,
