@@ -100,7 +100,7 @@ const NextWaveTimer = struct {
 const DrawQuadCommand = struct {
     opts: SpriteBatch.DrawQuadOptions,
 };
-const DrawQueue = std.ArrayListUnmanaged(DrawQuadCommand);
+const DrawQueue = []DrawQuadCommand;
 
 game: *Game,
 camera: Camera = DEFAULT_CAMERA,
@@ -130,7 +130,6 @@ ui_upgrade_states: [3]UpgradeButtonState,
 fast: bool = false,
 music_params: ?*audio.AudioParameters = null,
 wave_timer: NextWaveTimer,
-draw_queue: DrawQueue = .{},
 
 paused: bool = false,
 
@@ -177,9 +176,8 @@ pub fn create(game: *Game) !*PlayState {
         .game = game,
         .ui_root = ui.Root.init(game.allocator, &game.sdl_backend),
         .t_minimap = game.texman.createInMemory(),
-        // Created/destroyed in update()
-        .frame_arena = undefined,
         // Initialized below
+        .frame_arena = undefined,
         .fontspec = undefined,
         .fontspec_numbers = undefined,
         .ui_buttons = undefined,
@@ -207,6 +205,9 @@ pub fn create(game: *Game) !*PlayState {
         .b_recruit = undefined,
         .b_call_wave = undefined,
     };
+
+    self.frame_arena = std.heap.ArenaAllocator.init(game.allocator);
+    errdefer self.frame_arena.deinit();
 
     self.r_world = try WorldRenderer.create(game.allocator, &game.renderers);
     errdefer self.r_world.destroy(game.allocator);
@@ -392,6 +393,7 @@ fn onMinimapPan(_: *ui.Minimap, self: *PlayState, x: f32, y: f32) void {
 }
 
 pub fn destroy(self: *PlayState) void {
+    self.frame_arena.deinit();
     if (self.music_params) |params| {
         params.release();
     }
@@ -408,7 +410,6 @@ pub fn destroy(self: *PlayState) void {
         world.destroy();
         self.world = null;
     }
-    self.draw_queue.deinit(self.game.allocator);
     self.ui_root.deinit();
     self.minimap_elements.deinit(self.game.allocator);
     self.game.allocator.destroy(self);
@@ -433,8 +434,10 @@ pub fn leave(self: *PlayState, to: ?Game.StateId) void {
 pub fn update(self: *PlayState) void {
     var world = self.world orelse @panic("update with no world");
 
-    self.frame_arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer self.frame_arena.deinit();
+    const arena_was_reset = self.frame_arena.reset(.retain_capacity);
+    if (!arena_was_reset) {
+        std.log.warn("PlayState.update: frame_arena not reset!", .{});
+    }
     var arena = self.frame_arena.allocator();
 
     self.prev_camera = self.camera;
@@ -590,7 +593,7 @@ fn sortDrawQueueY(q: DrawQueue) void {
             return a.opts.dest.y < b.opts.dest.y;
         }
     };
-    std.sort.sort(DrawQuadCommand, q.items, {}, SortImpl.less);
+    std.sort.sort(DrawQuadCommand, q, {}, SortImpl.less);
 }
 
 fn execDrawQueue(renderers: *RenderServices, q: DrawQueue) void {
@@ -598,7 +601,7 @@ fn execDrawQueue(renderers: *RenderServices, q: DrawQueue) void {
     renderers.r_batch.begin(.{
         .texture = renderers.texman.getNamedTexture("characters.png"),
     });
-    for (q.items) |cmd| {
+    for (q) |cmd| {
         renderers.r_batch.drawQuad(cmd.opts);
     }
     renderers.r_batch.end();
@@ -607,13 +610,16 @@ fn execDrawQueue(renderers: *RenderServices, q: DrawQueue) void {
 pub fn render(self: *PlayState, alpha: f64) void {
     var world = self.world orelse @panic("render with no world");
 
-    // TODO: should probably replace this with an arena at some point, but it seems like the stdlib arena doesn't reuse memory?
-    // https://github.com/ziglang/zig/pull/12590
-    self.draw_queue.ensureTotalCapacity(self.game.allocator, world.monsters.slice().len) catch |err| {
+    const arena_was_reset = self.frame_arena.reset(.retain_capacity);
+    if (!arena_was_reset) {
+        std.log.warn("PlayState.render: frame_arena not reset!", .{});
+    }
+    var arena = self.frame_arena.allocator();
+
+    var draw_queue = arena.alloc(DrawQuadCommand, world.monsters.slice().len) catch |err| {
         std.log.err("Failed to allocate draw_queue storage: {!}", .{err});
         std.process.exit(1);
     };
-    self.draw_queue.clearRetainingCapacity();
 
     const world_interp = if (self.paused or self.sub != .none) @as(f64, 0) else alpha;
 
@@ -628,9 +634,9 @@ pub fn render(self: *PlayState, alpha: f64) void {
     renderGoal(&self.game.renderers, world, cam_interp, world_interp);
     renderTowerBases(&self.game.renderers, world, cam_interp, if (self.interact_state == .select) self.interact_state.select.selected_tower else null);
 
-    renderMonsters(world, cam_interp, world_interp, &self.draw_queue);
-    sortDrawQueueY(self.draw_queue);
-    execDrawQueue(&self.game.renderers, self.draw_queue);
+    renderMonsters(world, cam_interp, world_interp, draw_queue);
+    sortDrawQueueY(draw_queue);
+    execDrawQueue(&self.game.renderers, draw_queue);
 
     renderTowers(&self.game.renderers, world, cam_interp, if (self.interact_state == .select) self.interact_state.select.selected_tower else null);
     renderStolenHearts(&self.game.renderers, world, cam_interp, world_interp, self.r_world.heart_anim);
@@ -1002,21 +1008,23 @@ fn renderMonsters(
     world: *World,
     cam: Camera,
     a: f64,
-    buf: *DrawQueue,
+    buf: DrawQueue,
 ) void {
-    for (world.monsters.slice()) |*m| {
+    for (world.monsters.slice()) |*m, i| {
         const animator = m.animator orelse continue;
         var color: [4]u8 = m.spec.color;
         if (m.slow_frames > 0) {
             color = mathutil.colorMulU8(4, color, .{ 0x80, 0x80, 0xFF, 0xFF });
         }
         const w = m.getInterpWorldPosition(a);
-        buf.appendAssumeCapacity(.{ .opts = .{
-            .src = animator.getCurrentRect().toRectf(),
-            .dest = Rect.init(@intCast(i32, w[0]) - cam.view.left(), @intCast(i32, w[1]) - cam.view.top(), 16, 16).toRectf(),
-            .flash = m.flash_frames > 0,
-            .color = color,
-        } });
+        buf[i] = .{
+            .opts = .{
+                .src = animator.getCurrentRect().toRectf(),
+                .dest = Rect.init(@intCast(i32, w[0]) - cam.view.left(), @intCast(i32, w[1]) - cam.view.top(), 16, 16).toRectf(),
+                .flash = m.flash_frames > 0,
+                .color = color,
+            },
+        };
     }
 }
 
