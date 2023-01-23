@@ -156,7 +156,7 @@ pub fn IntrusiveSlotMap(comptime T: type) type {
         @compileError(@typeName(T) ++ " must have a field `id: u32`");
     }
     const id_info = std.meta.fieldInfo(T, .id);
-    if (id_info.field_type != u32) {
+    if (id_info.type != u32) {
         @compileError(@typeName(T) ++ ".id must have type `u32`");
     }
 
