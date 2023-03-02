@@ -780,7 +780,7 @@ pub const t_ninja = TowerSpec{
 
     .anim_set = anim.a_human4.animationSet(),
     .updateFn = ninjaUpdate,
-    .max_range = 90,
+    .max_range = 120,
     .upgrades = [3]?*const TowerSpec{ null, null, null },
     .tint_rgba = .{ 128, 128, 128, 255 },
 };
@@ -793,9 +793,9 @@ fn ninjaUpdate(self: *Tower, frame: u64) void {
         const target = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         const r = self.angleTo(target[0], target[1]);
 
-        var i: i8 = -1;
+        var i: i8 = -2;
         var num: u8 = 0;
-        while (i <= 1) : (i += 1) {
+        while (i <= 2) : (i += 1) {
             const angle_diff = (std.math.pi / 8.0) * @intToFloat(f32, i);
             var proj = self.world.spawnProjectileDelayed(&proj_star, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8), 3 * num) catch unreachable;
             proj.activate_sound = .bow;
