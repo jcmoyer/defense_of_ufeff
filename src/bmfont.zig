@@ -206,7 +206,7 @@ pub const BitmapFont = struct {
             dx = getXStart(opts.h_alignment, opts.dest, dims, line_dims);
         }
         var last_ch: u8 = 0;
-        for (text) |ch, i| {
+        for (text, 0..) |ch, i| {
             if (ch == '\n') {
                 dy += self.mapGlyph(' ').h;
                 dx = opts.dest.x;

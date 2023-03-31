@@ -2128,7 +2128,7 @@ pub const World = struct {
             goal.update(self.world_frame);
         }
 
-        for (self.active_waves.items) |wave_id, active_wave_index| {
+        for (self.active_waves.items, 0..) |wave_id, active_wave_index| {
             if (!self.waves.waves[wave_id].anyRemainingEvents()) {
                 active_waves_pending_removal.append(frame_arena, active_wave_index) catch unreachable;
             }
@@ -2402,7 +2402,7 @@ const PathfindingCache = struct {
         }
 
         var my_path = self.copyPath(path) catch unreachable;
-        for (my_path) |start, i| {
+        for (my_path, 0..) |start, i| {
             const key = PathingCoords{
                 .start = start,
                 .end = coords.end,
@@ -2700,7 +2700,7 @@ pub fn loadWavesFromJson(allocator: Allocator, filename: []const u8, world: *Wor
     var waves = try allocator.alloc(Wave, doc.waves.len);
     errdefer allocator.free(waves);
 
-    for (doc.waves) |doc_wave, wave_index| {
+    for (doc.waves, 0..) |doc_wave, wave_index| {
         waves[wave_index] = Wave{
             .spawn_events = std.AutoArrayHashMapUnmanaged(u32, WaveEventList){},
         };
@@ -2708,7 +2708,7 @@ pub fn loadWavesFromJson(allocator: Allocator, filename: []const u8, world: *Wor
         for (doc_wave.spawn_points) |doc_sp| {
             const world_spawn_id = world.getSpawnId(doc_sp.spawn_point) orelse return error.InvalidSpawnPoint;
             var event_list = try allocator.alloc(WaveEvent, doc_sp.events.len);
-            for (doc_sp.events) |doc_event, event_index| {
+            for (doc_sp.events, 0..) |doc_event, event_index| {
                 switch (doc_event) {
                     .spawn => |spawn| {
                         event_list[event_index] = .{ .spawn = EventSpawn{
@@ -2890,7 +2890,7 @@ fn loadTileLayer(layer: TiledTileLayer, ctx: LoadContext) !void {
         std.process.exit(1);
     };
 
-    for (layer_ints) |t_tid, i| {
+    for (layer_ints, 0..) |t_tid, i| {
         const result = ctx.classifier.classify(@intCast(u16, t_tid));
         tilemap.atScalarPtr(layer_id, i).* = .{
             .bank = result.bank,

@@ -13,3 +13,10 @@ pub fn build(b: *std.build.Builder) void {
 inline fn thisDir() []const u8 {
     return comptime std.fs.path.dirname(@src().file) orelse ".";
 }
+
+pub fn link(b: *std.build.Builder, exe: *std.build.LibExeObjStep) void {
+    const m = b.addModule("gl33", .{
+        .source_file = .{ .path = thisDir() ++ "/src/gl_3v3.zig" },
+    });
+    exe.addModule("gl33", m);
+}

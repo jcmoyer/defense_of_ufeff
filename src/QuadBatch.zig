@@ -136,7 +136,7 @@ pub fn begin(self: *QuadBatch, params: QuadBatchParams) void {
     _ = params;
     gl.useProgram(self.prog.handle);
     gl.bindVertexArray(self.vao);
-    gl.uniformMatrix4fv(self.uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
+    gl.uniformMatrix4fv(self.uniforms.uTransform, 1, gl.FALSE, zm.arrNPtr(&self.transform));
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.index_buffer);
 

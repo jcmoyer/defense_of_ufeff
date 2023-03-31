@@ -148,7 +148,7 @@ pub fn setOutputDimensions(self: *SpriteBatch, w: u32, h: u32) void {
 pub fn begin(self: *SpriteBatch, params: SpriteBatchParams) void {
     gl.useProgram(self.prog.handle);
     gl.bindVertexArray(self.vao);
-    gl.uniformMatrix4fv(self.uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
+    gl.uniformMatrix4fv(self.uniforms.uTransform, 1, gl.FALSE, zm.arrNPtr(&self.transform));
     gl.uniform1i(self.uniforms.uSampler, 0);
     gl.uniform3f(
         self.uniforms.uFlashRGB,

@@ -9,7 +9,7 @@ pub fn dist(v0: anytype, v1: anytype) f32 {
     const ints = info == .Int or info == .ComptimeInt;
 
     var r: f32 = 0;
-    inline for (v0) |_, i| {
+    inline for (v0, 0..) |_, i| {
         var d = v1[i] - v0[i];
         if (d < 0) {
             d *= -1;
@@ -36,7 +36,7 @@ pub fn colorMulU8Scalar(a: u8, b: u8) u8 {
 
 pub fn colorMulU8(comptime N: usize, a: [N]u8, b: [N]u8) [N]u8 {
     var result: [N]u8 = undefined;
-    for (a) |a_i, i| {
+    for (a, 0..) |a_i, i| {
         const b_i = b[i];
         result[i] = @intCast(u8, (@as(u16, a_i) * @as(u16, b_i) + 255) >> 8);
     }

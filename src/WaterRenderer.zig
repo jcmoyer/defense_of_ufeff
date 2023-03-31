@@ -154,7 +154,7 @@ pub fn begin(self: *WaterRenderer, params: WaterRendererParams) void {
     gl.useProgram(self.prog.handle);
     gl.bindVertexArray(self.vao);
 
-    gl.uniformMatrix4fv(self.uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
+    gl.uniformMatrix4fv(self.uniforms.uTransform, 1, gl.FALSE, zm.arrNPtr(&self.transform));
     gl.uniform1f(self.uniforms.uGlobalTime, params.global_time);
     gl.uniform2fv(self.uniforms.uWaterDirection, 1, zm.arrNPtr(&params.water_direction));
     gl.uniform1f(self.uniforms.uWaterSpeed, params.water_speed);

@@ -304,7 +304,7 @@ pub fn create(game: *Game) !*PlayState {
     self.ui_upgrade_panel.background = .{ .color = ui.ControlColor.black };
     try self.ui_root.addChild(self.ui_upgrade_panel.control());
 
-    for (self.ui_upgrade_buttons) |*b, i| {
+    for (&self.ui_upgrade_buttons, 0..) |*b, i| {
         b.* = try self.ui_root.createButton();
         b.*.texture_rects = makeStandardButtonRects(0, 0);
         b.*.rect = Rect.init(@intCast(i32, i) * 32, 0, 32, 32);
@@ -1010,7 +1010,7 @@ fn renderMonsters(
     a: f64,
     buf: DrawQueue,
 ) void {
-    for (world.monsters.slice()) |*m, i| {
+    for (world.monsters.slice(), 0..) |*m, i| {
         const animator = m.animator orelse continue;
         var color: [4]u8 = m.spec.color;
         if (m.slow_frames > 0) {
@@ -1547,7 +1547,7 @@ fn renderWipe(self: *PlayState, alpha: f64) void {
     self.game.renderers.r_imm.drawQuadRGBA(Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT), .{ 0, 0, 0, a });
 
     self.game.renderers.r_quad.begin(.{});
-    for (self.wipe_scanlines) |*sc, i| {
+    for (&self.wipe_scanlines, 0..) |*sc, i| {
         const rect = Rect.init(0, @intCast(i32, i), right + sc.*, 1);
         self.game.renderers.r_quad.drawQuadRGBA(rect, 0, 0, 0, 255);
     }
@@ -1733,7 +1733,7 @@ fn beginWipe(self: *PlayState) void {
 
     var rng = std.rand.DefaultPrng.init(@intCast(u64, std.time.milliTimestamp()));
     var r = rng.random();
-    for (self.wipe_scanlines) |*sc| {
+    for (&self.wipe_scanlines) |*sc| {
         sc.* = r.intRangeLessThan(i32, 0, wipe_scanline_width);
     }
 }

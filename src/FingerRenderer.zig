@@ -67,7 +67,7 @@ pub fn setOutputDimensions(self: *FingerRenderer, w: u32, h: u32) void {
 pub fn beginTextured(self: *FingerRenderer, params: TexturedParams) void {
     gl.useProgram(self.tex_prog.handle);
     gl.bindVertexArray(self.vao);
-    gl.uniformMatrix4fv(self.tex_uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
+    gl.uniformMatrix4fv(self.tex_uniforms.uTransform, 1, gl.FALSE, zm.arrNPtr(&self.transform));
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, params.texture.handle);
     self.tex_params = params;

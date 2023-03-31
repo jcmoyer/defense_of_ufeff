@@ -79,7 +79,7 @@ pub fn setOutputDimensions(self: *ImmRenderer, w: u32, h: u32) void {
 pub fn beginTextured(self: *ImmRenderer, params: TexturedParams) void {
     gl.useProgram(self.tex_prog.handle);
     gl.bindVertexArray(self.vao);
-    gl.uniformMatrix4fv(self.tex_uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
+    gl.uniformMatrix4fv(self.tex_uniforms.uTransform, 1, gl.FALSE, zm.arrNPtr(&self.transform));
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, params.texture.handle);
     self.tex_params = params;
@@ -88,7 +88,7 @@ pub fn beginTextured(self: *ImmRenderer, params: TexturedParams) void {
 pub fn beginUntextured(self: ImmRenderer) void {
     gl.useProgram(self.untex_prog.handle);
     gl.bindVertexArray(self.vao);
-    gl.uniformMatrix4fv(self.untex_uniforms.uTransform, 1, gl.TRUE, zm.arrNPtr(&self.transform));
+    gl.uniformMatrix4fv(self.untex_uniforms.uTransform, 1, gl.FALSE, zm.arrNPtr(&self.transform));
 }
 
 pub fn drawQuad(self: ImmRenderer, x: i32, y: i32, w: u32, h: u32, r: u8, g: u8, b: u8) void {
@@ -136,7 +136,7 @@ pub fn drawRectangle(self: ImmRenderer, p0: zm.Vec, p1: zm.Vec, rgba: [4]u8) voi
 
 pub fn drawCircle(self: ImmRenderer, comptime segs: comptime_int, p0: zm.Vec, r: f32, rgba: [4]u8) void {
     var vertices: [segs]Vertex = undefined;
-    inline for (vertices) |*v, i| {
+    inline for (&vertices, 0..) |*v, i| {
         const f = @intToFloat(f32, i) + 1.0;
         const d = f / @intToFloat(f32, segs);
         const offset = p0 + zm.f32x4(
