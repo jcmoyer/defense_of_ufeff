@@ -334,7 +334,7 @@ pub fn render(self: *LevelSelectState, alpha: f64) void {
         .texture = self.game.texman.getNamedTexture("finger.png"),
     });
     const p = self.finger.getInterpWorldPosition(@floatCast(f32, alpha));
-    self.r_finger.drawFinger(p[0], p[1], @intToFloat(f32, self.game.frame_counter) / 8.0);
+    self.r_finger.drawFinger(p[0], p[1], @floatFromInt(f32, self.game.frame_counter) / 8.0);
 
     self.renderFade();
 }
@@ -421,8 +421,8 @@ fn moveFingerToRecommendedMap(self: *LevelSelectState) void {
         const p = b.rect.centerPoint();
         self.finger.unlocking_button = self.buttons[self.prog_state.num_complete];
         self.finger.moveTo(
-            @intToFloat(f32, p[0]),
-            @intToFloat(f32, p[1]),
+            @floatFromInt(f32, p[0]),
+            @floatFromInt(f32, p[1]),
             FrameTimer.initSeconds(self.game.frame_counter, 3),
         );
     } else {
@@ -437,5 +437,5 @@ fn moveFingerToRecommendedMap(self: *LevelSelectState) void {
 fn warpFingerToLastMap(self: *LevelSelectState) void {
     const b = self.buttons[self.prog_state.last_map_entered];
     const p = b.rect.centerPoint();
-    self.finger.warpTo(@intToFloat(f32, p[0]), @intToFloat(f32, p[1]));
+    self.finger.warpTo(@floatFromInt(f32, p[0]), @floatFromInt(f32, p[1]));
 }

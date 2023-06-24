@@ -130,8 +130,8 @@ fn renderTilemapLayer(
                 self.water_buf[self.n_water] = WaterDraw{
                     .dest = dest,
                     .world_xy = zm.f32x4(
-                        @intToFloat(f32, x * 16),
-                        @intToFloat(f32, y * 16),
+                        @floatFromInt(f32, x * 16),
+                        @floatFromInt(f32, y * 16),
                         0,
                         0,
                     ),
@@ -177,12 +177,12 @@ pub fn renderTilemap(self: *WorldRenderer, cam: Camera, map: *const Tilemap, fra
 
     const min_tile_x = @intCast(usize, cam.view.left()) / 16;
     const min_tile_y = @intCast(usize, cam.view.top()) / 16;
-    const max_tile_x = std.math.min(
+    const max_tile_x = @min(
         map.width,
         // +1 to account for partially transparent UI panel
         1 + 1 + @intCast(usize, cam.view.right()) / 16,
     );
-    const max_tile_y = std.math.min(
+    const max_tile_y = @min(
         map.height,
         1 + @intCast(usize, cam.view.bottom()) / 16,
     );
@@ -200,7 +200,7 @@ pub fn renderTilemap(self: *WorldRenderer, cam: Camera, map: *const Tilemap, fra
         .water_base = self.renderers.texman.getNamedTexture("water.png"),
         .water_blend = self.renderers.texman.getNamedTexture("water.png"),
         .blend_amount = 0.3,
-        .global_time = @intToFloat(f32, frame_count) / 30.0,
+        .global_time = @floatFromInt(f32, frame_count) / 30.0,
         .water_direction = zm.f32x4(0.3, 0.2, 0, 0),
         .water_drift_range = zm.f32x4(0.2, 0.05, 0, 0),
         .water_drift_scale = zm.f32x4(32, 16, 0, 0),

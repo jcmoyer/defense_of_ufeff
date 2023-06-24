@@ -78,8 +78,8 @@ pub fn inflate(self: *Rect, dx: c_int, dy: c_int) void {
 }
 
 pub fn intersect(self: Rect, other: Rect, subrect: ?*Rect) bool {
-    const xmin = std.math.max(self.x, other.x);
-    const ymin = std.math.max(self.y, other.y);
+    const xmin = @max(self.x, other.x);
+    const ymin = @max(self.y, other.y);
     // TODO: need to figure out if we want inclusive or exclusive width/height
     // (maybe just provide both?) This routine produces undesirable results in
     // some circumstances without the subtraction by one. For example, on a grid
@@ -88,8 +88,8 @@ pub fn intersect(self: Rect, other: Rect, subrect: ?*Rect) bool {
     // the top edge of [2,3]. But such an intersection would produce a
     // zero-height rectangle which seems wrong. So we fudge the numbers such
     // that the above example becomes (32,32,47,47) and (32,48,47,63).
-    const xmax = std.math.min(self.right() - 1, other.right() - 1);
-    const ymax = std.math.min(self.bottom() - 1, other.bottom() - 1);
+    const xmax = @min(self.right() - 1, other.right() - 1);
+    const ymax = @min(self.bottom() - 1, other.bottom() - 1);
     if (xmax < xmin or ymax < ymin) {
         return false;
     } else {
@@ -117,9 +117,9 @@ pub fn clampPoint(self: Rect, x: i32, y: i32) [2]i32 {
 
 pub fn toRectf(self: Rect) Rectf {
     return Rectf.init(
-        @intToFloat(f32, self.x),
-        @intToFloat(f32, self.y),
-        @intToFloat(f32, self.w),
-        @intToFloat(f32, self.h),
+        @floatFromInt(f32, self.x),
+        @floatFromInt(f32, self.y),
+        @floatFromInt(f32, self.w),
+        @floatFromInt(f32, self.h),
     );
 }

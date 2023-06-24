@@ -68,9 +68,9 @@ pub fn create() SpriteBatch {
 
     gl.bindVertexArray(self.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer);
-    gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "xyuv")));
-    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "rgba")));
-    gl.vertexAttribPointer(2, 1, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "flash")));
+    gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @ptrFromInt(?*anyopaque, @offsetOf(Vertex, "xyuv")));
+    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @ptrFromInt(?*anyopaque, @offsetOf(Vertex, "rgba")));
+    gl.vertexAttribPointer(2, 1, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @ptrFromInt(?*anyopaque, @offsetOf(Vertex, "flash")));
 
     gl.enableVertexAttribArray(0);
     gl.enableVertexAttribArray(1);
@@ -140,8 +140,8 @@ pub fn destroy(self: *SpriteBatch) void {
 }
 
 pub fn setOutputDimensions(self: *SpriteBatch, w: u32, h: u32) void {
-    const wf = @intToFloat(f32, w);
-    const hf = @intToFloat(f32, h);
+    const wf = @floatFromInt(f32, w);
+    const hf = @floatFromInt(f32, h);
     self.transform = zm.orthographicOffCenterRh(0, wf, 0, hf, 0, 1);
 }
 
@@ -152,17 +152,17 @@ pub fn begin(self: *SpriteBatch, params: SpriteBatchParams) void {
     gl.uniform1i(self.uniforms.uSampler, 0);
     gl.uniform3f(
         self.uniforms.uFlashRGB,
-        @intToFloat(f32, params.flash_r) / 255.0,
-        @intToFloat(f32, params.flash_g) / 255.0,
-        @intToFloat(f32, params.flash_r) / 255.0,
+        @floatFromInt(f32, params.flash_r) / 255.0,
+        @floatFromInt(f32, params.flash_g) / 255.0,
+        @floatFromInt(f32, params.flash_r) / 255.0,
     );
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, params.texture.handle);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.index_buffer);
 
-    self.ref_width = @intToFloat(f32, params.texture.width);
-    self.ref_height = @intToFloat(f32, params.texture.height);
+    self.ref_width = @floatFromInt(f32, params.texture.width);
+    self.ref_height = @floatFromInt(f32, params.texture.height);
 
     self.vertex_head = 0;
     gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer);
@@ -221,7 +221,7 @@ pub fn drawQuad(self: *SpriteBatch, opts: DrawQuadOptions) void {
     p2 = zm.f32x4(right, top, uv_right, uv_top);
     p3 = zm.f32x4(right, bottom, uv_right, uv_bottom);
 
-    const f_val: u8 = if (opts.flash) @floatToInt(u8, opts.flash_mag * 255) else 0;
+    const f_val: u8 = if (opts.flash) @intFromFloat(u8, opts.flash_mag * 255) else 0;
 
     self.vertices[self.vertex_head + 0] = .{
         .xyuv = p0,

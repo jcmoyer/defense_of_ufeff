@@ -256,7 +256,13 @@ pub const AudioSystem = struct {
         self.music_thread.join();
         self.music_thread.deinit();
         for (self.cache.keys()) |k| {
-            self.allocator.free(k);
+            // TODO: this used to be fine without a cast, but something changed
+            // so that the allocator gets a mismatched allocation size without
+            // it. Filenames are *always* null terminated for interoperability
+            // with stb_vorbis, but StringArrayHashMapUnmanaged uses []const u8
+            // internally so the free ends up being one byte shorter than it
+            // should be...
+            self.allocator.free(@ptrCast([:0]const u8, k));
         }
         for (self.cache.values()) |val| {
             val.destroy(self.allocator);
@@ -317,7 +323,7 @@ pub const AudioSystem = struct {
 
     fn fillBuffer(self: *AudioSystem, buffer: []i16) void {
         // buffer is uninitialized; zero to silence
-        std.mem.set(i16, buffer, 0);
+        @memset(buffer, 0);
 
         self.tracks_m.lock();
         defer self.tracks_m.unlock();
@@ -363,8 +369,8 @@ pub const AudioSystem = struct {
                 std.debug.assert(m_right >= 0 and m_right <= 1);
                 std.debug.assert(volume >= 0 and volume <= 1);
 
-                output_left.* +|= @intCast(i16, (@floatToInt(i32, @intToFloat(f32, input_left) * volume * m_left)));
-                output_right.* +|= @intCast(i16, (@floatToInt(i32, @intToFloat(f32, input_right) * volume * m_right)));
+                output_left.* +|= @intCast(i16, (@intFromFloat(i32, @floatFromInt(f32, input_left) * volume * m_left)));
+                output_right.* +|= @intCast(i16, (@intFromFloat(i32, @floatFromInt(f32, input_right) * volume * m_right)));
 
                 track.cursor += 2;
                 if (track.cursor == buffer_sample_count) {
@@ -456,15 +462,15 @@ const zm = @import("zmath");
 pub fn computePositionalOptions(view: Rect, audio_position: [2]i32) AudioOptions {
     const view_center = view.centerPoint();
     const theta = mathutil.angleBetween(
-        .{ @intToFloat(f32, view_center[0]), @intToFloat(f32, view_center[1]) },
-        .{ @intToFloat(f32, audio_position[0]), @intToFloat(f32, audio_position[1]) },
+        .{ @floatFromInt(f32, view_center[0]), @floatFromInt(f32, view_center[1]) },
+        .{ @floatFromInt(f32, audio_position[0]), @floatFromInt(f32, audio_position[1]) },
     );
 
     // cosine except shifted from -1..1 to 0..1
     const cos_shift = 0.5 * (1.0 + std.math.cos(theta));
 
     const d_center = mathutil.dist(view.centerPoint(), audio_position);
-    const d_edge = @intToFloat(f32, view.w);
+    const d_edge = @floatFromInt(f32, view.w);
     // normalized distance to edge of view, 0 = right in center, 1 = at edge
     const d_norm = std.math.clamp(d_center / d_edge, 0, 1);
     const volume = std.math.clamp(0.9 - d_norm, 0, 1);

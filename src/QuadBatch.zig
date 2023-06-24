@@ -58,8 +58,8 @@ pub fn create() QuadBatch {
 
     gl.bindVertexArray(self.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "x")));
-    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @intToPtr(?*anyopaque, @offsetOf(Vertex, "rgba")));
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @ptrFromInt(?*anyopaque, @offsetOf(Vertex, "x")));
+    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @ptrFromInt(?*anyopaque, @offsetOf(Vertex, "rgba")));
     gl.enableVertexAttribArray(0);
     gl.enableVertexAttribArray(1);
 
@@ -127,8 +127,8 @@ pub fn destroy(self: *QuadBatch) void {
 }
 
 pub fn setOutputDimensions(self: *QuadBatch, w: u32, h: u32) void {
-    const wf = @intToFloat(f32, w);
-    const hf = @intToFloat(f32, h);
+    const wf = @floatFromInt(f32, w);
+    const hf = @floatFromInt(f32, h);
     self.transform = zm.orthographicOffCenterRh(0, wf, 0, hf, 0, 1);
 }
 

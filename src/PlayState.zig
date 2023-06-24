@@ -85,8 +85,8 @@ const NextWaveTimer = struct {
     fontspec: *const bmfont.BitmapFontSpec,
 
     fn setTimerText(self: *NextWaveTimer, sec: f32) void {
-        const mod_sec = @floatToInt(u32, sec) % 60;
-        const min = @floatToInt(u32, sec) / 60;
+        const mod_sec = @intFromFloat(u32, sec) % 60;
+        const min = @intFromFloat(u32, sec) / 60;
         std.debug.assert(mod_sec < 60);
         std.debug.assert(min <= 99);
 
@@ -386,8 +386,8 @@ fn onDemolishClick(button: *ui.Button, self: *PlayState) void {
 
 fn onMinimapPan(_: *ui.Minimap, self: *PlayState, x: f32, y: f32) void {
     self.camera.view.centerOn(
-        @floatToInt(i32, x * @intToFloat(f32, self.camera.bounds.w)) + self.camera.bounds.x,
-        @floatToInt(i32, y * @intToFloat(f32, self.camera.bounds.h)) + self.camera.bounds.y,
+        @intFromFloat(i32, x * @floatFromInt(f32, self.camera.bounds.w)) + self.camera.bounds.x,
+        @intFromFloat(i32, y * @floatFromInt(f32, self.camera.bounds.h)) + self.camera.bounds.y,
     );
     self.camera.clampToBounds();
 }
@@ -568,12 +568,12 @@ fn addMinimapElement(self: *PlayState, world_x: u32, world_y: u32, color: [4]u8)
         return;
     }
 
-    const tx = @intToFloat(f32, range.min.x * 16);
-    const ty = @intToFloat(f32, range.min.y * 16);
-    const ox = @intToFloat(f32, world_x) - tx;
-    const oy = @intToFloat(f32, world_y) - ty;
-    const ww = @intToFloat(f32, range.getWidth() * 16);
-    const wh = @intToFloat(f32, range.getHeight() * 16);
+    const tx = @floatFromInt(f32, range.min.x * 16);
+    const ty = @floatFromInt(f32, range.min.y * 16);
+    const ox = @floatFromInt(f32, world_x) - tx;
+    const oy = @floatFromInt(f32, world_y) - ty;
+    const ww = @floatFromInt(f32, range.getWidth() * 16);
+    const wh = @floatFromInt(f32, range.getHeight() * 16);
     const nx = ox / ww;
     const ny = oy / wh;
 
@@ -593,7 +593,7 @@ fn sortDrawQueueY(q: DrawQueue) void {
             return a.opts.dest.y < b.opts.dest.y;
         }
     };
-    std.sort.sort(DrawQuadCommand, q, {}, SortImpl.less);
+    std.sort.insertion(DrawQuadCommand, q, {}, SortImpl.less);
 }
 
 fn execDrawQueue(renderers: *RenderServices, q: DrawQueue) void {
@@ -815,7 +815,7 @@ fn renderFields(
     var i: usize = 0;
 
     while (i < sys.num_alive) : (i += 1) {
-        const src = particle_rects[@enumToInt(sys.particles.items(.kind)[i])];
+        const src = particle_rects[@intFromEnum(sys.particles.items(.kind)[i])];
         const s = sys.particles.items(.scale)[i];
         const c = sys.particles.items(.rgba)[i];
         const r = sys.particles.items(.rotation)[i];
@@ -870,7 +870,7 @@ fn renderSpriteEffects(
 
         var transform = zm.mul(zm.rotationZ(angle), zm.translation(offset_x, offset_y, 0));
         transform = zm.mul(transform, zm.rotationZ(post_angle));
-        transform = zm.mul(transform, zm.translation(world_x - @intToFloat(f32, cam.view.left()), world_y - @intToFloat(f32, cam.view.top()), 0));
+        transform = zm.mul(transform, zm.translation(world_x - @floatFromInt(f32, cam.view.left()), world_y - @floatFromInt(f32, cam.view.top()), 0));
 
         renderers.r_batch.drawQuadTransformed(.{
             .src = animator.getCurrentRect().toRectf(),
@@ -893,8 +893,8 @@ fn renderProjectiles(
     for (world.projectiles.slice()) |p| {
         var animator = p.animator orelse continue;
         const dest = p.getInterpWorldPosition(alpha);
-        const dx = @intToFloat(f32, dest[0] - cam.view.left());
-        const dy = @intToFloat(f32, dest[1] - cam.view.top());
+        const dx = @floatFromInt(f32, dest[0] - cam.view.left());
+        const dy = @floatFromInt(f32, dest[1] - cam.view.top());
         var t: zm.Mat = zm.scaling(p.scale, p.scale, 1);
         if (p.spec.rotation == .no_rotation) {
             // do nothing
@@ -902,7 +902,7 @@ fn renderProjectiles(
             t = zm.mul(t, zm.rotationZ(p.angle));
         }
         t = zm.mul(t, zm.translation(dx, dy, 0));
-        var color_a = if (p.fadeout_timer) |timer| @floatToInt(u8, timer.invProgressClamped(world.world_frame) * 255) else 255;
+        var color_a = if (p.fadeout_timer) |timer| @intFromFloat(u8, timer.invProgressClamped(world.world_frame) * 255) else 255;
         renderers.r_batch.drawQuadTransformed(.{
             .src = animator.getCurrentRect().toRectf(),
             .transform = t,
@@ -935,7 +935,7 @@ fn renderFloatingText(
                     t.color[0],
                     t.color[1],
                     t.color[2],
-                    @floatToInt(u8, 255 * a_coef),
+                    @intFromFloat(u8, 255 * a_coef),
                 },
                 .v_alignment = .middle,
                 .h_alignment = .center,
@@ -952,7 +952,7 @@ fn renderTowerBases(
     selected_tower: ?wo.TowerId,
 ) void {
     const t_special = renderers.texman.getNamedTexture("special.png");
-    var highlight_mag = @floatCast(f32, 0.5 * (1.0 + std.math.sin(@intToFloat(f64, std.time.milliTimestamp()) / 500.0)));
+    var highlight_mag = @floatCast(f32, 0.5 * (1.0 + std.math.sin(@floatFromInt(f64, std.time.milliTimestamp()) / 500.0)));
 
     // render tower bases
     renderers.r_batch.begin(.{
@@ -980,7 +980,7 @@ fn renderTowers(
 ) void {
     const t_characters = renderers.texman.getNamedTexture("characters.png");
 
-    var highlight_mag = @floatCast(f32, 0.5 * (1.0 + std.math.sin(@intToFloat(f64, std.time.milliTimestamp()) / 500.0)));
+    var highlight_mag = @floatCast(f32, 0.5 * (1.0 + std.math.sin(@floatFromInt(f64, std.time.milliTimestamp()) / 500.0)));
 
     // render tower characters
     renderers.r_batch.begin(.{
@@ -1067,7 +1067,7 @@ fn renderHealthBars(
         var dest_red = Rect.init(w[0] - cam.view.left(), w[1] - 4 - cam.view.top(), 16, 1);
         var dest_border = dest_red;
         dest_border.inflate(1, 1);
-        dest_red.w = @floatToInt(i32, @intToFloat(f32, dest_red.w) * @intToFloat(f32, m.hp) / @intToFloat(f32, m.spec.max_hp));
+        dest_red.w = @intFromFloat(i32, @floatFromInt(f32, dest_red.w) * @floatFromInt(f32, m.hp) / @floatFromInt(f32, m.spec.max_hp));
         renderers.r_quad.drawQuadRGBA(dest_border, 0, 0, 0, 255);
         renderers.r_quad.drawQuadRGBA(dest_red, 255, 0, 0, 255);
     }
@@ -1099,12 +1099,12 @@ fn renderGrid(
     renderers: *RenderServices,
     cam: Camera,
 ) void {
-    var offset_x = @intToFloat(f32, @mod(cam.view.x, 16));
-    var offset_y = @intToFloat(f32, @mod(cam.view.y, 16));
+    var offset_x = @floatFromInt(f32, @mod(cam.view.x, 16));
+    var offset_y = @floatFromInt(f32, @mod(cam.view.y, 16));
     var viewf = cam.view.toRectf();
 
-    const width = @intToFloat(f32, renderers.output_width);
-    const height = @intToFloat(f32, renderers.output_height);
+    const width = @floatFromInt(f32, renderers.output_width);
+    const height = @floatFromInt(f32, renderers.output_height);
 
     const grid_color = [4]u8{ 0, 0, 0, 50 };
 
@@ -1131,11 +1131,11 @@ fn renderBlockedConstructionRects(
 ) void {
     const min_tile_x = @intCast(usize, cam.view.left()) / 16;
     const min_tile_y = @intCast(usize, cam.view.top()) / 16;
-    const max_tile_x = std.math.min(
+    const max_tile_x = @min(
         world.getWidth(),
         1 + @intCast(usize, cam.view.right()) / 16,
     );
-    const max_tile_y = std.math.min(
+    const max_tile_y = @min(
         world.getHeight(),
         1 + @intCast(usize, cam.view.bottom()) / 16,
     );
@@ -1157,9 +1157,9 @@ fn renderBlockedConstructionRects(
                 .w = 16,
                 .h = 16,
             };
-            var a = 0.3 * @sin(@intToFloat(f64, std.time.milliTimestamp()) / 500.0);
-            a = std.math.max(a, 0);
-            renderers.r_quad.drawQuadRGBA(dest, 255, 0, 0, @floatToInt(u8, a * 255.0));
+            var a = 0.3 * @sin(@floatFromInt(f64, std.time.milliTimestamp()) / 500.0);
+            a = @max(a, 0);
+            renderers.r_quad.drawQuadRGBA(dest, 255, 0, 0, @intFromFloat(u8, a * 255.0));
         }
     }
     renderers.r_quad.end();
@@ -1185,13 +1185,13 @@ fn renderRangeIndicatorForTower(renderers: *RenderServices, cam: Camera, spec: *
     renderers.r_imm.beginUntextured();
     renderers.r_imm.drawCircle(
         32,
-        zm.f32x4(@intToFloat(f32, world_x - cam.view.left()), @intToFloat(f32, world_y - cam.view.top()), 0, 0),
+        zm.f32x4(@floatFromInt(f32, world_x - cam.view.left()), @floatFromInt(f32, world_y - cam.view.top()), 0, 0),
         spec.min_range,
         .{ 255, 0, 0, 255 },
     );
     renderers.r_imm.drawCircle(
         32,
-        zm.f32x4(@intToFloat(f32, world_x - cam.view.left()), @intToFloat(f32, world_y - cam.view.top()), 0, 0),
+        zm.f32x4(@floatFromInt(f32, world_x - cam.view.left()), @floatFromInt(f32, world_y - cam.view.top()), 0, 0),
         spec.max_range,
         .{ 0, 255, 0, 255 },
     );
@@ -1230,11 +1230,11 @@ fn renderDemolishIndicator(self: *PlayState, cam: Camera) void {
 fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
     const min_tile_x = @intCast(usize, cam.view.left()) / 16;
     const min_tile_y = @intCast(usize, cam.view.top()) / 16;
-    const max_tile_x = std.math.min(
+    const max_tile_x = @min(
         self.world.?.getWidth(),
         1 + @intCast(usize, cam.view.right()) / 16,
     );
-    const max_tile_y = std.math.min(
+    const max_tile_y = @min(
         self.world.?.getHeight(),
         1 + @intCast(usize, cam.view.bottom()) / 16,
     );
@@ -1459,8 +1459,8 @@ fn renderMinimapBlockage(
         while (x <= range.max.x) : (x += 1) {
             const t = map.at2DPtr(.base, x, y);
             const dest = Rectf.init(
-                @intToFloat(f32, x - range.min.x),
-                @intToFloat(f32, y - range.min.y),
+                @floatFromInt(f32, x - range.min.x),
+                @floatFromInt(f32, y - range.min.y),
                 1.0,
                 1.0,
             );
@@ -1507,8 +1507,8 @@ fn renderMinimapLayer(
                 .h = 16,
             };
             const dest = Rectf.init(
-                @intToFloat(f32, x - range.min.x),
-                @intToFloat(f32, y - range.min.y),
+                @floatFromInt(f32, x - range.min.x),
+                @floatFromInt(f32, y - range.min.y),
                 1.0,
                 1.0,
             );
@@ -1536,12 +1536,12 @@ fn renderWipe(self: *PlayState, alpha: f64) void {
         return;
     }
 
-    const t0 = self.fade_timer.invProgressClamped(std.math.max(self.game.frame_counter -| 1, self.fade_timer.frame_start));
+    const t0 = self.fade_timer.invProgressClamped(@max(self.game.frame_counter -| 1, self.fade_timer.frame_start));
     const t1 = self.fade_timer.invProgressClamped(self.game.frame_counter);
     const tx = zm.lerpV(t0, t1, @floatCast(f32, alpha));
 
-    const right = @floatToInt(i32, zm.lerpV(-wipe_scanline_width, Game.INTERNAL_WIDTH, tx));
-    const a = @floatToInt(u8, 255.0 * tx);
+    const right = @intFromFloat(i32, zm.lerpV(-wipe_scanline_width, Game.INTERNAL_WIDTH, tx));
+    const a = @intFromFloat(u8, 255.0 * tx);
 
     self.game.renderers.r_imm.beginUntextured();
     self.game.renderers.r_imm.drawQuadRGBA(Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT), .{ 0, 0, 0, a });
@@ -1755,12 +1755,12 @@ fn renderWaveTimer(self: *PlayState, alpha: f64) void {
     switch (self.wave_timer.state) {
         .middle_screen => {},
         .move_to_corner => {
-            const t0 = self.wave_timer.state_timer.invProgressClamped(std.math.max(self.world.?.world_frame -| 1, self.wave_timer.state_timer.frame_start));
+            const t0 = self.wave_timer.state_timer.invProgressClamped(@max(self.world.?.world_frame -| 1, self.wave_timer.state_timer.frame_start));
             const t1 = self.wave_timer.state_timer.invProgressClamped(self.world.?.world_frame);
             const tx = zm.lerpV(t0, t1, @floatCast(f32, alpha));
             const k = 1 - std.math.pow(f32, tx, 3);
-            box_rect.x = @floatToInt(i32, zm.lerpV(@intToFloat(f32, box_rect.x), 0.0, k));
-            box_rect.y = @floatToInt(i32, zm.lerpV(@intToFloat(f32, box_rect.y), 0.0, k));
+            box_rect.x = @intFromFloat(i32, zm.lerpV(@floatFromInt(f32, box_rect.x), 0.0, k));
+            box_rect.y = @intFromFloat(i32, zm.lerpV(@floatFromInt(f32, box_rect.y), 0.0, k));
         },
         .corner => {
             box_rect.x = 0;
@@ -1775,14 +1775,14 @@ fn renderWaveTimer(self: *PlayState, alpha: f64) void {
     const sec = next_wave_timer.remainingSecondsUnbounded(self.world.?.world_frame);
     if (sec <= 5) {
         const diff = 5.0 - sec;
-        text_alpha = @floatToInt(u8, (0.5 * (1.0 + std.math.cos(diff * 8.0))) * 255.0);
+        text_alpha = @intFromFloat(u8, (0.5 * (1.0 + std.math.cos(diff * 8.0))) * 255.0);
     }
     if (sec < 0) {
         total_alpha = 1.0 - std.math.clamp(-sec, 0, 2.0) / 2.0;
     }
 
     self.game.renderers.r_quad.begin(.{});
-    self.game.renderers.r_quad.drawQuadRGBA(box_rect, 0, 0, 0, @floatToInt(u8, total_alpha * 128));
+    self.game.renderers.r_quad.drawQuadRGBA(box_rect, 0, 0, 0, @intFromFloat(u8, total_alpha * 128));
     self.game.renderers.r_quad.end();
 
     self.game.renderers.r_font.begin(.{
@@ -1791,7 +1791,7 @@ fn renderWaveTimer(self: *PlayState, alpha: f64) void {
     });
     self.game.renderers.r_font.drawText(self.wave_timer.wave_timer_text, .{
         .dest = box_rect,
-        .color = .{ 255, 255, 255, @floatToInt(u8, total_alpha * @intToFloat(f32, text_alpha)) },
+        .color = .{ 255, 255, 255, @intFromFloat(u8, total_alpha * @floatFromInt(f32, text_alpha)) },
         .h_alignment = .center,
         .v_alignment = .middle,
     });

@@ -100,7 +100,7 @@ pub const Projectile = struct {
             }
         }
         if (!self.activated) {
-            self.world.playPositionalSoundId(self.activate_sound, @floatToInt(i32, self.world_x), @floatToInt(i32, self.world_y));
+            self.world.playPositionalSoundId(self.activate_sound, @intFromFloat(i32, self.world_x), @intFromFloat(i32, self.world_y));
             self.activated = true;
         }
         self.p_world_x = self.world_x;
@@ -145,7 +145,7 @@ pub const Projectile = struct {
     }
 
     pub fn getWorldCollisionRect(self: Projectile) Rect {
-        var r = Rect.init(@floatToInt(i32, self.world_x), @floatToInt(i32, self.world_y), 0, 0);
+        var r = Rect.init(@intFromFloat(i32, self.world_x), @intFromFloat(i32, self.world_y), 0, 0);
         // TODO: replace with projectile size?
         r.inflate(4, 4);
         return r;
@@ -157,7 +157,7 @@ pub const Projectile = struct {
     pub fn getInterpWorldPosition(self: Projectile, t: f64) [2]i32 {
         const ix = zm.lerpV(self.p_world_x, self.world_x, @floatCast(f32, t));
         const iy = zm.lerpV(self.p_world_y, self.world_y, @floatCast(f32, t));
-        return [2]i32{ @floatToInt(i32, ix), @floatToInt(i32, iy) };
+        return [2]i32{ @intFromFloat(i32, ix), @intFromFloat(i32, iy) };
     }
 };
 
@@ -396,15 +396,15 @@ pub const Monster = struct {
         else
             self.spec.speed;
 
-        const progress_f = @intToFloat(f32, self.moved_amount) / @intToFloat(f32, tile_distance);
+        const progress_f = @floatFromInt(f32, self.moved_amount) / @floatFromInt(f32, tile_distance);
 
-        const x0 = @intToFloat(f32, self.last_tile_pos.worldX());
-        const x1 = @intToFloat(f32, self.tile_pos.worldX());
-        const y0 = @intToFloat(f32, self.last_tile_pos.worldY());
-        const y1 = @intToFloat(f32, self.tile_pos.worldY());
+        const x0 = @floatFromInt(f32, self.last_tile_pos.worldX());
+        const x1 = @floatFromInt(f32, self.tile_pos.worldX());
+        const y0 = @floatFromInt(f32, self.last_tile_pos.worldY());
+        const y1 = @floatFromInt(f32, self.tile_pos.worldY());
 
-        self.world_x = @floatToInt(u32, zm.lerpV(x0, x1, progress_f));
-        self.world_y = @floatToInt(u32, zm.lerpV(y0, y1, progress_f));
+        self.world_x = @intFromFloat(u32, zm.lerpV(x0, x1, progress_f));
+        self.world_y = @intFromFloat(u32, zm.lerpV(y0, y1, progress_f));
 
         self.moved_amount += move_amount;
     }
@@ -451,9 +451,9 @@ pub const Monster = struct {
 
     // TODO: this return type is bad, need a proper vec abstraction
     pub fn getInterpWorldPosition(self: Monster, t: f64) [2]i32 {
-        const ix = zm.lerpV(@intToFloat(f64, self.p_world_x), @intToFloat(f64, self.world_x), t);
-        const iy = zm.lerpV(@intToFloat(f64, self.p_world_y), @intToFloat(f64, self.world_y), t);
-        return [2]i32{ @floatToInt(i32, ix), @floatToInt(i32, iy) };
+        const ix = zm.lerpV(@floatFromInt(f64, self.p_world_x), @floatFromInt(f64, self.world_x), t);
+        const iy = zm.lerpV(@floatFromInt(f64, self.p_world_y), @floatFromInt(f64, self.world_y), t);
+        return [2]i32{ @intFromFloat(i32, ix), @intFromFloat(i32, iy) };
     }
 
     pub fn getWorldCollisionRect(self: Monster) Rect {
@@ -470,7 +470,7 @@ pub const Monster = struct {
     }
 
     pub fn slow(self: *Monster, amt: u32) void {
-        self.slow_frames = std.math.max(self.slow_frames, amt);
+        self.slow_frames = @max(self.slow_frames, amt);
     }
 
     pub fn hurtDirectional(self: *Monster, amt: u32, dir: [2]f32) void {
@@ -634,7 +634,7 @@ fn pyroUpdate(self: *Tower, frame: u64) void {
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
         _ = self.world.spawnField(.{
-            .position = .{ @intToFloat(f32, p[0]), @intToFloat(f32, p[1]) },
+            .position = .{ @floatFromInt(f32, p[0]), @floatFromInt(f32, p[1]) },
             .radius = 30,
             .duration_sec = 5,
             .tick_rate_sec = 1,
@@ -675,7 +675,7 @@ fn cryoUpdate(self: *Tower, frame: u64) void {
         const q = self.getWorldCollisionRect().centerPoint();
 
         _ = self.world.spawnField(.{
-            .position = .{ @intToFloat(f32, q[0]), @intToFloat(f32, q[1]) },
+            .position = .{ @floatFromInt(f32, q[0]), @floatFromInt(f32, q[1]) },
             .radius = 50,
             .duration_sec = 5,
             .tick_rate_sec = 1,
@@ -741,7 +741,7 @@ fn berserkerUpdate(self: *Tower, frame: u64) void {
 
         self.world.playPositionalSound("assets/sounds/slash.ogg", @intCast(i32, self.world_x), @intCast(i32, self.world_y));
 
-        self.world.hurtMonstersInRadiusDelay(.{ @intToFloat(f32, p[0]), @intToFloat(f32, p[1]) }, 16, 5, .slash, 4);
+        self.world.hurtMonstersInRadiusDelay(.{ @floatFromInt(f32, p[0]), @floatFromInt(f32, p[1]) }, 16, 5, .slash, 4);
         self.lookTowards(p[0], p[1]);
         self.cooldown.restart(frame);
     }
@@ -796,7 +796,7 @@ fn ninjaUpdate(self: *Tower, frame: u64) void {
         var i: i8 = -1;
         var num: u8 = 0;
         while (i <= 1) : (i += 1) {
-            const angle_diff = (std.math.pi / 8.0) * @intToFloat(f32, i);
+            const angle_diff = (std.math.pi / 8.0) * @floatFromInt(f32, i);
             var proj = self.world.spawnProjectileDelayed(&proj_star, @intCast(i32, self.world_x + 8), @intCast(i32, self.world_y + 8), 3 * num) catch unreachable;
             proj.activate_sound = .bow;
             const cos_r = std.math.cos(r + angle_diff);
@@ -1085,8 +1085,8 @@ pub const Tower = struct {
 
     pub fn angleTo(self: *Tower, world_x: i32, world_y: i32) f32 {
         var r = mu.angleBetween(
-            .{ @intToFloat(f32, self.world_x + 8), @intToFloat(f32, self.world_y + 8) },
-            .{ @intToFloat(f32, world_x), @intToFloat(f32, world_y) },
+            .{ @floatFromInt(f32, self.world_x + 8), @floatFromInt(f32, self.world_y + 8) },
+            .{ @floatFromInt(f32, world_x), @floatFromInt(f32, world_y) },
         );
         return r;
     }
@@ -1277,7 +1277,7 @@ pub const SpriteEffect = struct {
             }
         }
         if (!self.activated) {
-            self.world.playPositionalSoundId(self.activate_sound, @floatToInt(i32, self.world_x), @floatToInt(i32, self.world_y));
+            self.world.playPositionalSoundId(self.activate_sound, @intFromFloat(i32, self.world_x), @intFromFloat(i32, self.world_y));
             self.activated = true;
         }
         self.p_world_x = self.world_x;
@@ -1352,11 +1352,11 @@ pub const FloatingText = struct {
     pub fn getInterpWorldPosition(self: FloatingText, t: f64) [2]i32 {
         const ix = zm.lerpV(self.p_world_x, self.world_x, @floatCast(f32, t));
         const iy = zm.lerpV(self.p_world_y, self.world_y, @floatCast(f32, t));
-        return [2]i32{ @floatToInt(i32, ix), @floatToInt(i32, iy) };
+        return [2]i32{ @intFromFloat(i32, ix), @intFromFloat(i32, iy) };
     }
 
     pub fn lifePercent(self: FloatingText) f32 {
-        return @intToFloat(f32, self.life) / @intToFloat(f32, self.max_life);
+        return @floatFromInt(f32, self.life) / @floatFromInt(f32, self.max_life);
     }
 
     /// 0 at start, 1 at end
@@ -1379,7 +1379,7 @@ pub const Goal = struct {
             .world_y = world_y,
             .emitter = .{
                 .parent = &world.particle_sys,
-                .pos = .{ @intToFloat(f32, world_x + 8), @intToFloat(f32, world_y + 16) },
+                .pos = .{ @floatFromInt(f32, world_x + 8), @floatFromInt(f32, world_y + 16) },
                 .params = particle.warp_params,
             },
         };
@@ -1478,7 +1478,7 @@ pub const WaveEventList = struct {
         for (self.events) |e| {
             switch (e) {
                 .spawn => |s| {
-                    total += @intToFloat(f32, s.repeat) * s.time_sec;
+                    total += @floatFromInt(f32, s.repeat) * s.time_sec;
                 },
                 .wait => |w| {
                     total += w.time_sec;
@@ -1536,7 +1536,7 @@ pub const WaveList = struct {
     fn getWaveDuration(self: WaveList, num: usize) f32 {
         var max: f32 = 0;
         for (self.waves[num].spawn_events.values()) |list| {
-            max = std.math.max(max, list.getDuration());
+            max = @max(max, list.getDuration());
         }
         return max;
     }
@@ -1694,7 +1694,7 @@ pub const World = struct {
             if (range.contains(spawn.coord)) {
                 spawn.emitter = particle.PointEmitter{
                     .parent = &self.particle_sys,
-                    .pos = .{ @intToFloat(f32, spawn.coord.worldX() + 8), @intToFloat(f32, spawn.coord.worldY() + 16) },
+                    .pos = .{ @floatFromInt(f32, spawn.coord.worldX() + 8), @floatFromInt(f32, spawn.coord.worldY() + 16) },
                     .params = particle.warp_params,
                 };
             }
@@ -1826,10 +1826,10 @@ pub const World = struct {
         const id = try self.floating_text.put(self.allocator, FloatingText{
             .world = self,
             .text = undefined,
-            .world_x = @intToFloat(f32, world_x),
-            .world_y = @intToFloat(f32, world_y),
-            .p_world_x = @intToFloat(f32, world_x),
-            .p_world_y = @intToFloat(f32, world_y),
+            .world_x = @floatFromInt(f32, world_x),
+            .world_y = @floatFromInt(f32, world_y),
+            .p_world_x = @floatFromInt(f32, world_x),
+            .p_world_y = @floatFromInt(f32, world_y),
             .vel_x = 0,
             .vel_y = 0,
         });
@@ -1875,7 +1875,7 @@ pub const World = struct {
 
     pub fn sellTower(self: *World, id: TowerId) void {
         const tower = self.towers.getPtr(id);
-        const gold = std.math.max(1, tower.invested_gold / 2);
+        const gold = @max(1, tower.invested_gold / 2);
         const p = tower.getWorldCollisionRect().centerPoint();
         self.spawnGoldGain(gold, p[0], p[1]) catch unreachable;
         self.playPositionalSound("assets/sounds/coindrop.ogg", p[0], p[1]);
@@ -1892,8 +1892,8 @@ pub const World = struct {
         const id = try self.sprite_effects.put(self.allocator, SpriteEffect{
             .world = self,
             .spec = spec,
-            .world_x = @intToFloat(f32, world_x),
-            .world_y = @intToFloat(f32, world_y),
+            .world_x = @floatFromInt(f32, world_x),
+            .world_y = @floatFromInt(f32, world_y),
         });
         self.sprite_effects.getPtr(id).spawn(self.world_frame);
         return id;
@@ -1905,14 +1905,14 @@ pub const World = struct {
         ptr.* = Projectile{
             .world = self,
             .spec = spec,
-            .world_x = @intToFloat(f32, world_x),
-            .world_y = @intToFloat(f32, world_y),
-            .p_world_x = @intToFloat(f32, world_x),
-            .p_world_y = @intToFloat(f32, world_y),
-            .vel_x = @intToFloat(f32, 0),
-            .vel_y = @intToFloat(f32, 0),
-            .spawn_x = @intToFloat(f32, world_x),
-            .spawn_y = @intToFloat(f32, world_y),
+            .world_x = @floatFromInt(f32, world_x),
+            .world_y = @floatFromInt(f32, world_y),
+            .p_world_x = @floatFromInt(f32, world_x),
+            .p_world_y = @floatFromInt(f32, world_y),
+            .vel_x = @floatFromInt(f32, 0),
+            .vel_y = @floatFromInt(f32, 0),
+            .spawn_x = @floatFromInt(f32, world_x),
+            .spawn_y = @floatFromInt(f32, world_y),
         };
         return ptr;
     }
@@ -1922,15 +1922,15 @@ pub const World = struct {
         ptr.* = Projectile{
             .world = self,
             .spec = spec,
-            .world_x = @intToFloat(f32, world_x),
-            .world_y = @intToFloat(f32, world_y),
-            .p_world_x = @intToFloat(f32, world_x),
-            .p_world_y = @intToFloat(f32, world_y),
-            .vel_x = @intToFloat(f32, 0),
-            .vel_y = @intToFloat(f32, 0),
+            .world_x = @floatFromInt(f32, world_x),
+            .world_y = @floatFromInt(f32, world_y),
+            .p_world_x = @floatFromInt(f32, world_x),
+            .p_world_y = @floatFromInt(f32, world_y),
+            .vel_x = @floatFromInt(f32, 0),
+            .vel_y = @floatFromInt(f32, 0),
             .delay = FrameTimer.initFrames(self.world_frame, frames),
-            .spawn_x = @intToFloat(f32, world_x),
-            .spawn_y = @intToFloat(f32, world_y),
+            .spawn_x = @floatFromInt(f32, world_x),
+            .spawn_y = @floatFromInt(f32, world_y),
         };
         return ptr;
     }
@@ -1965,7 +1965,7 @@ pub const World = struct {
             }
         }
         if (num_hit != 0) {
-            self.playPositionalSoundId(hopts.damage_type.getHurtSound(), @floatToInt(i32, pos[0]), @floatToInt(i32, pos[1]));
+            self.playPositionalSoundId(hopts.damage_type.getHurtSound(), @intFromFloat(i32, pos[0]), @intFromFloat(i32, pos[1]));
         }
     }
 
@@ -1988,16 +1988,16 @@ pub const World = struct {
             return null;
         }
         var closest: ?MonsterId = null;
-        var best_dist = std.math.inf_f32;
-        const fx = @intToFloat(f32, world_x);
-        const fy = @intToFloat(f32, world_y);
+        var best_dist = std.math.inf(f32);
+        const fx = @floatFromInt(f32, world_x);
+        const fy = @floatFromInt(f32, world_y);
         for (self.monsters.slice()) |m| {
             if (m.dead) {
                 continue;
             }
             const p = m.getWorldCollisionRect().centerPoint();
-            const mx = @intToFloat(f32, p[0]);
-            const my = @intToFloat(f32, p[1]);
+            const mx = @floatFromInt(f32, p[0]);
+            const my = @floatFromInt(f32, p[1]);
             const dist = mu.dist([2]f32{ fx, fy }, [2]f32{ mx, my });
             if (dist >= range_min and dist <= range_max and dist < best_dist) {
                 closest = m.id;
@@ -2436,8 +2436,8 @@ const PathfindingState = struct {
         from: TileCoord,
 
         const infinity = Score{
-            .fscore = std.math.inf_f32,
-            .gscore = std.math.inf_f32,
+            .fscore = std.math.inf(f32),
+            .gscore = std.math.inf(f32),
             .from = undefined,
         };
     };
@@ -2506,7 +2506,7 @@ const PathfindingState = struct {
         // so we don't have to reverse the coord list at the end.
         try self.frontier.add(coords.end);
         try self.frontier_set.put(self.allocator, coords.end, {});
-        std.mem.set(Score, self.score_map, Score.infinity);
+        @memset(self.score_map, Score.infinity);
 
         self.score_map[coords.end.toScalarCoord(map.width)] = .{
             .fscore = 0,
@@ -2533,7 +2533,7 @@ const PathfindingState = struct {
             // examine neighbors
             var d_int: u8 = 0;
             while (d_int < 4) : (d_int += 1) {
-                const dir = @intToEnum(Direction, d_int);
+                const dir = @enumFromInt(Direction, d_int);
                 if (map.isValidMove(current, dir)) {
                     // 1 here is the graph edge weight, basically hardcoding manhattan distance
                     const tentative_score = self.score_map[current.toScalarCoord(width)].gscore + 1;
@@ -2576,7 +2576,7 @@ const PathfindingState = struct {
 
         try self.frontier.add(coords.start);
         try self.frontier_set.put(self.allocator, coords.start, {});
-        std.mem.set(Score, self.score_map, Score.infinity);
+        @memset(self.score_map, Score.infinity);
 
         self.score_map[coords.start.toScalarCoord(map.width)] = .{
             .fscore = 0,
@@ -2618,7 +2618,7 @@ const PathfindingState = struct {
             // examine neighbors
             var d_int: u8 = 0;
             while (d_int < 4) : (d_int += 1) {
-                const dir = @intToEnum(Direction, d_int);
+                const dir = @enumFromInt(Direction, d_int);
                 if (map.isValidMove(current, dir)) {
                     // 1 here is the graph edge weight, basically hardcoding manhattan distance
                     const tentative_score = self.score_map[current.toScalarCoord(width)].gscore + 1;
@@ -2670,6 +2670,23 @@ const JsonSpawnPointEventType = enum {
 const JsonSpawnPointEvent = union(JsonSpawnPointEventType) {
     spawn: JsonSpawnPointSpawnEvent,
     wait: JsonSpawnPointWaitEvent,
+
+    pub fn jsonParseFromValue(allocator: Allocator, source: std.json.Value, options: std.json.ParseOptions) !@This() {
+        if (source != .object) {
+            return error.UnexpectedToken;
+        }
+        const type_val = source.object.get("type") orelse return error.UnexpectedToken;
+        if (type_val != .string) {
+            return error.UnexpectedToken;
+        }
+        const type_str = type_val.string;
+        if (std.mem.eql(u8, type_str, "spawn")) {
+            return .{ .spawn = try std.json.parseFromValueLeaky(JsonSpawnPointSpawnEvent, allocator, source, options) };
+        } else if (std.mem.eql(u8, type_str, "wait")) {
+            return .{ .wait = try std.json.parseFromValueLeaky(JsonSpawnPointWaitEvent, allocator, source, options) };
+        }
+        return error.UnexpectedToken;
+    }
 };
 const JsonSpawnPointSpawnEvent = struct {
     type: []const u8,
@@ -2694,8 +2711,8 @@ pub fn loadWavesFromJson(allocator: Allocator, filename: []const u8, world: *Wor
 
     const buffer = try file.readToEndAlloc(arena_allocator, 1024 * 1024);
 
-    var tokens = std.json.TokenStream.init(buffer);
-    var doc = try std.json.parse(JsonWaveDoc, &tokens, .{ .allocator = arena_allocator, .ignore_unknown_fields = true });
+    const tree = try std.json.parseFromSliceLeaky(std.json.Value, arena_allocator, buffer, .{ .ignore_unknown_fields = true });
+    const doc = try std.json.parseFromValueLeaky(JsonWaveDoc, arena_allocator, tree, .{ .ignore_unknown_fields = true });
 
     var waves = try allocator.alloc(Wave, doc.waves.len);
     errdefer allocator.free(waves);
@@ -2747,8 +2764,9 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !*World {
     defer file.close();
 
     const buffer = try file.readToEndAlloc(arena_allocator, 1024 * 1024);
-    var tokens = std.json.TokenStream.init(buffer);
-    var doc = try std.json.parse(TiledDoc, &tokens, .{ .allocator = arena_allocator, .ignore_unknown_fields = true });
+
+    const tree = try std.json.parseFromSliceLeaky(std.json.Value, arena_allocator, buffer, .{ .ignore_unknown_fields = true });
+    const doc = try std.json.parseFromValueLeaky(TiledDoc, arena_allocator, tree, .{ .ignore_unknown_fields = true });
 
     var world = try allocator.create(World);
     errdefer allocator.destroy(world);
@@ -2852,8 +2870,8 @@ pub fn loadWorldRawJson(allocator: Allocator, filename: []const u8) !TiledDoc {
 
     const buffer = try file.readToEndAlloc(arena_allocator, 1024 * 1024);
 
-    var tokens = std.json.TokenStream.init(buffer);
-    var doc = try std.json.parse(TiledDoc, &tokens, .{ .allocator = allocator, .ignore_unknown_fields = true });
+    const tree = try std.json.parseFromSliceLeaky(std.json.Value, allocator, buffer, .{ .ignore_unknown_fields = true });
+    const doc = try std.json.parseFromValueLeaky(TiledDoc, allocator, tree, .{ .ignore_unknown_fields = true });
 
     return doc;
 }
@@ -2944,7 +2962,7 @@ fn b64decompressLayer(allocator: Allocator, data: []const u8) ![]u32 {
     var fbs = std.io.fixedBufferStream(b64_decode_buffer);
     var b64_reader = fbs.reader();
 
-    var zstream = try std.compress.zlib.zlibStream(allocator, b64_reader);
+    var zstream = try std.compress.zlib.decompressStream(allocator, b64_reader);
     var zreader = zstream.reader();
 
     // enough for a 512x512 map
@@ -3052,6 +3070,23 @@ const TiledObject = struct {
 const TiledLayer = union(TiledLayerType) {
     tilelayer: TiledTileLayer,
     objectgroup: TiledObjectGroup,
+
+    pub fn jsonParseFromValue(allocator: Allocator, source: std.json.Value, options: std.json.ParseOptions) !@This() {
+        if (source != .object) {
+            return error.UnexpectedToken;
+        }
+        const type_val = source.object.get("type") orelse return error.UnexpectedToken;
+        if (type_val != .string) {
+            return error.UnexpectedToken;
+        }
+        const type_str = type_val.string;
+        if (std.mem.eql(u8, type_str, "tilelayer")) {
+            return .{ .tilelayer = try std.json.parseFromValueLeaky(TiledTileLayer, allocator, source, options) };
+        } else if (std.mem.eql(u8, type_str, "objectgroup")) {
+            return .{ .objectgroup = try std.json.parseFromValueLeaky(TiledObjectGroup, allocator, source, options) };
+        }
+        return error.UnexpectedToken;
+    }
 };
 
 const TiledDoc = struct {
@@ -3104,8 +3139,36 @@ const TiledMapProperty = struct {
     pub fn toString(self: TiledMapProperty) []const u8 {
         return self.value.string;
     }
+
     pub fn toInt(self: TiledMapProperty) i64 {
         return self.value.integer;
+    }
+
+    pub fn jsonParseFromValue(allocator: Allocator, source: std.json.Value, options: std.json.ParseOptions) !@This() {
+        _ = allocator;
+        _ = options;
+        if (source != .object) {
+            return error.UnexpectedToken;
+        }
+        const type_val = source.object.get("type") orelse return error.UnexpectedToken;
+        if (type_val != .string) {
+            return error.UnexpectedToken;
+        }
+        const type_str = type_val.string;
+        const name_val = source.object.get("name") orelse return error.UnexpectedToken;
+        if (name_val != .string) {
+            return error.UnexpectedToken;
+        }
+        const name_str = name_val.string;
+        const value_val = source.object.get("value") orelse return error.UnexpectedToken;
+        if (std.mem.eql(u8, type_str, "file") and value_val == .string) {
+            return .{ .name = name_str, .type = .file, .value = .{ .string = value_val.string } };
+        } else if (std.mem.eql(u8, type_str, "string") and value_val == .string) {
+            return .{ .name = name_str, .type = .string, .value = .{ .string = value_val.string } };
+        } else if (std.mem.eql(u8, type_str, "int") and value_val == .integer) {
+            return .{ .name = name_str, .type = .int, .value = .{ .integer = value_val.integer } };
+        }
+        return error.UnexpectedToken;
     }
 };
 

@@ -21,13 +21,10 @@ pub const BitmapFontSpec = struct {
             glyphs: []GlyphDef,
             kerning: ?[][]const u8 = null,
         };
-        var ts = std.json.TokenStream.init(json);
-        var parse_opts = std.json.ParseOptions{
-            .allocator = allocator,
-        };
+        const parsed_doc = try std.json.parseFromSlice(Document, allocator, json, .{});
+        defer parsed_doc.deinit();
 
-        var doc = try std.json.parse(Document, &ts, parse_opts);
-        defer std.json.parseFree(Document, doc, parse_opts);
+        const doc = &parsed_doc.value;
 
         var map = std.AutoArrayHashMapUnmanaged(u8, Rect){};
         errdefer map.deinit(allocator);
@@ -108,7 +105,7 @@ pub const BitmapFontSpec = struct {
         var last_ch: u8 = 0;
         for (text) |ch| {
             if (ch == '\n') {
-                width = std.math.max(width, width_this_line);
+                width = @max(width, width_this_line);
                 height += height_this_line;
                 width_this_line = 0;
                 height_this_line = self.mapGlyph(' ').h;
@@ -116,11 +113,11 @@ pub const BitmapFontSpec = struct {
             }
             const glyph_rect = self.mapGlyph(ch);
             width_this_line += glyph_rect.w + self.space + self.kerning(last_ch, ch);
-            height_this_line = std.math.max(height_this_line, glyph_rect.h);
+            height_this_line = @max(height_this_line, glyph_rect.h);
             last_ch = ch;
         }
         width_this_line -= self.space;
-        width = std.math.max(width, width_this_line);
+        width = @max(width, width_this_line);
         height += height_this_line;
         return Rect.init(0, 0, width, height);
     }

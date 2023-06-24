@@ -15,7 +15,7 @@ pub fn dist(v0: anytype, v1: anytype) f32 {
             d *= -1;
         }
         if (ints) {
-            r += @intToFloat(f32, d * d);
+            r += @floatFromInt(f32, d * d);
         } else {
             r += d * d;
         }

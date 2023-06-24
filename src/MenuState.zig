@@ -194,7 +194,7 @@ pub fn render(self: *MenuState, alpha: f64) void {
     self.game.renderers.r_font.drawText("Defense of Ufeff", .{ .dest = Rect.init(0, 0, Game.INTERNAL_WIDTH, 50), .h_alignment = .center });
 
     var measured = self.fontspec.measureText(tips[self.tip_index]);
-    measured.centerOn(Game.INTERNAL_WIDTH / 2, @floatToInt(i32, 0.8 * Game.INTERNAL_HEIGHT));
+    measured.centerOn(Game.INTERNAL_WIDTH / 2, @intFromFloat(i32, 0.8 * Game.INTERNAL_HEIGHT));
 
     self.game.renderers.r_font.drawText(tips[self.tip_index], .{ .dest = Rect.init(0, 200, 512, 50), .h_alignment = .center });
     self.game.renderers.r_font.end();
@@ -248,8 +248,8 @@ pub fn renderBackground(self: *MenuState, alpha: f64) void {
             self.game.renderers.r_batch.drawQuad(.{
                 .src = src,
                 .dest = Rectf.init(
-                    @intToFloat(f32, x) * src.w - scroll_offset,
-                    @intToFloat(f32, y) * src.h - scroll_offset,
+                    @floatFromInt(f32, x) * src.w - scroll_offset,
+                    @floatFromInt(f32, y) * src.h - scroll_offset,
                     src.w,
                     src.h,
                 ),

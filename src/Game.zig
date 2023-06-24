@@ -118,8 +118,8 @@ pub fn create(allocator: Allocator) !*Game {
         "defense of ufeff",
         sdl.SDL_WINDOWPOS_CENTERED,
         sdl.SDL_WINDOWPOS_CENTERED,
-        @floatToInt(c_int, ptr.output_scale_x * INTERNAL_WIDTH),
-        @floatToInt(c_int, ptr.output_scale_y * INTERNAL_HEIGHT),
+        @intFromFloat(c_int, ptr.output_scale_x * INTERNAL_WIDTH),
+        @intFromFloat(c_int, ptr.output_scale_y * INTERNAL_HEIGHT),
         sdl.SDL_WINDOW_OPENGL,
     ) orelse {
         log.err("SDL_CreateWindow failed: {s}", .{sdl.SDL_GetError()});
@@ -226,9 +226,9 @@ pub fn run(self: *Game) void {
     self.running = true;
     self.changeState(.menu);
 
-    var last: f64 = @intToFloat(f64, sdl.SDL_GetTicks64());
+    var last: f64 = @floatFromInt(f64, sdl.SDL_GetTicks64());
     var acc: f64 = 0;
-    const DELAY = 1000 / @intToFloat(f64, UPDATE_RATE);
+    const DELAY = 1000 / @floatFromInt(f64, UPDATE_RATE);
     const MAX_SKIP_FRAMES = 4;
 
     while (self.running) {
@@ -237,7 +237,7 @@ pub fn run(self: *Game) void {
             self.handleEvent(ev);
         }
 
-        const now = @intToFloat(f64, sdl.SDL_GetTicks64());
+        const now = @floatFromInt(f64, sdl.SDL_GetTicks64());
         const elapsed = now - last;
         last = now;
         acc += elapsed;
@@ -309,16 +309,16 @@ fn performLayout(self: *Game) void {
     var window_height: c_int = 0;
     sdl.SDL_GetWindowSize(self.window, &window_width, &window_height);
 
-    const aspect_ratio = @intToFloat(f32, INTERNAL_WIDTH) / @intToFloat(f32, INTERNAL_HEIGHT);
+    const aspect_ratio = @floatFromInt(f32, INTERNAL_WIDTH) / @floatFromInt(f32, INTERNAL_HEIGHT);
     if (self.isFullscreen()) {
         var output_width: i32 = undefined;
         var output_height: i32 = undefined;
         if (aspect_ratio > 1) {
             output_width = @intCast(i32, window_width);
-            output_height = @floatToInt(i32, @intToFloat(f32, output_width) / aspect_ratio);
+            output_height = @intFromFloat(i32, @floatFromInt(f32, output_width) / aspect_ratio);
         } else {
             output_height = @intCast(i32, window_height);
-            output_width = @floatToInt(f32, @intToFloat(f32, output_height) * aspect_ratio);
+            output_width = @intFromFloat(f32, @floatFromInt(f32, output_height) * aspect_ratio);
         }
         self.output_rect = .{
             .x = @divFloor(window_width - output_width, 2),
@@ -336,8 +336,8 @@ fn performLayout(self: *Game) void {
     }
     log.debug("Output rect: {any}", .{self.output_rect});
 
-    self.output_scale_x = @intToFloat(f32, self.output_rect.w) / INTERNAL_WIDTH;
-    self.output_scale_y = @intToFloat(f32, self.output_rect.h) / INTERNAL_HEIGHT;
+    self.output_scale_x = @floatFromInt(f32, self.output_rect.w) / INTERNAL_WIDTH;
+    self.output_scale_y = @floatFromInt(f32, self.output_rect.h) / INTERNAL_HEIGHT;
 
     log.debug("New scale {d}, {d}", .{ self.output_scale_x, self.output_scale_y });
 
@@ -474,14 +474,14 @@ pub fn unproject(self: *Game, x: i32, y: i32) [2]i32 {
     const scale_y = self.output_scale_y;
 
     return [2]i32{
-        @floatToInt(i32, @intToFloat(f64, x - self.output_rect.x) / scale_x),
-        @floatToInt(i32, @intToFloat(f64, y - self.output_rect.y) / scale_y),
+        @intFromFloat(i32, @floatFromInt(f64, x - self.output_rect.x) / scale_x),
+        @intFromFloat(i32, @floatFromInt(f64, y - self.output_rect.y) / scale_y),
     };
 }
 
 pub fn setOutputScale(self: *Game, s: f32) void {
-    const window_width = @floatToInt(c_int, s * INTERNAL_WIDTH);
-    const window_height = @floatToInt(c_int, s * INTERNAL_HEIGHT);
+    const window_width = @intFromFloat(c_int, s * INTERNAL_WIDTH);
+    const window_height = @intFromFloat(c_int, s * INTERNAL_HEIGHT);
     sdl.SDL_SetWindowSize(self.window, window_width, window_height);
     sdl.SDL_SetWindowPosition(self.window, sdl.SDL_WINDOWPOS_CENTERED, sdl.SDL_WINDOWPOS_CENTERED);
     self.performLayout();

@@ -20,11 +20,11 @@ pub fn build(b: *std.build.Builder) void {
     opengl.link(b, exe);
     stb.linkImage(b, exe);
     stb.linkVorbis(b, exe);
-    exe.install();
+    b.installArtifact(exe);
 
     installAssets(b);
 
-    const run_cmd = exe.run();
+    const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
         run_cmd.addArgs(args);

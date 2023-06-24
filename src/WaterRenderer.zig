@@ -76,8 +76,8 @@ pub fn create() WaterRenderer {
 
     gl.bindVertexArray(self.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer);
-    gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*anyopaque, 0));
-    gl.vertexAttribPointer(1, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @intToPtr(?*anyopaque, 16));
+    gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @ptrFromInt(?*anyopaque, 0));
+    gl.vertexAttribPointer(1, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @ptrFromInt(?*anyopaque, 16));
     gl.enableVertexAttribArray(0);
     gl.enableVertexAttribArray(1);
 
@@ -145,8 +145,8 @@ pub fn destroy(self: *WaterRenderer) void {
 }
 
 pub fn setOutputDimensions(self: *WaterRenderer, w: u32, h: u32) void {
-    const wf = @intToFloat(f32, w);
-    const hf = @intToFloat(f32, h);
+    const wf = @floatFromInt(f32, w);
+    const hf = @floatFromInt(f32, h);
     self.transform = zm.orthographicOffCenterRh(0, wf, 0, hf, 0, 1);
 }
 
@@ -199,17 +199,17 @@ fn flush(self: *WaterRenderer, remap: bool) void {
 }
 
 pub fn drawQuad(self: *WaterRenderer, dest: Rect, world_xy: zm.Vec) void {
-    const left = @intToFloat(f32, dest.left());
-    const right = @intToFloat(f32, dest.right());
-    const top = @intToFloat(f32, dest.top());
-    const bottom = @intToFloat(f32, dest.bottom());
+    const left = @floatFromInt(f32, dest.left());
+    const right = @floatFromInt(f32, dest.right());
+    const top = @floatFromInt(f32, dest.top());
+    const bottom = @floatFromInt(f32, dest.bottom());
 
     const uv_left = 0.0;
     const uv_right = 1.0;
     const uv_top = 1.0;
     const uv_bottom = 0.0;
 
-    const uv_scale = zm.f32x4(@intToFloat(f32, dest.w), @intToFloat(f32, dest.h), 0, 0);
+    const uv_scale = zm.f32x4(@floatFromInt(f32, dest.w), @floatFromInt(f32, dest.h), 0, 0);
 
     self.vertices[self.vertex_head + 0] = .{
         .xyuv = zm.f32x4(left, top, uv_left, uv_top),

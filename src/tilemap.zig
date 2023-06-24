@@ -39,8 +39,8 @@ pub const TileCoord = struct {
     /// This seems to be a better A* heuristic than manhattan distance, as the
     /// resulting path doesn't change by placing obstacles next to it.
     pub fn euclideanDistance(a: TileCoord, b: TileCoord) f32 {
-        const dx = @intToFloat(f32, a.x) - @intToFloat(f32, b.x);
-        const dy = @intToFloat(f32, a.y) - @intToFloat(f32, b.y);
+        const dx = @floatFromInt(f32, a.x) - @floatFromInt(f32, b.x);
+        const dy = @floatFromInt(f32, a.y) - @floatFromInt(f32, b.y);
         return std.math.sqrt(dx * dx + dy * dy);
     }
 
@@ -282,7 +282,7 @@ pub const Tilemap = struct {
     }
 
     fn layerStart(self: Tilemap, layer: TileLayer) usize {
-        return self.tileCount() * @enumToInt(layer);
+        return self.tileCount() * @intFromEnum(layer);
     }
 
     pub fn isValidIndex(self: Tilemap, x: usize, y: usize) bool {
