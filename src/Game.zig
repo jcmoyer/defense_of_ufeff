@@ -283,6 +283,9 @@ pub fn render(self: *Game, alpha: f64) void {
 
     self.endRenderToScene();
 
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
     self.renderers.r_imm.beginTextured(.{
         .texture = self.scene_color,
     });
