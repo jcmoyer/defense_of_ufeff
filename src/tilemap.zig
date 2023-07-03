@@ -8,22 +8,22 @@ pub const TileCoord = struct {
 
     pub fn initWorld(world_x: u32, world_y: u32) TileCoord {
         return .{
-            .x = @as(u16, @intCast(world_x / 16)),
-            .y = @as(u16, @intCast(world_y / 16)),
+            .x = @intCast(world_x / 16),
+            .y = @intCast(world_y / 16),
         };
     }
 
     /// Casts parameters to `u32`. Negative values are invalid.
     pub fn initSignedWorld(world_x: i32, world_y: i32) TileCoord {
-        return initWorld(@as(u32, @intCast(world_x)), @as(u32, @intCast(world_y)));
+        return initWorld(@intCast(world_x), @intCast(world_y));
     }
 
     pub fn worldX(self: TileCoord) u32 {
-        return @as(u32, @intCast(self.x * 16));
+        return @intCast(self.x * 16);
     }
 
     pub fn worldY(self: TileCoord) u32 {
-        return @as(u32, @intCast(self.y * 16));
+        return @intCast(self.y * 16);
     }
 
     pub fn toScalarCoord(self: TileCoord, ref_width: usize) usize {
@@ -33,7 +33,7 @@ pub const TileCoord = struct {
     pub fn manhattan(a: TileCoord, b: TileCoord) usize {
         const dx = @as(isize, @intCast(a.x)) - @as(isize, @intCast(b.x));
         const dy = @as(isize, @intCast(a.y)) - @as(isize, @intCast(b.y));
-        return @as(usize, @intCast(std.math.absInt(dx + dy) catch @panic("manhattan distance of TileCoords too big")));
+        return @intCast(std.math.absInt(dx + dy) catch @panic("manhattan distance of TileCoords too big"));
     }
 
     /// This seems to be a better A* heuristic than manhattan distance, as the

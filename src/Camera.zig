@@ -29,7 +29,7 @@ pub fn lerp(a: Camera, b: Camera, alpha: f64) Camera {
     const fx = zm.lerpV(@as(f64, @floatFromInt(a.view.x)), @as(f64, @floatFromInt(b.view.x)), alpha);
     const fy = zm.lerpV(@as(f64, @floatFromInt(a.view.y)), @as(f64, @floatFromInt(b.view.y)), alpha);
     return Camera{
-        .view = Rect.init(@as(i32, @intFromFloat(fx)), @as(i32, @intFromFloat(fy)), a.view.w, a.view.h),
+        .view = Rect.init(@intFromFloat(fx), @intFromFloat(fy), a.view.w, a.view.h),
         .bounds = a.bounds,
     };
 }

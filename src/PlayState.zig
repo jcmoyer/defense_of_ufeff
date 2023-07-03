@@ -228,7 +228,7 @@ pub fn create(game: *Game) !*PlayState {
 
     const t_panel = self.game.texman.getNamedTexture("ui_panel.png");
     var ui_panel = try self.ui_root.createPanel();
-    ui_panel.rect = Rect.init(0, 0, @as(i32, @intCast(t_panel.width)), @as(i32, @intCast(t_panel.height)));
+    ui_panel.rect = Rect.init(0, 0, @intCast(t_panel.width), @intCast(t_panel.height));
     ui_panel.rect.alignRight(Game.INTERNAL_WIDTH);
     ui_panel.background = .{ .texture = .{ .texture = t_panel } };
     try self.ui_root.addChild(ui_panel.control());
@@ -550,11 +550,11 @@ fn updateUI(self: *PlayState) void {
     self.minimap_elements.clearRetainingCapacity();
     for (world.monsters.slice()) |*m| {
         var p = m.getWorldCollisionRect().centerPoint();
-        self.addMinimapElement(@as(u32, @intCast(p[0])), @as(u32, @intCast(p[1])), .{ 255, 0, 0, 255 });
+        self.addMinimapElement(@intCast(p[0]), @intCast(p[1]), .{ 255, 0, 0, 255 });
     }
     for (world.towers.slice()) |*t| {
         var p = t.getWorldCollisionRect().centerPoint();
-        self.addMinimapElement(@as(u32, @intCast(p[0])), @as(u32, @intCast(p[1])), .{ 0, 255, 0, 255 });
+        self.addMinimapElement(@intCast(p[0]), @intCast(p[1]), .{ 0, 255, 0, 255 });
     }
     self.ui_minimap.elements = self.minimap_elements.items;
 }
@@ -622,7 +622,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
         std.process.exit(1);
     };
 
-    const world_interp = if (self.paused or self.sub != .none) @as(f64, 0) else alpha;
+    const world_interp = if (self.paused or self.sub != .none) 0 else alpha;
 
     self.game.renderers.r_quad.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
     self.game.renderers.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
@@ -861,7 +861,7 @@ fn renderSpriteEffects(
         const interp = zm.lerp(
             zm.f32x4(t.p_offset_x, t.p_offset_y, t.p_world_x, t.p_world_y),
             zm.f32x4(t.offset_x, t.offset_y, t.world_x, t.world_y),
-            @as(f32, @floatCast(alpha)),
+            @floatCast(alpha),
         );
 
         const offset_x = interp[0];
@@ -1068,7 +1068,7 @@ fn renderHealthBars(
         var dest_red = Rect.init(w[0] - cam.view.left(), w[1] - 4 - cam.view.top(), 16, 1);
         var dest_border = dest_red;
         dest_border.inflate(1, 1);
-        dest_red.w = @as(i32, @intFromFloat(@as(f32, @floatFromInt(dest_red.w)) * @as(f32, @floatFromInt(m.hp)) / @as(f32, @floatFromInt(m.spec.max_hp))));
+        dest_red.w = @intFromFloat(@as(f32, @floatFromInt(dest_red.w)) * @as(f32, @floatFromInt(m.hp)) / @as(f32, @floatFromInt(m.spec.max_hp)));
         renderers.r_quad.drawQuadRGBA(dest_border, 0, 0, 0, 255);
         renderers.r_quad.drawQuadRGBA(dest_red, 255, 0, 0, 255);
     }
@@ -1160,7 +1160,7 @@ fn renderBlockedConstructionRects(
             };
             var a = 0.3 * @sin(@as(f64, @floatFromInt(std.time.milliTimestamp())) / 500.0);
             a = @max(a, 0);
-            renderers.r_quad.drawQuadRGBA(dest, 255, 0, 0, @as(u8, @intFromFloat(a * 255.0)));
+            renderers.r_quad.drawQuadRGBA(dest, 255, 0, 0, @intFromFloat(a * 255.0));
         }
     }
     renderers.r_quad.end();
@@ -1186,13 +1186,13 @@ fn renderRangeIndicatorForTower(renderers: *RenderServices, cam: Camera, spec: *
     renderers.r_imm.beginUntextured();
     renderers.r_imm.drawCircle(
         32,
-        zm.f32x4(@as(f32, @floatFromInt(world_x - cam.view.left())), @as(f32, @floatFromInt(world_y - cam.view.top())), 0, 0),
+        zm.f32x4(@floatFromInt(world_x - cam.view.left()), @floatFromInt(world_y - cam.view.top()), 0, 0),
         spec.min_range,
         .{ 255, 0, 0, 255 },
     );
     renderers.r_imm.drawCircle(
         32,
-        zm.f32x4(@as(f32, @floatFromInt(world_x - cam.view.left())), @as(f32, @floatFromInt(world_y - cam.view.top())), 0, 0),
+        zm.f32x4(@floatFromInt(world_x - cam.view.left()), @floatFromInt(world_y - cam.view.top()), 0, 0),
         spec.max_range,
         .{ 0, 255, 0, 255 },
     );
@@ -1379,13 +1379,13 @@ pub fn loadWorld(self: *PlayState, mapid: u32) void {
         self.camera.bounds = Rect.init(
             0,
             0,
-            @as(i32, @intCast(world.getWidth() * 16)),
-            @as(i32, @intCast(world.getHeight() * 16)),
+            @intCast(world.getWidth() * 16),
+            @intCast(world.getHeight() * 16),
         );
     }
 
     if (world.goal) |goal| {
-        self.camera.view.centerOn(@as(i32, @intCast(goal.world_x)), @as(i32, @intCast(goal.world_y)));
+        self.camera.view.centerOn(@intCast(goal.world_x), @intCast(goal.world_y));
     } else {
         self.camera.view.x = 0;
         self.camera.view.y = 0;
@@ -1418,8 +1418,8 @@ fn createMinimap(
         gl.deleteTextures(1, &t_minimap.handle);
         gl.genTextures(1, &t_minimap.handle);
     }
-    t_minimap.width = @as(u32, @intCast(range.getWidth()));
-    t_minimap.height = @as(u32, @intCast(range.getHeight()));
+    t_minimap.width = @intCast(range.getWidth());
+    t_minimap.height = @intCast(range.getHeight());
 
     var fbo: gl.GLuint = 0;
     gl.genFramebuffers(1, &fbo);
@@ -1431,13 +1431,13 @@ fn createMinimap(
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @as(gl.GLsizei, @intCast(t_minimap.width)), @as(gl.GLsizei, @intCast(t_minimap.height)), 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @intCast(t_minimap.width), @intCast(t_minimap.height), 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t_minimap.handle, 0);
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
         std.log.err("createMinimap: failed to create framebuffer", .{});
         std.process.exit(1);
     }
-    gl.viewport(0, 0, @as(c_int, @intCast(t_minimap.width)), @as(c_int, @intCast(t_minimap.height)));
+    gl.viewport(0, 0, @intCast(t_minimap.width), @intCast(t_minimap.height));
     renderers.r_batch.setOutputDimensions(t_minimap.width, t_minimap.height);
     renderers.r_quad.setOutputDimensions(t_minimap.width, t_minimap.height);
     renderMinimapLayer(renderers, world.map, .base, .terrain, range);
@@ -1460,8 +1460,8 @@ fn renderMinimapBlockage(
         while (x <= range.max.x) : (x += 1) {
             const t = map.at2DPtr(.base, x, y);
             const dest = Rectf.init(
-                @as(f32, @floatFromInt(x - range.min.x)),
-                @as(f32, @floatFromInt(y - range.min.y)),
+                @floatFromInt(x - range.min.x),
+                @floatFromInt(y - range.min.y),
                 1.0,
                 1.0,
             );
@@ -1508,8 +1508,8 @@ fn renderMinimapLayer(
                 .h = 16,
             };
             const dest = Rectf.init(
-                @as(f32, @floatFromInt(x - range.min.x)),
-                @as(f32, @floatFromInt(y - range.min.y)),
+                @floatFromInt(x - range.min.x),
+                @floatFromInt(y - range.min.y),
                 1.0,
                 1.0,
             );
@@ -1549,7 +1549,7 @@ fn renderWipe(self: *PlayState, alpha: f64) void {
 
     self.game.renderers.r_quad.begin(.{});
     for (&self.wipe_scanlines, 0..) |*sc, i| {
-        const rect = Rect.init(0, @as(i32, @intCast(i)), right + sc.*, 1);
+        const rect = Rect.init(0, @intCast(i), right + sc.*, 1);
         self.game.renderers.r_quad.drawQuadRGBA(rect, 0, 0, 0, 255);
     }
     self.game.renderers.r_quad.end();
@@ -1591,7 +1591,7 @@ fn updateUpgradeButtons(self: *PlayState) void {
             self.ui_upgrade_states[i].play_state = self;
             self.ui_upgrade_states[i].tower_spec = spec;
             self.ui_upgrade_states[i].tower_id = self.interact_state.select.selected_tower;
-            self.ui_upgrade_states[i].slot = @as(u8, @intCast(i));
+            self.ui_upgrade_states[i].slot = @intCast(i);
             if (self.world.?.canAfford(spec)) {
                 self.ui_upgrade_buttons[i].state = .normal;
             } else {
@@ -1691,20 +1691,20 @@ const ButtonTextureGenerator = struct {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @as(gl.GLsizei, @intCast(button_base.width)), @as(gl.GLsizei, @intCast(button_base.height)), 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @intCast(button_base.width), @intCast(button_base.height), 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.handle, 0);
         if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
             std.log.err("createButtonWithBadge: failed to create framebuffer", .{});
             std.process.exit(1);
         }
-        gl.viewport(0, 0, @as(c_int, @intCast(t.width)), @as(c_int, @intCast(t.height)));
+        gl.viewport(0, 0, @intCast(t.width), @intCast(t.height));
         self.r_batch.setOutputDimensions(t.width, t.height);
         self.r_batch.begin(.{
             .texture = button_base,
         });
         self.r_batch.drawQuad(.{
-            .src = Rect.init(0, 0, @as(i32, @intCast(button_base.width)), @as(i32, @intCast(button_base.height))).toRectf(),
-            .dest = Rect.init(0, 0, @as(i32, @intCast(t.width)), @as(i32, @intCast(t.height))).toRectf(),
+            .src = Rect.init(0, 0, @intCast(button_base.width), @intCast(button_base.height)).toRectf(),
+            .dest = Rect.init(0, 0, @intCast(t.width), @intCast(t.height)).toRectf(),
         });
         self.r_batch.end();
         self.r_batch.begin(.{
@@ -1732,7 +1732,7 @@ fn beginWipe(self: *PlayState) void {
     self.sub = .wipe_fadein;
     self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
 
-    var rng = std.rand.DefaultPrng.init(@as(u64, @intCast(std.time.milliTimestamp())));
+    var rng = std.rand.DefaultPrng.init(@intCast(std.time.milliTimestamp()));
     var r = rng.random();
     for (&self.wipe_scanlines) |*sc| {
         sc.* = r.intRangeLessThan(i32, 0, wipe_scanline_width);
@@ -1760,8 +1760,8 @@ fn renderWaveTimer(self: *PlayState, alpha: f64) void {
             const t1 = self.wave_timer.state_timer.invProgressClamped(self.world.?.world_frame);
             const tx = zm.lerpV(t0, t1, @as(f32, @floatCast(alpha)));
             const k = 1 - std.math.pow(f32, tx, 3);
-            box_rect.x = @as(i32, @intFromFloat(zm.lerpV(@as(f32, @floatFromInt(box_rect.x)), 0.0, k)));
-            box_rect.y = @as(i32, @intFromFloat(zm.lerpV(@as(f32, @floatFromInt(box_rect.y)), 0.0, k)));
+            box_rect.x = @intFromFloat(zm.lerpV(@as(f32, @floatFromInt(box_rect.x)), 0.0, k));
+            box_rect.y = @intFromFloat(zm.lerpV(@as(f32, @floatFromInt(box_rect.y)), 0.0, k));
         },
         .corner => {
             box_rect.x = 0;
@@ -1783,7 +1783,7 @@ fn renderWaveTimer(self: *PlayState, alpha: f64) void {
     }
 
     self.game.renderers.r_quad.begin(.{});
-    self.game.renderers.r_quad.drawQuadRGBA(box_rect, 0, 0, 0, @as(u8, @intFromFloat(total_alpha * 128)));
+    self.game.renderers.r_quad.drawQuadRGBA(box_rect, 0, 0, 0, @intFromFloat(total_alpha * 128));
     self.game.renderers.r_quad.end();
 
     self.game.renderers.r_font.begin(.{

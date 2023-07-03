@@ -43,5 +43,5 @@ pub fn renderLinearFade(renderers: RenderServices, dir: FadeDirection, amt: f32)
     const a_byte = @as(u8, @intFromFloat(a * 255.0));
 
     renderers.r_imm.beginUntextured();
-    renderers.r_imm.drawQuadRGBA(Rect.init(0, 0, @as(i32, @intCast(renderers.output_width)), @as(i32, @intCast(renderers.output_height))), .{ 0, 0, 0, a_byte });
+    renderers.r_imm.drawQuadRGBA(Rect.init(0, 0, @intCast(renderers.output_width), @intCast(renderers.output_height)), .{ 0, 0, 0, a_byte });
 }

@@ -34,7 +34,7 @@ pub fn SlotMap(comptime T: type) type {
                 // (i.e. this index is *not* a hole)
                 .next_free = null,
             });
-            return @as(u32, @intCast(self.indices.items.len - 1));
+            return @intCast(self.indices.items.len - 1);
         }
 
         /// Returns a handle that can be used to access item storage at `item_index`.
@@ -56,7 +56,7 @@ pub fn SlotMap(comptime T: type) type {
         }
 
         pub fn put(self: *Self, allocator: Allocator, value: T) !u32 {
-            const handle = try self.reserveNextHandle(allocator, @as(u32, @intCast(self.items.len)));
+            const handle = try self.reserveNextHandle(allocator, @intCast(self.items.len));
             try self.items.append(allocator, TaggedT{
                 .value = value,
                 .handle = handle,
@@ -185,7 +185,7 @@ pub fn IntrusiveSlotMap(comptime T: type) type {
                 // (i.e. this index is *not* a hole)
                 .next_free = null,
             });
-            return @as(u32, @intCast(self.indices.items.len - 1));
+            return @intCast(self.indices.items.len - 1);
         }
 
         /// Returns a handle that can be used to access item storage at `item_index`.
@@ -358,7 +358,7 @@ pub fn IntrusiveGenSlotMap(comptime T: type) type {
                 // (i.e. this index is *not* a hole)
                 .next_free = null,
             });
-            return Handle{ .generation = 0, .index = @as(u32, @intCast(self.indices.items.len - 1)) };
+            return Handle{ .generation = 0, .index = @intCast(self.indices.items.len - 1) };
         }
 
         /// Returns a handle that can be used to access item storage at `item_index`.
@@ -383,7 +383,7 @@ pub fn IntrusiveGenSlotMap(comptime T: type) type {
         }
 
         pub fn put(self: *Self, allocator: Allocator, value: T) !Handle {
-            const handle = try self.reserveNextHandle(allocator, @as(u32, @intCast(self.items.items.len)));
+            const handle = try self.reserveNextHandle(allocator, @intCast(self.items.items.len));
             var ptr = try self.items.addOne(allocator);
             ptr.* = value;
             ptr.id = handle;

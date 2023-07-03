@@ -58,8 +58,8 @@ pub fn create() QuadBatch {
 
     gl.bindVertexArray(self.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(@offsetOf(Vertex, "x"))));
-    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(@offsetOf(Vertex, "rgba"))));
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @ptrFromInt(@offsetOf(Vertex, "x")));
+    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @ptrFromInt(@offsetOf(Vertex, "rgba")));
     gl.enableVertexAttribArray(0);
     gl.enableVertexAttribArray(1);
 
@@ -73,7 +73,7 @@ fn createIndices(self: *QuadBatch) void {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.index_buffer);
     gl.bufferData(
         gl.ELEMENT_ARRAY_BUFFER,
-        @as(gl.GLsizeiptr, @intCast(@sizeOf(u16) * index_count)),
+        @intCast(@sizeOf(u16) * index_count),
         null,
         gl.STATIC_DRAW,
     );
@@ -102,7 +102,7 @@ fn createVertexStorage(self: *QuadBatch) void {
     _ = self;
     gl.bufferData(
         gl.ARRAY_BUFFER,
-        @as(gl.GLsizeiptr, @intCast(@sizeOf(Vertex) * vertex_count)),
+        @intCast(@sizeOf(Vertex) * vertex_count),
         null,
         gl.STREAM_DRAW,
     );

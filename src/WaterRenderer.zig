@@ -76,8 +76,8 @@ pub fn create() WaterRenderer {
 
     gl.bindVertexArray(self.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer);
-    gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(0)));
-    gl.vertexAttribPointer(1, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(16)));
+    gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @ptrFromInt(0));
+    gl.vertexAttribPointer(1, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @ptrFromInt(16));
     gl.enableVertexAttribArray(0);
     gl.enableVertexAttribArray(1);
 
@@ -91,7 +91,7 @@ fn createIndices(self: *WaterRenderer) void {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.index_buffer);
     gl.bufferData(
         gl.ELEMENT_ARRAY_BUFFER,
-        @as(gl.GLsizeiptr, @intCast(@sizeOf(u16) * index_count)),
+        @intCast(@sizeOf(u16) * index_count),
         null,
         gl.STATIC_DRAW,
     );
@@ -120,7 +120,7 @@ fn createVertexStorage(self: *WaterRenderer) void {
     _ = self;
     gl.bufferData(
         gl.ARRAY_BUFFER,
-        @as(gl.GLsizeiptr, @intCast(@sizeOf(Vertex) * vertex_count)),
+        @intCast(@sizeOf(Vertex) * vertex_count),
         null,
         gl.STREAM_DRAW,
     );
@@ -209,7 +209,7 @@ pub fn drawQuad(self: *WaterRenderer, dest: Rect, world_xy: zm.Vec) void {
     const uv_top = 1.0;
     const uv_bottom = 0.0;
 
-    const uv_scale = zm.f32x4(@as(f32, @floatFromInt(dest.w)), @as(f32, @floatFromInt(dest.h)), 0, 0);
+    const uv_scale = zm.f32x4(@floatFromInt(dest.w), @floatFromInt(dest.h), 0, 0);
 
     self.vertices[self.vertex_head + 0] = .{
         .xyuv = zm.f32x4(left, top, uv_left, uv_top),

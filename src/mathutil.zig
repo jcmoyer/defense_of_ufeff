@@ -15,7 +15,7 @@ pub fn dist(v0: anytype, v1: anytype) f32 {
             d *= -1;
         }
         if (ints) {
-            r += @as(f32, @floatFromInt(d * d));
+            r += @floatFromInt(d * d);
         } else {
             r += d * d;
         }
@@ -31,14 +31,14 @@ pub fn angleBetween(v0: anytype, v1: anytype) f32 {
 }
 
 pub fn colorMulU8Scalar(a: u8, b: u8) u8 {
-    return @as(u8, @intCast((@as(u16, a) * @as(u16, b) + 255) >> 8));
+    return @intCast((@as(u16, a) * @as(u16, b) + 255) >> 8);
 }
 
 pub fn colorMulU8(comptime N: usize, a: [N]u8, b: [N]u8) [N]u8 {
     var result: [N]u8 = undefined;
     for (a, 0..) |a_i, i| {
         const b_i = b[i];
-        result[i] = @as(u8, @intCast((@as(u16, a_i) * @as(u16, b_i) + 255) >> 8));
+        result[i] = @intCast((@as(u16, a_i) * @as(u16, b_i) + 255) >> 8);
     }
     return result;
 }

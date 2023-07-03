@@ -68,9 +68,9 @@ pub fn create() SpriteBatch {
 
     gl.bindVertexArray(self.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer);
-    gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(@offsetOf(Vertex, "xyuv"))));
-    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(@offsetOf(Vertex, "rgba"))));
-    gl.vertexAttribPointer(2, 1, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(@offsetOf(Vertex, "flash"))));
+    gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @ptrFromInt(@offsetOf(Vertex, "xyuv")));
+    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @ptrFromInt(@offsetOf(Vertex, "rgba")));
+    gl.vertexAttribPointer(2, 1, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @ptrFromInt(@offsetOf(Vertex, "flash")));
 
     gl.enableVertexAttribArray(0);
     gl.enableVertexAttribArray(1);
@@ -86,7 +86,7 @@ fn createIndices(self: *SpriteBatch) void {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.index_buffer);
     gl.bufferData(
         gl.ELEMENT_ARRAY_BUFFER,
-        @as(gl.GLsizeiptr, @intCast(@sizeOf(u16) * index_count)),
+        @intCast(@sizeOf(u16) * index_count),
         null,
         gl.STATIC_DRAW,
     );
@@ -115,7 +115,7 @@ fn createVertexStorage(self: *SpriteBatch) void {
     _ = self;
     gl.bufferData(
         gl.ARRAY_BUFFER,
-        @as(gl.GLsizeiptr, @intCast(@sizeOf(Vertex) * vertex_count)),
+        @intCast(@sizeOf(Vertex) * vertex_count),
         null,
         gl.STREAM_DRAW,
     );
@@ -161,8 +161,8 @@ pub fn begin(self: *SpriteBatch, params: SpriteBatchParams) void {
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.index_buffer);
 
-    self.ref_width = @as(f32, @floatFromInt(params.texture.width));
-    self.ref_height = @as(f32, @floatFromInt(params.texture.height));
+    self.ref_width = @floatFromInt(params.texture.width);
+    self.ref_height = @floatFromInt(params.texture.height);
 
     self.vertex_head = 0;
     gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer);
@@ -194,7 +194,7 @@ fn flush(self: *SpriteBatch, remap: bool) void {
 pub const DrawQuadOptions = struct {
     src: Rectf,
     dest: Rectf,
-    color: [4]u8 = @splat(4, @as(u8, 255)),
+    color: [4]u8 = .{ 255, 255, 255, 255 },
     flash: bool = false,
     flash_mag: f32 = 1,
 };

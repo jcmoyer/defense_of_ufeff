@@ -117,9 +117,9 @@ pub fn clampPoint(self: Rect, x: i32, y: i32) [2]i32 {
 
 pub fn toRectf(self: Rect) Rectf {
     return Rectf.init(
-        @as(f32, @floatFromInt(self.x)),
-        @as(f32, @floatFromInt(self.y)),
-        @as(f32, @floatFromInt(self.w)),
-        @as(f32, @floatFromInt(self.h)),
+        @floatFromInt(self.x),
+        @floatFromInt(self.y),
+        @floatFromInt(self.w),
+        @floatFromInt(self.h),
     );
 }

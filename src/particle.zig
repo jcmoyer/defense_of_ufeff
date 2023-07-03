@@ -132,7 +132,7 @@ pub const ParticleSystem = struct {
         var self: ParticleSystem = .{
             .allocator = allocator,
             .capacity = capacity,
-            .rng = std.rand.DefaultPrng.init(@as(u64, @intCast(std.time.milliTimestamp()))),
+            .rng = std.rand.DefaultPrng.init(@intCast(std.time.milliTimestamp())),
         };
         try self.particles.resize(allocator, capacity);
         var i: usize = 0;
@@ -197,7 +197,7 @@ pub const ParticleSystem = struct {
                     rgba[0],
                     rgba[1],
                     rgba[2],
-                    @as(u8, @intFromFloat(a)),
+                    @intFromFloat(a),
                 };
                 const s = self.particles.items(.life)[i].invProgressClamped(frame);
                 self.particles.items(.scale)[i] = s;

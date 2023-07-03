@@ -90,9 +90,9 @@ pub fn intersect(self: Rectf, other: Rectf, subRectf: ?*Rectf) bool {
 
 pub fn toRect(self: Rectf) Rect {
     return Rect.init(
-        @as(i32, @intFromFloat(self.x)),
-        @as(i32, @intFromFloat(self.y)),
-        @as(i32, @intFromFloat(self.w)),
-        @as(i32, @intFromFloat(self.h)),
+        @intFromFloat(self.x),
+        @intFromFloat(self.y),
+        @intFromFloat(self.w),
+        @intFromFloat(self.h),
     );
 }

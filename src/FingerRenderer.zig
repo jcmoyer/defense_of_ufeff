@@ -47,7 +47,7 @@ pub fn create() FingerRenderer {
     gl.genBuffers(1, &self.buffer);
     gl.bindVertexArray(self.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, self.buffer);
-    gl.vertexAttribIPointer(0, 1, gl.UNSIGNED_INT, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(@offsetOf(Vertex, "id"))));
+    gl.vertexAttribIPointer(0, 1, gl.UNSIGNED_INT, @sizeOf(Vertex), @ptrFromInt(@offsetOf(Vertex, "id")));
     gl.enableVertexAttribArray(0);
 
     return self;

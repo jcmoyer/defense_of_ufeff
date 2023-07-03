@@ -318,7 +318,7 @@ pub const AudioSystem = struct {
             &samples,
         );
         buffer.samples = samples;
-        buffer.sample_count.store(@as(u32, @intCast(sample_count)), .SeqCst);
+        buffer.sample_count.store(@intCast(sample_count), .SeqCst);
     }
 
     fn fillBuffer(self: *AudioSystem, buffer: []i16) void {
@@ -369,8 +369,8 @@ pub const AudioSystem = struct {
                 std.debug.assert(m_right >= 0 and m_right <= 1);
                 std.debug.assert(volume >= 0 and volume <= 1);
 
-                output_left.* +|= @as(i16, @intCast((@as(i32, @intFromFloat(@as(f32, @floatFromInt(input_left)) * volume * m_left)))));
-                output_right.* +|= @as(i16, @intCast((@as(i32, @intFromFloat(@as(f32, @floatFromInt(input_right)) * volume * m_right)))));
+                output_left.* +|= @intCast(@as(i32, @intFromFloat(@as(f32, @floatFromInt(input_left)) * volume * m_left)));
+                output_right.* +|= @intCast(@as(i32, @intFromFloat(@as(f32, @floatFromInt(input_right)) * volume * m_right)));
 
                 track.cursor += 2;
                 if (track.cursor == buffer_sample_count) {
@@ -397,7 +397,7 @@ pub const AudioSystem = struct {
 
     fn audioCallback(sys: ?*anyopaque, stream: [*]u8, len: c_int) callconv(.C) void {
         var self = @as(*AudioSystem, @ptrCast(@alignCast(sys)));
-        const stream_bytes = stream[0..@as(usize, @intCast(len))];
+        const stream_bytes = stream[0..@intCast(len)];
         self.fillBuffer(
             std.mem.bytesAsSlice(i16, @as([]align(2) u8, @alignCast(stream_bytes))),
         );
@@ -462,8 +462,8 @@ const zm = @import("zmath");
 pub fn computePositionalOptions(view: Rect, audio_position: [2]i32) AudioOptions {
     const view_center = view.centerPoint();
     const theta = mathutil.angleBetween(
-        .{ @as(f32, @floatFromInt(view_center[0])), @as(f32, @floatFromInt(view_center[1])) },
-        .{ @as(f32, @floatFromInt(audio_position[0])), @as(f32, @floatFromInt(audio_position[1])) },
+        [2]f32{ @floatFromInt(view_center[0]), @floatFromInt(view_center[1]) },
+        [2]f32{ @floatFromInt(audio_position[0]), @floatFromInt(audio_position[1]) },
     );
 
     // cosine except shifted from -1..1 to 0..1

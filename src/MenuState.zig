@@ -85,7 +85,7 @@ pub fn create(game: *Game) !*MenuState {
         .game = game,
         .fontspec = undefined,
         .ui_root = ui.Root.init(game.allocator, &game.sdl_backend),
-        .rng = std.rand.DefaultPrng.init(@as(u64, @intCast(std.time.milliTimestamp()))),
+        .rng = std.rand.DefaultPrng.init(@intCast(std.time.milliTimestamp())),
         // Initialized below
         .ui_tip = undefined,
     };
@@ -194,7 +194,7 @@ pub fn render(self: *MenuState, alpha: f64) void {
     self.game.renderers.r_font.drawText("Defense of Ufeff", .{ .dest = Rect.init(0, 0, Game.INTERNAL_WIDTH, 50), .h_alignment = .center });
 
     var measured = self.fontspec.measureText(tips[self.tip_index]);
-    measured.centerOn(Game.INTERNAL_WIDTH / 2, @as(i32, @intFromFloat(0.8 * Game.INTERNAL_HEIGHT)));
+    measured.centerOn(Game.INTERNAL_WIDTH / 2, @intFromFloat(0.8 * Game.INTERNAL_HEIGHT));
 
     self.game.renderers.r_font.drawText(tips[self.tip_index], .{ .dest = Rect.init(0, 200, 512, 50), .h_alignment = .center });
     self.game.renderers.r_font.end();

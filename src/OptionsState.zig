@@ -164,7 +164,7 @@ fn onScaleChange(button: *ui.Button, self: *OptionsState) void {
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.scale_index = (self.scale_index + 1) % scales.len;
     const new_scale = scales[self.scale_index];
-    self.game.setOutputScale(@as(f32, @floatFromInt(new_scale)));
+    self.game.setOutputScale(@floatFromInt(new_scale));
     self.ui_root.backend.client_rect = self.game.output_rect;
     self.ui_root.backend.coord_scale_x = self.game.output_scale_x;
     self.ui_root.backend.coord_scale_y = self.game.output_scale_y;

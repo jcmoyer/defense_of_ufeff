@@ -105,7 +105,7 @@ pub const Projectile = struct {
             }
         }
         if (!self.activated) {
-            self.world.playPositionalSoundId(self.activate_sound, @as(i32, @intFromFloat(self.world_x)), @as(i32, @intFromFloat(self.world_y)));
+            self.world.playPositionalSoundId(self.activate_sound, @intFromFloat(self.world_x), @intFromFloat(self.world_y));
             self.activated = true;
         }
         self.world_x += self.vel_x;
@@ -148,7 +148,7 @@ pub const Projectile = struct {
     }
 
     pub fn getWorldCollisionRect(self: Projectile) Rect {
-        var r = Rect.init(@as(i32, @intFromFloat(self.world_x)), @as(i32, @intFromFloat(self.world_y)), 0, 0);
+        var r = Rect.init(@intFromFloat(self.world_x), @intFromFloat(self.world_y), 0, 0);
         // TODO: replace with projectile size?
         r.inflate(4, 4);
         return r;
@@ -160,7 +160,7 @@ pub const Projectile = struct {
     pub fn getInterpWorldPosition(self: Projectile, t: f64) [2]i32 {
         const ix = zm.lerpV(self.p_world_x, self.world_x, @as(f32, @floatCast(t)));
         const iy = zm.lerpV(self.p_world_y, self.world_y, @as(f32, @floatCast(t)));
-        return [2]i32{ @as(i32, @intFromFloat(ix)), @as(i32, @intFromFloat(iy)) };
+        return [2]i32{ @intFromFloat(ix), @intFromFloat(iy) };
     }
 };
 
@@ -309,7 +309,7 @@ pub const Monster = struct {
     const tile_distance = 10000;
 
     pub fn setTilePosition(self: *Monster, coord: TileCoord) void {
-        self.setWorldPosition(@as(u32, @intCast(coord.x * 16)), @as(u32, @intCast(coord.y * 16)));
+        self.setWorldPosition(@intCast(coord.x * 16), @intCast(coord.y * 16));
     }
 
     pub fn setWorldPosition(self: *Monster, new_x: u32, new_y: u32) void {
@@ -349,7 +349,7 @@ pub const Monster = struct {
 
     fn warpToSpawn(self: *Monster) void {
         self.world.goal.?.emitWarpParticles();
-        self.world.playPositionalSoundId(.warp, @as(i32, @intCast(self.world.goal.?.world_x)), @as(i32, @intCast(self.world.goal.?.world_y)));
+        self.world.playPositionalSoundId(.warp, @intCast(self.world.goal.?.world_x), @intCast(self.world.goal.?.world_y));
         self.setTilePosition(self.world.getSpawnPosition(self.spawn_id));
         self.computePath();
         self.path_index = 0;
@@ -406,8 +406,8 @@ pub const Monster = struct {
         const y0 = @as(f32, @floatFromInt(self.last_tile_pos.worldY()));
         const y1 = @as(f32, @floatFromInt(self.tile_pos.worldY()));
 
-        self.world_x = @as(u32, @intFromFloat(zm.lerpV(x0, x1, progress_f)));
-        self.world_y = @as(u32, @intFromFloat(zm.lerpV(y0, y1, progress_f)));
+        self.world_x = @intFromFloat(zm.lerpV(x0, x1, progress_f));
+        self.world_y = @intFromFloat(zm.lerpV(y0, y1, progress_f));
 
         self.moved_amount += move_amount;
     }
@@ -459,12 +459,12 @@ pub const Monster = struct {
     pub fn getInterpWorldPosition(self: Monster, t: f64) [2]i32 {
         const ix = zm.lerpV(@as(f64, @floatFromInt(self.p_world_x)), @as(f64, @floatFromInt(self.world_x)), t);
         const iy = zm.lerpV(@as(f64, @floatFromInt(self.p_world_y)), @as(f64, @floatFromInt(self.world_y)), t);
-        return [2]i32{ @as(i32, @intFromFloat(ix)), @as(i32, @intFromFloat(iy)) };
+        return [2]i32{ @intFromFloat(ix), @intFromFloat(iy) };
     }
 
     pub fn getWorldCollisionRect(self: Monster) Rect {
         // TODO: origin is top left, this may change
-        return Rect.init(@as(i32, @intCast(self.world_x)), @as(i32, @intCast(self.world_y)), 16, 16);
+        return Rect.init(@intCast(self.world_x), @intCast(self.world_y), 16, 16);
     }
 
     pub fn hurt(self: *Monster, opts: HurtOptions) void {
@@ -607,7 +607,7 @@ fn magicianUpdate(self: *Tower, frame: u64) void {
         const r = self.angleTo(p[0], p[1]);
         self.swingEffect(&se_staff, r, 10, 0.3);
 
-        self.world.playPositionalSound("assets/sounds/slash.ogg", @as(i32, @intCast(self.world_x)), @as(i32, @intCast(self.world_y)));
+        self.world.playPositionalSound("assets/sounds/slash.ogg", @intCast(self.world_x), @intCast(self.world_y));
 
         const ho = HurtOptions{
             .amount = 1,
@@ -714,7 +714,7 @@ fn soldierUpdate(self: *Tower, frame: u64) void {
         const r = self.angleTo(p[0], p[1]);
         self.swingEffect(&se_sword, r, 10, 0.3);
 
-        self.world.playPositionalSound("assets/sounds/slash.ogg", @as(i32, @intCast(self.world_x)), @as(i32, @intCast(self.world_y)));
+        self.world.playPositionalSound("assets/sounds/slash.ogg", @intCast(self.world_x), @intCast(self.world_y));
 
         const ho = HurtOptions{
             .amount = 3,
@@ -745,7 +745,7 @@ fn berserkerUpdate(self: *Tower, frame: u64) void {
         const r = self.angleTo(p[0], p[1]);
         self.swingEffect(&se_battleaxe, r, 10, 0.4);
 
-        self.world.playPositionalSound("assets/sounds/slash.ogg", @as(i32, @intCast(self.world_x)), @as(i32, @intCast(self.world_y)));
+        self.world.playPositionalSound("assets/sounds/slash.ogg", @intCast(self.world_x), @intCast(self.world_y));
 
         self.world.hurtMonstersInRadiusDelay(.{ @as(f32, @floatFromInt(p[0])), @as(f32, @floatFromInt(p[1])) }, 16, 5, .slash, 4);
         self.lookTowards(p[0], p[1]);
@@ -771,7 +771,7 @@ fn rogueUpdate(self: *Tower, frame: u64) void {
         const r = self.angleTo(p[0], p[1]);
         self.stabEffect(&se_dagger, r, 10, 0.3, 0.9);
 
-        self.world.playPositionalSound("assets/sounds/stab.ogg", @as(i32, @intCast(self.world_x)), @as(i32, @intCast(self.world_y)));
+        self.world.playPositionalSound("assets/sounds/stab.ogg", @intCast(self.world_x), @intCast(self.world_y));
 
         self.world.monsters.getPtr(m).hurtDirectional(2, [2]f32{ std.math.cos(r), std.math.sin(r) });
         self.lookTowards(p[0], p[1]);
@@ -803,7 +803,7 @@ fn ninjaUpdate(self: *Tower, frame: u64) void {
         var num: u8 = 0;
         while (i <= 1) : (i += 1) {
             const angle_diff = (std.math.pi / 8.0) * @as(f32, @floatFromInt(i));
-            var proj = self.world.spawnProjectileDelayed(&proj_star, @as(i32, @intCast(self.world_x + 8)), @as(i32, @intCast(self.world_y + 8)), 3 * num) catch unreachable;
+            var proj = self.world.spawnProjectileDelayed(&proj_star, @intCast(self.world_x + 8), @intCast(self.world_y + 8), 3 * num) catch unreachable;
             proj.activate_sound = .bow;
             const cos_r = std.math.cos(r + angle_diff);
             const sin_r = std.math.sin(r + angle_diff);
@@ -848,7 +848,7 @@ fn lancerUpdate(self: *Tower, frame: u64) void {
         self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 7, 0.15, 15);
         self.stabEffectDelayed(&se_spear, r + random.float(f32) * random_angle, 6, 0.10, 20);
 
-        self.world.playPositionalSound("assets/sounds/stab.ogg", @as(i32, @intCast(self.world_x)), @as(i32, @intCast(self.world_y)));
+        self.world.playPositionalSound("assets/sounds/stab.ogg", @intCast(self.world_x), @intCast(self.world_y));
 
         const ho = HurtOptions{
             .amount = 2,
@@ -887,7 +887,7 @@ fn archerUpdate(self: *Tower, frame: u64) void {
         };
         const target = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
 
-        self.world.playPositionalSound("assets/sounds/bow.ogg", @as(i32, @intCast(self.world_x)), @as(i32, @intCast(self.world_y)));
+        self.world.playPositionalSound("assets/sounds/bow.ogg", @intCast(self.world_x), @intCast(self.world_y));
 
         self.setAssocEffectAimed(&se_bow, target[0], target[1], 6, 1);
         var proj = self.fireProjectileTowards(&proj_arrow, target[0], target[1]);
@@ -917,7 +917,7 @@ fn gunnerUpdate(self: *Tower, frame: u64) void {
         };
         const target = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
 
-        self.world.playPositionalSound("assets/sounds/gun.ogg", @as(i32, @intCast(self.world_x)), @as(i32, @intCast(self.world_y)));
+        self.world.playPositionalSound("assets/sounds/gun.ogg", @intCast(self.world_x), @intCast(self.world_y));
 
         self.setAssocEffectAimed(&se_gun, target[0], target[1], 6, 1);
         var proj = self.fireProjectileTowards(&proj_bullet, target[0], target[1]);
@@ -950,13 +950,13 @@ fn shotgunnerUpdate(self: *Tower, frame: u64) void {
         const target = self.world.monsters.getPtr(m).getWorldCollisionRect().centerPoint();
         const r = self.angleTo(target[0], target[1]);
 
-        self.world.playPositionalSoundId(.shotgun, @as(i32, @intCast(self.world_x)), @as(i32, @intCast(self.world_y)));
+        self.world.playPositionalSoundId(.shotgun, @intCast(self.world_x), @intCast(self.world_y));
         self.setAssocEffectAimed(&se_biggun, target[0], target[1], 6, 1);
 
         var i: u8 = 0;
         while (i < 8) : (i += 1) {
             const angle_diff = (random.float(f32) * std.math.pi / 4.0) - std.math.pi / 8.0;
-            var proj = self.world.spawnProjectile(&proj_bullet, @as(i32, @intCast(self.world_x + 8)), @as(i32, @intCast(self.world_y + 8))) catch unreachable;
+            var proj = self.world.spawnProjectile(&proj_bullet, @intCast(self.world_x + 8), @intCast(self.world_y + 8)) catch unreachable;
             proj.scale = 0.5 + random.float(f32) * 0.5;
             const cos_r = std.math.cos(r + angle_diff);
             const sin_r = std.math.sin(r + angle_diff);
@@ -1013,7 +1013,7 @@ pub const Tower = struct {
     }
 
     pub fn getWorldCollisionRect(self: Tower) Rect {
-        return Rect.init(@as(i32, @intCast(self.world_x)), @as(i32, @intCast(self.world_y)), 16, 16);
+        return Rect.init(@intCast(self.world_x), @intCast(self.world_y), 16, 16);
     }
 
     pub fn swingEffect(self: *Tower, se_spec: *const SpriteEffectSpec, r: f32, offset: f32, effect_life_sec: f32) void {
@@ -1037,7 +1037,7 @@ pub const Tower = struct {
     pub fn stabEffectDelayed(self: *Tower, se_spec: *const SpriteEffectSpec, r: f32, offset: f32, effect_life_sec: f32, frame_count: u32) void {
         const basis_x = self.world_x + 8;
         const basis_y = self.world_y + 8;
-        const eid = self.world.spawnSpriteEffect(se_spec, @as(i32, @intCast(basis_x)), @as(i32, @intCast(basis_y))) catch unreachable;
+        const eid = self.world.spawnSpriteEffect(se_spec, @intCast(basis_x), @intCast(basis_y)) catch unreachable;
         var effect = self.world.sprite_effects.getPtr(eid);
         const delay = FrameTimer.initFrames(self.world.world_frame, frame_count);
         effect.delay = delay;
@@ -1055,7 +1055,7 @@ pub const Tower = struct {
         const basis_y = self.world_y + 8;
 
         if (self.assoc_effect == null or self.world.sprite_effects.getPtrWeak(self.assoc_effect.?) == null) {
-            self.assoc_effect = self.world.spawnSpriteEffect(se_spec, @as(i32, @intCast(basis_x)), @as(i32, @intCast(basis_y))) catch unreachable;
+            self.assoc_effect = self.world.spawnSpriteEffect(se_spec, @intCast(basis_x), @intCast(basis_y)) catch unreachable;
         }
         self.world.sprite_effects.getPtr(self.assoc_effect.?).setAngleOffset(r, offset);
         self.world.sprite_effects.getPtr(self.assoc_effect.?).lifetime = self.world.createTimerSeconds(effect_life_sec);
@@ -1076,7 +1076,7 @@ pub const Tower = struct {
     }
 
     pub fn fireProjectileTowards(self: *Tower, pspec: *const ProjectileSpec, world_x: i32, world_y: i32) *Projectile {
-        var proj = self.world.spawnProjectile(pspec, @as(i32, @intCast(self.world_x + 8)), @as(i32, @intCast(self.world_y + 8))) catch unreachable;
+        var proj = self.world.spawnProjectile(pspec, @intCast(self.world_x + 8), @intCast(self.world_y + 8)) catch unreachable;
 
         const r = self.angleTo(world_x, world_y);
         const cos_r = std.math.cos(r);
@@ -1091,8 +1091,8 @@ pub const Tower = struct {
 
     pub fn angleTo(self: *Tower, world_x: i32, world_y: i32) f32 {
         var r = mu.angleBetween(
-            .{ @as(f32, @floatFromInt(self.world_x + 8)), @as(f32, @floatFromInt(self.world_y + 8)) },
-            .{ @as(f32, @floatFromInt(world_x)), @as(f32, @floatFromInt(world_y)) },
+            [2]f32{ @floatFromInt(self.world_x + 8), @floatFromInt(self.world_y + 8) },
+            [2]f32{ @floatFromInt(world_x), @floatFromInt(world_y) },
         );
         return r;
     }
@@ -1292,7 +1292,7 @@ pub const SpriteEffect = struct {
             }
         }
         if (!self.activated) {
-            self.world.playPositionalSoundId(self.activate_sound, @as(i32, @intFromFloat(self.world_x)), @as(i32, @intFromFloat(self.world_y)));
+            self.world.playPositionalSoundId(self.activate_sound, @intFromFloat(self.world_x), @intFromFloat(self.world_y));
             self.activated = true;
         }
         self.post_angle += self.angular_vel;
@@ -1364,7 +1364,7 @@ pub const FloatingText = struct {
     pub fn getInterpWorldPosition(self: FloatingText, t: f64) [2]i32 {
         const ix = zm.lerpV(self.p_world_x, self.world_x, @as(f32, @floatCast(t)));
         const iy = zm.lerpV(self.p_world_y, self.world_y, @as(f32, @floatCast(t)));
-        return [2]i32{ @as(i32, @intFromFloat(ix)), @as(i32, @intFromFloat(iy)) };
+        return [2]i32{ @intFromFloat(ix), @intFromFloat(iy) };
     }
 
     pub fn lifePercent(self: FloatingText) f32 {
@@ -1391,7 +1391,7 @@ pub const Goal = struct {
             .world_y = world_y,
             .emitter = .{
                 .parent = &world.particle_sys,
-                .pos = .{ @as(f32, @floatFromInt(world_x + 8)), @as(f32, @floatFromInt(world_y + 16)) },
+                .pos = [2]f32{ @floatFromInt(world_x + 8), @floatFromInt(world_y + 16) },
                 .params = particle.warp_params,
             },
         };
@@ -1698,7 +1698,7 @@ pub const World = struct {
 
     /// Happens after successful load from json
     fn finalizeInit(self: *World) void {
-        self.safe_zone = Rect.init(0, 0, @as(i32, @intCast(self.getWidth() * 16)), @as(i32, @intCast(self.getHeight() * 16)));
+        self.safe_zone = Rect.init(0, 0, @intCast(self.getWidth() * 16), @intCast(self.getHeight() * 16));
         self.safe_zone.inflate(256, 256);
 
         const range = self.getPlayableRange();
@@ -1706,7 +1706,7 @@ pub const World = struct {
             if (range.contains(spawn.coord)) {
                 spawn.emitter = particle.PointEmitter{
                     .parent = &self.particle_sys,
-                    .pos = .{ @as(f32, @floatFromInt(spawn.coord.worldX() + 8)), @as(f32, @floatFromInt(spawn.coord.worldY() + 16)) },
+                    .pos = [2]f32{ @floatFromInt(spawn.coord.worldX() + 8), @floatFromInt(spawn.coord.worldY() + 16) },
                     .params = particle.warp_params,
                 };
             }
@@ -1740,7 +1740,7 @@ pub const World = struct {
         } else {
             return TileRange{
                 .min = TileCoord{ .x = 0, .y = 0 },
-                .max = TileCoord{ .x = @as(u16, @intCast(self.getWidth() - 1)), .y = @as(u16, @intCast(self.getHeight() - 1)) },
+                .max = TileCoord{ .x = @intCast(self.getWidth() - 1), .y = @intCast(self.getHeight() - 1) },
             };
         }
     }
@@ -1792,8 +1792,8 @@ pub const World = struct {
             return false;
         }
         const tile_world_rect = Rect.init(
-            @as(i32, @intCast(coord.worldX())),
-            @as(i32, @intCast(coord.worldY())),
+            @intCast(coord.worldX()),
+            @intCast(coord.worldY()),
             16,
             16,
         );
@@ -1838,16 +1838,16 @@ pub const World = struct {
         const id = try self.floating_text.put(self.allocator, FloatingText{
             .world = self,
             .text = undefined,
-            .world_x = @as(f32, @floatFromInt(world_x)),
-            .world_y = @as(f32, @floatFromInt(world_y)),
-            .p_world_x = @as(f32, @floatFromInt(world_x)),
-            .p_world_y = @as(f32, @floatFromInt(world_y)),
+            .world_x = @floatFromInt(world_x),
+            .world_y = @floatFromInt(world_y),
+            .p_world_x = @floatFromInt(world_x),
+            .p_world_y = @floatFromInt(world_y),
             .vel_x = 0,
             .vel_y = 0,
         });
         var ptr = self.floating_text.getPtr(id);
         std.mem.copy(u8, &ptr.text, text);
-        ptr.textlen = @as(u8, @intCast(text.len));
+        ptr.textlen = @intCast(text.len);
         return id;
     }
 
@@ -1877,8 +1877,8 @@ pub const World = struct {
         self.map.at2DPtr(.base, coord.x, coord.y).flags.contains_tower = true;
         var id = try self.spawnTowerWorld(
             spec,
-            @as(u32, @intCast(coord.x * 16)),
-            @as(u32, @intCast(coord.y * 16)),
+            @intCast(coord.x * 16),
+            @intCast(coord.y * 16),
         );
         try self.tower_map.put(self.allocator, coord, id);
         self.invalidatePathCache();
@@ -1904,8 +1904,8 @@ pub const World = struct {
         const id = try self.sprite_effects.put(self.allocator, SpriteEffect{
             .world = self,
             .spec = spec,
-            .world_x = @as(f32, @floatFromInt(world_x)),
-            .world_y = @as(f32, @floatFromInt(world_y)),
+            .world_x = @floatFromInt(world_x),
+            .world_y = @floatFromInt(world_y),
         });
         self.sprite_effects.getPtr(id).spawn(self.world_frame);
         return id;
@@ -1917,14 +1917,14 @@ pub const World = struct {
         ptr.* = Projectile{
             .world = self,
             .spec = spec,
-            .world_x = @as(f32, @floatFromInt(world_x)),
-            .world_y = @as(f32, @floatFromInt(world_y)),
-            .p_world_x = @as(f32, @floatFromInt(world_x)),
-            .p_world_y = @as(f32, @floatFromInt(world_y)),
-            .vel_x = @as(f32, @floatFromInt(0)),
-            .vel_y = @as(f32, @floatFromInt(0)),
-            .spawn_x = @as(f32, @floatFromInt(world_x)),
-            .spawn_y = @as(f32, @floatFromInt(world_y)),
+            .world_x = @floatFromInt(world_x),
+            .world_y = @floatFromInt(world_y),
+            .p_world_x = @floatFromInt(world_x),
+            .p_world_y = @floatFromInt(world_y),
+            .vel_x = @floatFromInt(0),
+            .vel_y = @floatFromInt(0),
+            .spawn_x = @floatFromInt(world_x),
+            .spawn_y = @floatFromInt(world_y),
         };
         return ptr;
     }
@@ -1934,15 +1934,15 @@ pub const World = struct {
         ptr.* = Projectile{
             .world = self,
             .spec = spec,
-            .world_x = @as(f32, @floatFromInt(world_x)),
-            .world_y = @as(f32, @floatFromInt(world_y)),
-            .p_world_x = @as(f32, @floatFromInt(world_x)),
-            .p_world_y = @as(f32, @floatFromInt(world_y)),
-            .vel_x = @as(f32, @floatFromInt(0)),
-            .vel_y = @as(f32, @floatFromInt(0)),
+            .world_x = @floatFromInt(world_x),
+            .world_y = @floatFromInt(world_y),
+            .p_world_x = @floatFromInt(world_x),
+            .p_world_y = @floatFromInt(world_y),
+            .vel_x = @floatFromInt(0),
+            .vel_y = @floatFromInt(0),
             .delay = FrameTimer.initFrames(self.world_frame, frames),
-            .spawn_x = @as(f32, @floatFromInt(world_x)),
-            .spawn_y = @as(f32, @floatFromInt(world_y)),
+            .spawn_x = @floatFromInt(world_x),
+            .spawn_y = @floatFromInt(world_y),
         };
         return ptr;
     }
@@ -1977,7 +1977,7 @@ pub const World = struct {
             }
         }
         if (num_hit != 0) {
-            self.playPositionalSoundId(hopts.damage_type.getHurtSound(), @as(i32, @intFromFloat(pos[0])), @as(i32, @intFromFloat(pos[1])));
+            self.playPositionalSoundId(hopts.damage_type.getHurtSound(), @intFromFloat(pos[0]), @intFromFloat(pos[1]));
         }
     }
 
@@ -2804,7 +2804,7 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !*World {
         .pathfinder = PathfindingState.init(allocator),
         .path_cache = PathfindingCache.init(allocator),
         .scratch_cache = PathfindingCache.init(allocator),
-        .rng = std.rand.DefaultPrng.init(@as(u64, @intCast(std.time.milliTimestamp()))),
+        .rng = std.rand.DefaultPrng.init(@intCast(std.time.milliTimestamp())),
         // Initialized below (failure to do so is an error)
         .particle_sys = undefined,
         .goal = undefined,
@@ -2881,7 +2881,7 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !*World {
             std.log.err("starting_gold must have type `int`", .{});
             std.process.exit(1);
         }
-        world.player_gold = @as(u32, @intCast(g.toInt()));
+        world.player_gold = @intCast(g.toInt());
     }
 
     world.finalizeInit();
@@ -2937,7 +2937,7 @@ fn loadTileLayer(layer: TiledTileLayer, ctx: LoadContext) !void {
     };
 
     for (layer_ints, 0..) |t_tid, i| {
-        const result = ctx.classifier.classify(@as(u16, @intCast(t_tid)));
+        const result = ctx.classifier.classify(@intCast(t_tid));
         tilemap.atScalarPtr(layer_id, i).* = .{
             .bank = result.bank,
             .id = result.adjusted_tile_id,

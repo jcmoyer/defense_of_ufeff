@@ -118,8 +118,8 @@ pub fn create(allocator: Allocator) !*Game {
         "defense of ufeff",
         sdl.SDL_WINDOWPOS_CENTERED,
         sdl.SDL_WINDOWPOS_CENTERED,
-        @as(c_int, @intFromFloat(ptr.output_scale_x * INTERNAL_WIDTH)),
-        @as(c_int, @intFromFloat(ptr.output_scale_y * INTERNAL_HEIGHT)),
+        @intFromFloat(ptr.output_scale_x * INTERNAL_WIDTH),
+        @intFromFloat(ptr.output_scale_y * INTERNAL_HEIGHT),
         sdl.SDL_WINDOW_OPENGL,
     ) orelse {
         log.err("SDL_CreateWindow failed: {s}", .{sdl.SDL_GetError()});
@@ -226,7 +226,7 @@ pub fn run(self: *Game) void {
     self.running = true;
     self.changeState(.menu);
 
-    var last: f64 = @as(f64, @floatFromInt(sdl.SDL_GetTicks64()));
+    var last: f64 = @floatFromInt(sdl.SDL_GetTicks64());
     var acc: f64 = 0;
     const DELAY = 1000 / @as(f64, @floatFromInt(UPDATE_RATE));
     const MAX_SKIP_FRAMES = 4;
@@ -237,7 +237,7 @@ pub fn run(self: *Game) void {
             self.handleEvent(ev);
         }
 
-        const now = @as(f64, @floatFromInt(sdl.SDL_GetTicks64()));
+        const now: f64 = @floatFromInt(sdl.SDL_GetTicks64());
         const elapsed = now - last;
         last = now;
         acc += elapsed;
@@ -292,8 +292,8 @@ pub fn render(self: *Game, alpha: f64) void {
     self.renderers.r_imm.drawQuad(
         self.output_rect.x,
         self.output_rect.y,
-        @as(u32, @intCast(self.output_rect.w)),
-        @as(u32, @intCast(self.output_rect.h)),
+        @intCast(self.output_rect.w),
+        @intCast(self.output_rect.h),
         255,
         255,
         255,
@@ -317,11 +317,11 @@ fn performLayout(self: *Game) void {
         var output_width: i32 = undefined;
         var output_height: i32 = undefined;
         if (aspect_ratio > 1) {
-            output_width = @as(i32, @intCast(window_width));
-            output_height = @as(i32, @intFromFloat(@as(f32, @floatFromInt(output_width)) / aspect_ratio));
+            output_width = @intCast(window_width);
+            output_height = @intFromFloat(@as(f32, @floatFromInt(output_width)) / aspect_ratio);
         } else {
-            output_height = @as(i32, @intCast(window_height));
-            output_width = @as(f32, @intFromFloat(@as(f32, @floatFromInt(output_height)) * aspect_ratio));
+            output_height = @intCast(window_height);
+            output_width = @intFromFloat(@as(f32, @floatFromInt(output_height)) * aspect_ratio);
         }
         self.output_rect = .{
             .x = @divFloor(window_width - output_width, 2),
@@ -347,8 +347,8 @@ fn performLayout(self: *Game) void {
     self.sdl_backend.client_rect = self.output_rect;
     self.sdl_backend.coord_scale_x = self.output_scale_x;
     self.sdl_backend.coord_scale_y = self.output_scale_y;
-    self.renderers.output_width = @as(u32, @intCast(self.output_rect.w));
-    self.renderers.output_height = @as(u32, @intCast(self.output_rect.h));
+    self.renderers.output_width = @intCast(self.output_rect.w);
+    self.renderers.output_height = @intCast(self.output_rect.h);
 }
 
 fn initFramebuffer(self: *Game) void {
@@ -398,7 +398,7 @@ fn endRenderToScene(self: *Game) void {
     var window_width: c_int = 0;
     var window_height: c_int = 0;
     sdl.SDL_GetWindowSize(self.window, &window_width, &window_height);
-    self.renderers.r_imm.setOutputDimensions(@as(u32, @intCast(window_width)), @as(u32, @intCast(window_height)));
+    self.renderers.r_imm.setOutputDimensions(@intCast(window_width), @intCast(window_height));
     gl.viewport(0, 0, window_width, window_height);
 }
 
@@ -477,14 +477,14 @@ pub fn unproject(self: *Game, x: i32, y: i32) [2]i32 {
     const scale_y = self.output_scale_y;
 
     return [2]i32{
-        @as(i32, @intFromFloat(@as(f64, @floatFromInt(x - self.output_rect.x)) / scale_x)),
-        @as(i32, @intFromFloat(@as(f64, @floatFromInt(y - self.output_rect.y)) / scale_y)),
+        @intFromFloat(@as(f64, @floatFromInt(x - self.output_rect.x)) / scale_x),
+        @intFromFloat(@as(f64, @floatFromInt(y - self.output_rect.y)) / scale_y),
     };
 }
 
 pub fn setOutputScale(self: *Game, s: f32) void {
-    const window_width = @as(c_int, @intFromFloat(s * INTERNAL_WIDTH));
-    const window_height = @as(c_int, @intFromFloat(s * INTERNAL_HEIGHT));
+    const window_width: c_int = @intFromFloat(s * INTERNAL_WIDTH);
+    const window_height: c_int = @intFromFloat(s * INTERNAL_HEIGHT);
     sdl.SDL_SetWindowSize(self.window, window_width, window_height);
     sdl.SDL_SetWindowPosition(self.window, sdl.SDL_WINDOWPOS_CENTERED, sdl.SDL_WINDOWPOS_CENTERED);
     self.performLayout();

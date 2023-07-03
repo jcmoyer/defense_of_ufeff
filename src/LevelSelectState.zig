@@ -35,7 +35,7 @@ const ProgressionState = extern struct {
 
     fn setMapComplete(self: *ProgressionState, mapid: u32) void {
         self.maps[mapid] = true;
-        self.num_complete = @as(u32, @intCast(std.mem.count(bool, &self.maps, &[_]bool{true})));
+        self.num_complete = @intCast(std.mem.count(bool, &self.maps, &[_]bool{true}));
     }
 };
 
@@ -333,7 +333,7 @@ pub fn render(self: *LevelSelectState, alpha: f64) void {
     self.r_finger.beginTextured(.{
         .texture = self.game.texman.getNamedTexture("finger.png"),
     });
-    const p = self.finger.getInterpWorldPosition(@as(f32, @floatCast(alpha)));
+    const p = self.finger.getInterpWorldPosition(@floatCast(alpha));
     self.r_finger.drawFinger(p[0], p[1], @as(f32, @floatFromInt(self.game.frame_counter)) / 8.0);
 
     self.renderFade();
@@ -421,8 +421,8 @@ fn moveFingerToRecommendedMap(self: *LevelSelectState) void {
         const p = b.rect.centerPoint();
         self.finger.unlocking_button = self.buttons[self.prog_state.num_complete];
         self.finger.moveTo(
-            @as(f32, @floatFromInt(p[0])),
-            @as(f32, @floatFromInt(p[1])),
+            @floatFromInt(p[0]),
+            @floatFromInt(p[1]),
             FrameTimer.initSeconds(self.game.frame_counter, 3),
         );
     } else {
@@ -437,5 +437,5 @@ fn moveFingerToRecommendedMap(self: *LevelSelectState) void {
 fn warpFingerToLastMap(self: *LevelSelectState) void {
     const b = self.buttons[self.prog_state.last_map_entered];
     const p = b.rect.centerPoint();
-    self.finger.warpTo(@as(f32, @floatFromInt(p[0])), @as(f32, @floatFromInt(p[1])));
+    self.finger.warpTo(@floatFromInt(p[0]), @floatFromInt(p[1]));
 }

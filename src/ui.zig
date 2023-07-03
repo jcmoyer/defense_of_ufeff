@@ -491,11 +491,11 @@ pub const Minimap = struct {
         // doing one of the above transforms for the other axis
         if (aspect_ratio > 1) {
             render_dest.w = rect.w;
-            render_dest.h = @as(i32, @intFromFloat(@as(f32, @floatFromInt(render_dest.w)) / aspect_ratio));
+            render_dest.h = @intFromFloat(@as(f32, @floatFromInt(render_dest.w)) / aspect_ratio);
             render_dest.centerOn(p[0], p[1]);
         } else {
             render_dest.h = rect.h;
-            render_dest.w = @as(i32, @intFromFloat(@as(f32, @floatFromInt(render_dest.h)) * aspect_ratio));
+            render_dest.w = @intFromFloat(@as(f32, @floatFromInt(render_dest.h)) * aspect_ratio);
             render_dest.centerOn(p[0], p[1]);
         }
 
@@ -1125,8 +1125,8 @@ pub const SDLBackend = struct {
     /// `coord_scale_x` and `coord_scale_y`.
     pub fn clientToVirtual(self: SDLBackend, x: i32, y: i32) [2]i32 {
         return [2]i32{
-            @as(i32, @intFromFloat((@as(f64, @floatFromInt(x - self.client_rect.x))) / self.coord_scale_x)),
-            @as(i32, @intFromFloat((@as(f64, @floatFromInt(y - self.client_rect.y))) / self.coord_scale_y)),
+            @intFromFloat(@as(f64, @floatFromInt(x - self.client_rect.x)) / self.coord_scale_x),
+            @intFromFloat(@as(f64, @floatFromInt(y - self.client_rect.y)) / self.coord_scale_y),
         };
     }
 
@@ -1145,8 +1145,8 @@ pub const SDLBackend = struct {
         var r = self.clientRect();
         r.x = 0;
         r.y = 0;
-        r.w = @as(i32, @intFromFloat(@as(f32, @floatFromInt(r.w)) / self.coord_scale_x));
-        r.h = @as(i32, @intFromFloat(@as(f32, @floatFromInt(r.h)) / self.coord_scale_y));
+        r.w = @intFromFloat(@as(f32, @floatFromInt(r.w)) / self.coord_scale_x);
+        r.h = @intFromFloat(@as(f32, @floatFromInt(r.h)) / self.coord_scale_y);
         return r;
     }
 };
@@ -1256,7 +1256,7 @@ fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRe
 
             switch (control.getBackground()) {
                 .texture => |t| {
-                    var render_src = t.texture_rect orelse Rect.init(0, 0, @as(i32, @intCast(t.texture.width)), @as(i32, @intCast(t.texture.height)));
+                    var render_src = t.texture_rect orelse Rect.init(0, 0, @intCast(t.texture.width), @intCast(t.texture.height));
                     opts.r_batch.begin(.{
                         .texture = t.texture,
                     });
@@ -1279,11 +1279,11 @@ fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRe
                     // doing one of the above transforms for the other axis
                     if (aspect_ratio > 1) {
                         render_dest.w = rect.w;
-                        render_dest.h = @as(i32, @intFromFloat(@as(f32, @floatFromInt(render_dest.w)) / aspect_ratio));
+                        render_dest.h = @intFromFloat(@as(f32, @floatFromInt(render_dest.w)) / aspect_ratio);
                         render_dest.centerOn(p[0], p[1]);
                     } else {
                         render_dest.h = rect.h;
-                        render_dest.w = @as(i32, @intFromFloat(@as(f32, @floatFromInt(render_dest.h)) * aspect_ratio));
+                        render_dest.w = @intFromFloat(@as(f32, @floatFromInt(render_dest.h)) * aspect_ratio);
                         render_dest.centerOn(p[0], p[1]);
                     }
 
@@ -1371,7 +1371,7 @@ fn drawTextureImpl(ptr: *anyopaque, texture: *const Texture, dest: Rect) void {
         state.opts.r_batch.begin(.{ .texture = texture });
         state.last_draw = .{ .spritebatch = texture };
     }
-    const src = Rect.init(0, 0, @as(i32, @intCast(texture.width)), @as(i32, @intCast(texture.height)));
+    const src = Rect.init(0, 0, @intCast(texture.width), @intCast(texture.height));
     var t_dest = dest;
     t_dest.translate(state.translate_x, state.translate_y);
     state.opts.r_batch.drawQuad(.{

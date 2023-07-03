@@ -130,8 +130,8 @@ fn renderTilemapLayer(
                 self.water_buf[self.n_water] = WaterDraw{
                     .dest = dest,
                     .world_xy = zm.f32x4(
-                        @as(f32, @floatFromInt(x * 16)),
-                        @as(f32, @floatFromInt(y * 16)),
+                        @floatFromInt(x * 16),
+                        @floatFromInt(y * 16),
                         0,
                         0,
                     ),
@@ -187,8 +187,8 @@ pub fn renderTilemap(self: *WorldRenderer, cam: Camera, map: *const Tilemap, fra
         1 + @as(usize, @intCast(cam.view.bottom())) / 16,
     );
     const range = TileRange{
-        .min = TileCoord{ .x = @as(u16, @intCast(min_tile_x)), .y = @as(u16, @intCast(min_tile_y)) },
-        .max = TileCoord{ .x = @as(u16, @intCast(max_tile_x)), .y = @as(u16, @intCast(max_tile_y)) },
+        .min = TileCoord{ .x = @intCast(min_tile_x), .y = @intCast(min_tile_y) },
+        .max = TileCoord{ .x = @intCast(max_tile_x), .y = @intCast(max_tile_y) },
     };
 
     self.renderers.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
