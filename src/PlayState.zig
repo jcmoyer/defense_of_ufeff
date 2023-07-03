@@ -813,9 +813,7 @@ fn renderFields(
     const pos = sys.particles.items(.pos);
     const prev_pos = sys.particles.items(.prev_pos);
 
-    var i: usize = 0;
-
-    while (i < sys.num_alive) : (i += 1) {
+    for (0..sys.num_alive) |i| {
         const src = particle_rects[@intFromEnum(sys.particles.items(.kind)[i])];
         const s = sys.particles.items(.scale)[i];
         const c = sys.particles.items(.rgba)[i];
@@ -1143,11 +1141,8 @@ fn renderBlockedConstructionRects(
     const map = world.map;
 
     renderers.r_quad.begin(.{});
-    var y: usize = min_tile_y;
-    var x: usize = 0;
-    while (y < max_tile_y) : (y += 1) {
-        x = min_tile_x;
-        while (x < max_tile_x) : (x += 1) {
+    for (min_tile_y..max_tile_y) |y| {
+        for (min_tile_x..max_tile_x) |x| {
             const t = map.at2DPtr(.base, x, y);
             if (!t.flags.construction_blocked) {
                 continue;
@@ -1242,11 +1237,8 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
     const map = self.world.?.map;
 
     self.game.renderers.r_quad.begin(.{});
-    var y: usize = min_tile_y;
-    var x: usize = 0;
-    while (y < max_tile_y) : (y += 1) {
-        x = min_tile_x;
-        while (x < max_tile_x) : (x += 1) {
+    for (min_tile_y..max_tile_y) |y| {
+        for (min_tile_x..max_tile_x) |x| {
             const t = map.getCollisionFlags2D(x, y);
             const dest = Rect{
                 .x = @as(i32, @intCast(x * 16)) - cam.view.left(),
@@ -1453,11 +1445,8 @@ fn renderMinimapBlockage(
     range: TileRange,
 ) void {
     renderers.r_quad.begin(.{});
-    var y: usize = range.min.y;
-    var x: usize = 0;
-    while (y <= range.max.y) : (y += 1) {
-        x = range.min.x;
-        while (x <= range.max.x) : (x += 1) {
+    for (range.min.y..range.max.y) |y| {
+        for (range.min.x..range.max.x) |x| {
             const t = map.at2DPtr(.base, x, y);
             const dest = Rectf.init(
                 @floatFromInt(x - range.min.x),
@@ -1492,11 +1481,8 @@ fn renderMinimapLayer(
     renderers.r_batch.begin(.{
         .texture = source_texture,
     });
-    var y: usize = range.min.y;
-    var x: usize = 0;
-    while (y <= range.max.y) : (y += 1) {
-        x = range.min.x;
-        while (x <= range.max.x) : (x += 1) {
+    for (range.min.y..range.max.y) |y| {
+        for (range.min.x..range.max.x) |x| {
             const t = map.at2DPtr(layer, x, y);
             if (t.bank != bank) {
                 continue;
@@ -1583,8 +1569,7 @@ fn updateUpgradeButtons(self: *PlayState) void {
 
     const t = self.world.?.towers.getPtr(self.interact_state.select.selected_tower);
     const s = t.spec;
-    var i: usize = 0;
-    while (i < 3) : (i += 1) {
+    for (0..3) |i| {
         if (s.upgrades[i]) |spec| {
             self.ui_upgrade_buttons[i].tooltip_text = self.getCachedTooltip(spec);
             self.ui_upgrade_buttons[i].setTexture(self.getCachedUpgradeButtonTexture(spec));
@@ -1710,9 +1695,8 @@ const ButtonTextureGenerator = struct {
         self.r_batch.begin(.{
             .texture = badge,
         });
-        var i: u8 = 0;
-        while (i < 4) : (i += 1) {
-            const button_frame_rect = Rect.init(0, i * 32, 32, 32);
+        for (0..4) |i| {
+            const button_frame_rect = Rect.init(0, @intCast(i * 32), 32, 32);
             const desired_center = button_frame_rect.centerPoint();
             var adjusted_dest = badge_rect;
             adjusted_dest.centerOn(desired_center[0], desired_center[1]);

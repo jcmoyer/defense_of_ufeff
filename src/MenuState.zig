@@ -240,11 +240,8 @@ pub fn renderBackground(self: *MenuState, alpha: f64) void {
 
     const scroll_offset = zm.lerpV(self.p_scroll_offset, self.scroll_offset, @as(f32, @floatCast(alpha)));
 
-    var y: i32 = 0;
-    var x: i32 = 0;
-    while (y < num_y) : (y += 1) {
-        x = 0;
-        while (x < num_x) : (x += 1) {
+    for (0..num_y) |y| {
+        for (0..num_x) |x| {
             self.game.renderers.r_batch.drawQuad(.{
                 .src = src,
                 .dest = Rectf.init(

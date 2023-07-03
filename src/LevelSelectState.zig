@@ -234,8 +234,7 @@ fn createButtonForRect(self: *LevelSelectState, rect: Rect, mapid: u32) !void {
 }
 
 fn updateButtonStates(self: *LevelSelectState) void {
-    var i: usize = 0;
-    while (i < self.prog_state.num_complete) : (i += 1) {
+    for (0..self.prog_state.num_complete) |i| {
         self.buttons[i].state = .normal;
     }
     // last map unlocked by finger

@@ -108,13 +108,8 @@ fn renderTilemapLayer(
     self.renderers.r_batch.begin(.{
         .texture = source_texture,
     });
-    var y: usize = range.min.y;
-    var x: usize = 0;
-    var ty: u8 = 0;
-    while (y < range.max.y) : (y += 1) {
-        x = range.min.x;
-        var tx: u8 = 0;
-        while (x < range.max.x) : (x += 1) {
+    for (range.min.y..range.max.y) |y| {
+        for (range.min.x..range.max.x) |x| {
             const t = map.at2DPtr(layer, x, y);
             // filter tiles to selected bank
             if (t.bank != bank) {
@@ -165,9 +160,7 @@ fn renderTilemapLayer(
                     .dest = dest.toRectf(),
                 });
             }
-            tx += 1;
         }
-        ty += 1;
     }
     self.renderers.r_batch.end();
 }

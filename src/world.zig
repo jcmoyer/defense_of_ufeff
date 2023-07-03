@@ -953,8 +953,8 @@ fn shotgunnerUpdate(self: *Tower, frame: u64) void {
         self.world.playPositionalSoundId(.shotgun, @intCast(self.world_x), @intCast(self.world_y));
         self.setAssocEffectAimed(&se_biggun, target[0], target[1], 6, 1);
 
-        var i: u8 = 0;
-        while (i < 8) : (i += 1) {
+        for (0..8) |i| {
+            _ = i;
             const angle_diff = (random.float(f32) * std.math.pi / 4.0) - std.math.pi / 8.0;
             var proj = self.world.spawnProjectile(&proj_bullet, @intCast(self.world_x + 8), @intCast(self.world_y + 8)) catch unreachable;
             proj.scale = 0.5 + random.float(f32) * 0.5;
@@ -2559,8 +2559,7 @@ const PathfindingState = struct {
             }
 
             // examine neighbors
-            var d_int: u8 = 0;
-            while (d_int < 4) : (d_int += 1) {
+            for (0..4) |d_int| {
                 const dir = @as(Direction, @enumFromInt(d_int));
                 if (map.isValidMove(current, dir)) {
                     // 1 here is the graph edge weight, basically hardcoding manhattan distance
@@ -2644,8 +2643,7 @@ const PathfindingState = struct {
             }
 
             // examine neighbors
-            var d_int: u8 = 0;
-            while (d_int < 4) : (d_int += 1) {
+            for (0..4) |d_int| {
                 const dir = @as(Direction, @enumFromInt(d_int));
                 if (map.isValidMove(current, dir)) {
                     // 1 here is the graph edge weight, basically hardcoding manhattan distance
@@ -2952,10 +2950,8 @@ fn loadObjectGroup(layer: TiledObjectGroup, ctx: LoadContext) !void {
         } else if (std.mem.eql(u8, obj.class, "construction_blocker")) {
             const tile_start = TileCoord.initSignedWorld(obj.x, obj.y);
             const tile_end = TileCoord.initSignedWorld(obj.x + obj.width, obj.y + obj.height);
-            var ty: usize = tile_start.y;
-            while (ty < tile_end.y) : (ty += 1) {
-                var tx: usize = tile_start.x;
-                while (tx < tile_end.x) : (tx += 1) {
+            for (tile_start.y..tile_end.y) |ty| {
+                for (tile_start.x..tile_end.x) |tx| {
                     ctx.world.map.at2DPtr(.base, tx, ty).flags.construction_blocked = true;
                 }
             }
@@ -2968,10 +2964,8 @@ fn loadObjectGroup(layer: TiledObjectGroup, ctx: LoadContext) !void {
         } else if (std.mem.eql(u8, obj.class, "pathable")) {
             const tile_start = TileCoord.initSignedWorld(obj.x, obj.y);
             const tile_end = TileCoord.initSignedWorld(obj.x + obj.width, obj.y + obj.height);
-            var ty: usize = tile_start.y;
-            while (ty < tile_end.y) : (ty += 1) {
-                var tx: usize = tile_start.x;
-                while (tx < tile_end.x) : (tx += 1) {
+            for (tile_start.y..tile_end.y) |ty| {
+                for (tile_start.x..tile_end.x) |tx| {
                     ctx.world.map.at2DPtr(.base, tx, ty).flags.pathable_override = true;
                     ctx.world.map.at2DPtr(.detail, tx, ty).flags.pathable_override = true;
                 }

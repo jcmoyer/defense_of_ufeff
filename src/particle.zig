@@ -86,8 +86,7 @@ pub const PointEmitter = struct {
     }
 
     pub fn emitCount(self: *PointEmitter, kind: ParticleKind, frame: u64, count: u16) void {
-        var i: u16 = 0;
-        while (i < count) : (i += 1) {
+        for (0..count) |_| {
             self.emit(kind, frame);
         }
     }
@@ -135,8 +134,7 @@ pub const ParticleSystem = struct {
             .rng = std.rand.DefaultPrng.init(@intCast(std.time.milliTimestamp())),
         };
         try self.particles.resize(allocator, capacity);
-        var i: usize = 0;
-        while (i < self.particles.len) : (i += 1) {
+        for (0..self.particles.len) |i| {
             self.particles.set(i, .{});
         }
         return self;
