@@ -74,6 +74,7 @@ pub const PointEmitter = struct {
 
         self.parent.addParticle(.{
             .pos = self.pos,
+            .prev_pos = self.pos,
             .acc = .{ ax, ay },
             .vel = .{ vx, vy },
             .damp_vel = .{ dvx, dvy },
@@ -106,9 +107,11 @@ pub const CircleEmitter = struct {
         const m = rand.float(f32) * self.radius;
         const dx = std.math.cos(a) * m;
         const dy = std.math.sin(a) * m;
+        const init_pos = @bitCast(V2, self.pos) + V2{ dx, dy };
 
         self.parent.addParticle(.{
-            .pos = @bitCast(V2, self.pos) + V2{ dx, dy },
+            .pos = init_pos,
+            .prev_pos = init_pos,
             .vel = .{ vx, vy },
             .alive = true,
             .kind = kind,
@@ -154,7 +157,7 @@ pub const ParticleSystem = struct {
         self.num_alive = 0;
     }
 
-    pub fn update(self: *ParticleSystem, frame: u64) void {
+    pub fn preUpdate(self: *ParticleSystem) void {
         std.mem.copy(
             [2]f32,
             self.particles.items(.prev_pos)[0..self.num_alive],
@@ -170,7 +173,9 @@ pub const ParticleSystem = struct {
             self.particles.items(.prev_scale)[0..self.num_alive],
             self.particles.items(.scale)[0..self.num_alive],
         );
+    }
 
+    pub fn update(self: *ParticleSystem, frame: u64) void {
         var i: usize = 0;
         while (i < self.num_alive) {
             if (self.particles.items(.life)[i].expired(frame)) {

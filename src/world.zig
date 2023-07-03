@@ -93,6 +93,11 @@ pub const Projectile = struct {
         }
     }
 
+    fn preUpdate(self: *Projectile) void {
+        self.p_world_x = self.world_x;
+        self.p_world_y = self.world_y;
+    }
+
     fn update(self: *Projectile, frame: u64) void {
         if (self.delay) |delay| {
             if (!delay.expired(frame)) {
@@ -103,8 +108,6 @@ pub const Projectile = struct {
             self.world.playPositionalSoundId(self.activate_sound, @intFromFloat(i32, self.world_x), @intFromFloat(i32, self.world_y));
             self.activated = true;
         }
-        self.p_world_x = self.world_x;
-        self.p_world_y = self.world_y;
         self.world_x += self.vel_x;
         self.world_y += self.vel_y;
         if (self.animator) |*an| {
@@ -409,11 +412,14 @@ pub const Monster = struct {
         self.moved_amount += move_amount;
     }
 
+    pub fn preUpdate(self: *Monster) void {
+        self.p_world_x = self.world_x;
+        self.p_world_y = self.world_y;
+    }
+
     pub fn update(self: *Monster, frame: u64) void {
         self.slow_frames -|= 1;
         self.flash_frames -|= 1;
-        self.p_world_x = self.world_x;
-        self.p_world_y = self.world_y;
 
         if (self.moved_amount >= tile_distance) {
             self.moved_amount -= tile_distance;
@@ -1270,6 +1276,15 @@ pub const SpriteEffect = struct {
         }
     }
 
+    fn preUpdate(self: *SpriteEffect) void {
+        self.p_world_x = self.world_x;
+        self.p_world_y = self.world_y;
+        self.p_offset_x = self.offset_x;
+        self.p_offset_y = self.offset_y;
+        self.p_angle = self.angle;
+        self.p_post_angle = self.post_angle;
+    }
+
     fn update(self: *SpriteEffect, frame: u64) void {
         if (self.delay) |delay| {
             if (!delay.expired(frame)) {
@@ -1280,12 +1295,6 @@ pub const SpriteEffect = struct {
             self.world.playPositionalSoundId(self.activate_sound, @intFromFloat(i32, self.world_x), @intFromFloat(i32, self.world_y));
             self.activated = true;
         }
-        self.p_world_x = self.world_x;
-        self.p_world_y = self.world_y;
-        self.p_offset_x = self.offset_x;
-        self.p_offset_y = self.offset_y;
-        self.p_angle = self.angle;
-        self.p_post_angle = self.post_angle;
         self.post_angle += self.angular_vel;
         self.offset_x *= self.offset_coef;
         self.offset_y *= self.offset_coef;
@@ -1331,9 +1340,12 @@ pub const FloatingText = struct {
     dead: bool = false,
     color: [4]u8 = .{ 255, 255, 255, 255 },
 
-    fn update(self: *FloatingText) void {
+    fn preUpdate(self: *FloatingText) void {
         self.p_world_x = self.world_x;
         self.p_world_y = self.world_y;
+    }
+
+    fn update(self: *FloatingText) void {
         self.world_x += self.vel_x;
         self.world_y += self.vel_y;
         self.vel_x *= 0.9;
@@ -2113,6 +2125,22 @@ pub const World = struct {
 
     pub fn remainingWaveCount(self: *World) usize {
         return self.waves.waves.len - self.next_wave;
+    }
+
+    pub fn preUpdate(self: *World) void {
+        for (self.monsters.slice()) |*m| {
+            m.preUpdate();
+        }
+        for (self.sprite_effects.slice()) |*e| {
+            e.preUpdate();
+        }
+        for (self.floating_text.slice()) |*t| {
+            t.preUpdate();
+        }
+        for (self.projectiles.slice()) |*p| {
+            p.preUpdate();
+        }
+        self.particle_sys.preUpdate();
     }
 
     pub fn update(self: *World, frame_arena: Allocator) void {

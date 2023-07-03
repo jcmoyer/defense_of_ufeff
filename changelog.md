@@ -7,6 +7,7 @@
 - Fixed excessive frame-to-frame allocation caused by arenas not reusing memory
 - Clear entire window to black every frame so MSI Afterburner's on-screen
   display is readable
+- Smoother object movement in fast mode
 
 # v1.0 (2022-11-25)
 

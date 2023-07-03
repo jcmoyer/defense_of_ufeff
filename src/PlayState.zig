@@ -464,6 +464,7 @@ pub fn update(self: *PlayState) void {
 
     world.view = self.camera.view;
     if (self.sub == .none and !self.paused) {
+        world.preUpdate();
         world.update(arena);
         if (self.fast) {
             world.update(arena);
