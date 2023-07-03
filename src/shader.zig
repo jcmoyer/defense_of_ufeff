@@ -9,7 +9,7 @@ pub const ShaderBase = struct {
         const handle = gl.createShader(shader_type);
 
         const srcs = [_][*]const u8{src.ptr};
-        const lens = [_]gl.GLint{@intCast(gl.GLint, src.len)};
+        const lens = [_]gl.GLint{@as(gl.GLint, @intCast(src.len))};
 
         gl.shaderSource(handle, 1, &srcs, &lens);
         gl.compileShader(handle);
@@ -20,7 +20,7 @@ pub const ShaderBase = struct {
             var info: [1024]u8 = undefined;
             var log_len: gl.GLsizei = 0;
             gl.getShaderInfoLog(handle, info.len, &log_len, &info);
-            log.err("Failed to compile shader: {s}", .{info[0..@intCast(usize, log_len)]});
+            log.err("Failed to compile shader: {s}", .{info[0..@as(usize, @intCast(log_len))]});
             std.process.exit(1);
         }
 
@@ -81,7 +81,7 @@ pub const Program = struct {
             var info: [1024]u8 = undefined;
             var log_len: gl.GLsizei = 0;
             gl.getProgramInfoLog(handle, info.len, &log_len, &info);
-            log.err("Failed to link program: {s}", .{info[0..@intCast(usize, log_len)]});
+            log.err("Failed to link program: {s}", .{info[0..@as(usize, @intCast(log_len))]});
             std.process.exit(1);
         }
 

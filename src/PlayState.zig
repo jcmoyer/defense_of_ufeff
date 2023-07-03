@@ -85,8 +85,8 @@ const NextWaveTimer = struct {
     fontspec: *const bmfont.BitmapFontSpec,
 
     fn setTimerText(self: *NextWaveTimer, sec: f32) void {
-        const mod_sec = @intFromFloat(u32, sec) % 60;
-        const min = @intFromFloat(u32, sec) / 60;
+        const mod_sec = @as(u32, @intFromFloat(sec)) % 60;
+        const min = @as(u32, @intFromFloat(sec)) / 60;
         std.debug.assert(mod_sec < 60);
         std.debug.assert(min <= 99);
 
@@ -228,7 +228,7 @@ pub fn create(game: *Game) !*PlayState {
 
     const t_panel = self.game.texman.getNamedTexture("ui_panel.png");
     var ui_panel = try self.ui_root.createPanel();
-    ui_panel.rect = Rect.init(0, 0, @intCast(i32, t_panel.width), @intCast(i32, t_panel.height));
+    ui_panel.rect = Rect.init(0, 0, @as(i32, @intCast(t_panel.width)), @as(i32, @intCast(t_panel.height)));
     ui_panel.rect.alignRight(Game.INTERNAL_WIDTH);
     ui_panel.background = .{ .texture = .{ .texture = t_panel } };
     try self.ui_root.addChild(ui_panel.control());
@@ -307,7 +307,7 @@ pub fn create(game: *Game) !*PlayState {
     for (&self.ui_upgrade_buttons, 0..) |*b, i| {
         b.* = try self.ui_root.createButton();
         b.*.texture_rects = makeStandardButtonRects(0, 0);
-        b.*.rect = Rect.init(@intCast(i32, i) * 32, 0, 32, 32);
+        b.*.rect = Rect.init(@as(i32, @intCast(i)) * 32, 0, 32, 32);
         try self.ui_upgrade_panel.addChild(b.*.control());
         // only first 3 buttons are upgrades, 4th is demolish
         if (i < 3) {
@@ -386,8 +386,8 @@ fn onDemolishClick(button: *ui.Button, self: *PlayState) void {
 
 fn onMinimapPan(_: *ui.Minimap, self: *PlayState, x: f32, y: f32) void {
     self.camera.view.centerOn(
-        @intFromFloat(i32, x * @floatFromInt(f32, self.camera.bounds.w)) + self.camera.bounds.x,
-        @intFromFloat(i32, y * @floatFromInt(f32, self.camera.bounds.h)) + self.camera.bounds.y,
+        @as(i32, @intFromFloat(x * @as(f32, @floatFromInt(self.camera.bounds.w)))) + self.camera.bounds.x,
+        @as(i32, @intFromFloat(y * @as(f32, @floatFromInt(self.camera.bounds.h)))) + self.camera.bounds.y,
     );
     self.camera.clampToBounds();
 }
@@ -550,11 +550,11 @@ fn updateUI(self: *PlayState) void {
     self.minimap_elements.clearRetainingCapacity();
     for (world.monsters.slice()) |*m| {
         var p = m.getWorldCollisionRect().centerPoint();
-        self.addMinimapElement(@intCast(u32, p[0]), @intCast(u32, p[1]), .{ 255, 0, 0, 255 });
+        self.addMinimapElement(@as(u32, @intCast(p[0])), @as(u32, @intCast(p[1])), .{ 255, 0, 0, 255 });
     }
     for (world.towers.slice()) |*t| {
         var p = t.getWorldCollisionRect().centerPoint();
-        self.addMinimapElement(@intCast(u32, p[0]), @intCast(u32, p[1]), .{ 0, 255, 0, 255 });
+        self.addMinimapElement(@as(u32, @intCast(p[0])), @as(u32, @intCast(p[1])), .{ 0, 255, 0, 255 });
     }
     self.ui_minimap.elements = self.minimap_elements.items;
 }
@@ -569,12 +569,12 @@ fn addMinimapElement(self: *PlayState, world_x: u32, world_y: u32, color: [4]u8)
         return;
     }
 
-    const tx = @floatFromInt(f32, range.min.x * 16);
-    const ty = @floatFromInt(f32, range.min.y * 16);
-    const ox = @floatFromInt(f32, world_x) - tx;
-    const oy = @floatFromInt(f32, world_y) - ty;
-    const ww = @floatFromInt(f32, range.getWidth() * 16);
-    const wh = @floatFromInt(f32, range.getHeight() * 16);
+    const tx = @as(f32, @floatFromInt(range.min.x * 16));
+    const ty = @as(f32, @floatFromInt(range.min.y * 16));
+    const ox = @as(f32, @floatFromInt(world_x)) - tx;
+    const oy = @as(f32, @floatFromInt(world_y)) - ty;
+    const ww = @as(f32, @floatFromInt(range.getWidth() * 16));
+    const wh = @as(f32, @floatFromInt(range.getHeight() * 16));
     const nx = ox / ww;
     const ny = oy / wh;
 
@@ -654,8 +654,8 @@ pub fn render(self: *PlayState, alpha: f64) void {
             renderBlockedConstructionRects(&self.game.renderers, world, cam_interp);
             renderGrid(&self.game.renderers, cam_interp);
             const tile_coord = self.mouseToTile();
-            const tower_center_x = @intCast(i32, tile_coord.worldX() + 8);
-            const tower_center_y = @intCast(i32, tile_coord.worldY() + 8);
+            const tower_center_x = @as(i32, @intCast(tile_coord.worldX() + 8));
+            const tower_center_y = @as(i32, @intCast(tile_coord.worldY() + 8));
             renderPlacementIndicator(&self.game.renderers, world, cam_interp, tile_coord);
             renderRangeIndicatorForTower(&self.game.renderers, cam_interp, b.tower_spec, tower_center_x, tower_center_y);
         },
@@ -823,7 +823,7 @@ fn renderFields(
 
         const V2 = @Vector(2, f32);
 
-        const p = zm.lerp(@bitCast(V2, prev_pos[i]), @bitCast(V2, pos[i]), @floatCast(f32, alpha));
+        const p = zm.lerp(@as(V2, @bitCast(prev_pos[i])), @as(V2, @bitCast(pos[i])), @as(f32, @floatCast(alpha)));
 
         var t = zm.mul(zm.scaling(s, s, 1), zm.rotationZ(r));
         t = zm.mul(t, zm.translation(p[0] - viewf.left(), p[1] - viewf.top(), 0));
@@ -855,13 +855,13 @@ fn renderSpriteEffects(
             }
         }
 
-        const angle = zm.lerpV(t.p_angle, t.angle, @floatCast(f32, alpha));
-        const post_angle = zm.lerpV(t.p_post_angle, t.post_angle, @floatCast(f32, alpha));
+        const angle = zm.lerpV(t.p_angle, t.angle, @as(f32, @floatCast(alpha)));
+        const post_angle = zm.lerpV(t.p_post_angle, t.post_angle, @as(f32, @floatCast(alpha)));
 
         const interp = zm.lerp(
             zm.f32x4(t.p_offset_x, t.p_offset_y, t.p_world_x, t.p_world_y),
             zm.f32x4(t.offset_x, t.offset_y, t.world_x, t.world_y),
-            @floatCast(f32, alpha),
+            @as(f32, @floatCast(alpha)),
         );
 
         const offset_x = interp[0];
@@ -871,7 +871,7 @@ fn renderSpriteEffects(
 
         var transform = zm.mul(zm.rotationZ(angle), zm.translation(offset_x, offset_y, 0));
         transform = zm.mul(transform, zm.rotationZ(post_angle));
-        transform = zm.mul(transform, zm.translation(world_x - @floatFromInt(f32, cam.view.left()), world_y - @floatFromInt(f32, cam.view.top()), 0));
+        transform = zm.mul(transform, zm.translation(world_x - @as(f32, @floatFromInt(cam.view.left())), world_y - @as(f32, @floatFromInt(cam.view.top())), 0));
 
         renderers.r_batch.drawQuadTransformed(.{
             .src = animator.getCurrentRect().toRectf(),
@@ -894,8 +894,8 @@ fn renderProjectiles(
     for (world.projectiles.slice()) |p| {
         var animator = p.animator orelse continue;
         const dest = p.getInterpWorldPosition(alpha);
-        const dx = @floatFromInt(f32, dest[0] - cam.view.left());
-        const dy = @floatFromInt(f32, dest[1] - cam.view.top());
+        const dx = @as(f32, @floatFromInt(dest[0] - cam.view.left()));
+        const dy = @as(f32, @floatFromInt(dest[1] - cam.view.top()));
         var t: zm.Mat = zm.scaling(p.scale, p.scale, 1);
         if (p.spec.rotation == .no_rotation) {
             // do nothing
@@ -903,7 +903,7 @@ fn renderProjectiles(
             t = zm.mul(t, zm.rotationZ(p.angle));
         }
         t = zm.mul(t, zm.translation(dx, dy, 0));
-        var color_a = if (p.fadeout_timer) |timer| @intFromFloat(u8, timer.invProgressClamped(world.world_frame) * 255) else 255;
+        var color_a = if (p.fadeout_timer) |timer| @as(u8, @intFromFloat(timer.invProgressClamped(world.world_frame) * 255)) else 255;
         renderers.r_batch.drawQuadTransformed(.{
             .src = animator.getCurrentRect().toRectf(),
             .transform = t,
@@ -936,7 +936,7 @@ fn renderFloatingText(
                     t.color[0],
                     t.color[1],
                     t.color[2],
-                    @intFromFloat(u8, 255 * a_coef),
+                    @as(u8, @intFromFloat(255 * a_coef)),
                 },
                 .v_alignment = .middle,
                 .h_alignment = .center,
@@ -953,7 +953,7 @@ fn renderTowerBases(
     selected_tower: ?wo.TowerId,
 ) void {
     const t_special = renderers.texman.getNamedTexture("special.png");
-    var highlight_mag = @floatCast(f32, 0.5 * (1.0 + std.math.sin(@floatFromInt(f64, std.time.milliTimestamp()) / 500.0)));
+    var highlight_mag = @as(f32, @floatCast(0.5 * (1.0 + std.math.sin(@as(f64, @floatFromInt(std.time.milliTimestamp())) / 500.0))));
 
     // render tower bases
     renderers.r_batch.begin(.{
@@ -965,7 +965,7 @@ fn renderTowerBases(
     for (world.towers.slice()) |*t| {
         renderers.r_batch.drawQuad(.{
             .src = Rectf.init(0, 7 * 16, 16, 16),
-            .dest = Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - cam.view.top(), 16, 16).toRectf(),
+            .dest = Rect.init(@as(i32, @intCast(t.world_x)) - cam.view.left(), @as(i32, @intCast(t.world_y)) - cam.view.top(), 16, 16).toRectf(),
             .flash = t.id.eql(selected_tower),
             .flash_mag = highlight_mag,
         });
@@ -981,7 +981,7 @@ fn renderTowers(
 ) void {
     const t_characters = renderers.texman.getNamedTexture("characters.png");
 
-    var highlight_mag = @floatCast(f32, 0.5 * (1.0 + std.math.sin(@floatFromInt(f64, std.time.milliTimestamp()) / 500.0)));
+    var highlight_mag = @as(f32, @floatCast(0.5 * (1.0 + std.math.sin(@as(f64, @floatFromInt(std.time.milliTimestamp())) / 500.0))));
 
     // render tower characters
     renderers.r_batch.begin(.{
@@ -995,7 +995,7 @@ fn renderTowers(
             // shift up on Y so the character is standing in the center of the tile
             renderers.r_batch.drawQuad(.{
                 .src = animator.getCurrentRect().toRectf(),
-                .dest = Rect.init(@intCast(i32, t.world_x) - cam.view.left(), @intCast(i32, t.world_y) - 4 - cam.view.top(), 16, 16).toRectf(),
+                .dest = Rect.init(@as(i32, @intCast(t.world_x)) - cam.view.left(), @as(i32, @intCast(t.world_y)) - 4 - cam.view.top(), 16, 16).toRectf(),
                 .flash = t.id.eql(selected_tower),
                 .flash_mag = highlight_mag,
                 .color = t.spec.tint_rgba,
@@ -1021,7 +1021,7 @@ fn renderMonsters(
         buf[i] = .{
             .opts = .{
                 .src = animator.getCurrentRect().toRectf(),
-                .dest = Rect.init(@intCast(i32, w[0]) - cam.view.left(), @intCast(i32, w[1]) - cam.view.top(), 16, 16).toRectf(),
+                .dest = Rect.init(@as(i32, @intCast(w[0])) - cam.view.left(), @as(i32, @intCast(w[1])) - cam.view.top(), 16, 16).toRectf(),
                 .flash = m.flash_frames > 0,
                 .color = color,
             },
@@ -1043,8 +1043,8 @@ fn renderGoal(
         .texture = renderers.texman.getNamedTexture("special.png"),
     });
     const dest = Rect.init(
-        @intCast(i32, goal.world_x) - cam.view.left(),
-        @intCast(i32, goal.world_y) - cam.view.top(),
+        @as(i32, @intCast(goal.world_x)) - cam.view.left(),
+        @as(i32, @intCast(goal.world_y)) - cam.view.top(),
         16,
         16,
     );
@@ -1068,7 +1068,7 @@ fn renderHealthBars(
         var dest_red = Rect.init(w[0] - cam.view.left(), w[1] - 4 - cam.view.top(), 16, 1);
         var dest_border = dest_red;
         dest_border.inflate(1, 1);
-        dest_red.w = @intFromFloat(i32, @floatFromInt(f32, dest_red.w) * @floatFromInt(f32, m.hp) / @floatFromInt(f32, m.spec.max_hp));
+        dest_red.w = @as(i32, @intFromFloat(@as(f32, @floatFromInt(dest_red.w)) * @as(f32, @floatFromInt(m.hp)) / @as(f32, @floatFromInt(m.spec.max_hp))));
         renderers.r_quad.drawQuadRGBA(dest_border, 0, 0, 0, 255);
         renderers.r_quad.drawQuadRGBA(dest_red, 255, 0, 0, 255);
     }
@@ -1100,12 +1100,12 @@ fn renderGrid(
     renderers: *RenderServices,
     cam: Camera,
 ) void {
-    var offset_x = @floatFromInt(f32, @mod(cam.view.x, 16));
-    var offset_y = @floatFromInt(f32, @mod(cam.view.y, 16));
+    var offset_x = @as(f32, @floatFromInt(@mod(cam.view.x, 16)));
+    var offset_y = @as(f32, @floatFromInt(@mod(cam.view.y, 16)));
     var viewf = cam.view.toRectf();
 
-    const width = @floatFromInt(f32, renderers.output_width);
-    const height = @floatFromInt(f32, renderers.output_height);
+    const width = @as(f32, @floatFromInt(renderers.output_width));
+    const height = @as(f32, @floatFromInt(renderers.output_height));
 
     const grid_color = [4]u8{ 0, 0, 0, 50 };
 
@@ -1130,15 +1130,15 @@ fn renderBlockedConstructionRects(
     world: *World,
     cam: Camera,
 ) void {
-    const min_tile_x = @intCast(usize, cam.view.left()) / 16;
-    const min_tile_y = @intCast(usize, cam.view.top()) / 16;
+    const min_tile_x = @as(usize, @intCast(cam.view.left())) / 16;
+    const min_tile_y = @as(usize, @intCast(cam.view.top())) / 16;
     const max_tile_x = @min(
         world.getWidth(),
-        1 + @intCast(usize, cam.view.right()) / 16,
+        1 + @as(usize, @intCast(cam.view.right())) / 16,
     );
     const max_tile_y = @min(
         world.getHeight(),
-        1 + @intCast(usize, cam.view.bottom()) / 16,
+        1 + @as(usize, @intCast(cam.view.bottom())) / 16,
     );
     const map = world.map;
 
@@ -1153,14 +1153,14 @@ fn renderBlockedConstructionRects(
                 continue;
             }
             const dest = Rect{
-                .x = @intCast(i32, x * 16) - cam.view.left(),
-                .y = @intCast(i32, y * 16) - cam.view.top(),
+                .x = @as(i32, @intCast(x * 16)) - cam.view.left(),
+                .y = @as(i32, @intCast(y * 16)) - cam.view.top(),
                 .w = 16,
                 .h = 16,
             };
-            var a = 0.3 * @sin(@floatFromInt(f64, std.time.milliTimestamp()) / 500.0);
+            var a = 0.3 * @sin(@as(f64, @floatFromInt(std.time.milliTimestamp())) / 500.0);
             a = @max(a, 0);
-            renderers.r_quad.drawQuadRGBA(dest, 255, 0, 0, @intFromFloat(u8, a * 255.0));
+            renderers.r_quad.drawQuadRGBA(dest, 255, 0, 0, @as(u8, @intFromFloat(a * 255.0)));
         }
     }
     renderers.r_quad.end();
@@ -1186,13 +1186,13 @@ fn renderRangeIndicatorForTower(renderers: *RenderServices, cam: Camera, spec: *
     renderers.r_imm.beginUntextured();
     renderers.r_imm.drawCircle(
         32,
-        zm.f32x4(@floatFromInt(f32, world_x - cam.view.left()), @floatFromInt(f32, world_y - cam.view.top()), 0, 0),
+        zm.f32x4(@as(f32, @floatFromInt(world_x - cam.view.left())), @as(f32, @floatFromInt(world_y - cam.view.top())), 0, 0),
         spec.min_range,
         .{ 255, 0, 0, 255 },
     );
     renderers.r_imm.drawCircle(
         32,
-        zm.f32x4(@floatFromInt(f32, world_x - cam.view.left()), @floatFromInt(f32, world_y - cam.view.top()), 0, 0),
+        zm.f32x4(@as(f32, @floatFromInt(world_x - cam.view.left())), @as(f32, @floatFromInt(world_y - cam.view.top())), 0, 0),
         spec.max_range,
         .{ 0, 255, 0, 255 },
     );
@@ -1201,8 +1201,8 @@ fn renderRangeIndicatorForTower(renderers: *RenderServices, cam: Camera, spec: *
 fn renderPlacementIndicator(renderers: *RenderServices, world: *World, cam: Camera, tile_coord: tilemap.TileCoord) void {
     const color: [4]u8 = if (world.canBuildAt(tile_coord)) .{ 0, 255, 0, 128 } else .{ 255, 0, 0, 128 };
     const dest = Rect.init(
-        @intCast(i32, tile_coord.worldX()) - cam.view.left(),
-        @intCast(i32, tile_coord.worldY()) - cam.view.top(),
+        @as(i32, @intCast(tile_coord.worldX())) - cam.view.left(),
+        @as(i32, @intCast(tile_coord.worldY())) - cam.view.top(),
         16,
         16,
     );
@@ -1218,8 +1218,8 @@ fn renderDemolishIndicator(self: *PlayState, cam: Camera) void {
     const tc = self.mouseToTile();
     if (self.world.?.getTowerAt(tc) != null) {
         const dest = Rect.init(
-            @intCast(i32, tc.x * 16) - cam.view.left(),
-            @intCast(i32, tc.y * 16) - cam.view.top(),
+            @as(i32, @intCast(tc.x * 16)) - cam.view.left(),
+            @as(i32, @intCast(tc.y * 16)) - cam.view.top(),
             16,
             16,
         );
@@ -1229,15 +1229,15 @@ fn renderDemolishIndicator(self: *PlayState, cam: Camera) void {
 }
 
 fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
-    const min_tile_x = @intCast(usize, cam.view.left()) / 16;
-    const min_tile_y = @intCast(usize, cam.view.top()) / 16;
+    const min_tile_x = @as(usize, @intCast(cam.view.left())) / 16;
+    const min_tile_y = @as(usize, @intCast(cam.view.top())) / 16;
     const max_tile_x = @min(
         self.world.?.getWidth(),
-        1 + @intCast(usize, cam.view.right()) / 16,
+        1 + @as(usize, @intCast(cam.view.right())) / 16,
     );
     const max_tile_y = @min(
         self.world.?.getHeight(),
-        1 + @intCast(usize, cam.view.bottom()) / 16,
+        1 + @as(usize, @intCast(cam.view.bottom())) / 16,
     );
     const map = self.world.?.map;
 
@@ -1249,8 +1249,8 @@ fn debugRenderTileCollision(self: *PlayState, cam: Camera) void {
         while (x < max_tile_x) : (x += 1) {
             const t = map.getCollisionFlags2D(x, y);
             const dest = Rect{
-                .x = @intCast(i32, x * 16) - cam.view.left(),
-                .y = @intCast(i32, y * 16) - cam.view.top(),
+                .x = @as(i32, @intCast(x * 16)) - cam.view.left(),
+                .y = @as(i32, @intCast(y * 16)) - cam.view.top(),
                 .w = 16,
                 .h = 16,
             };
@@ -1379,13 +1379,13 @@ pub fn loadWorld(self: *PlayState, mapid: u32) void {
         self.camera.bounds = Rect.init(
             0,
             0,
-            @intCast(i32, world.getWidth() * 16),
-            @intCast(i32, world.getHeight() * 16),
+            @as(i32, @intCast(world.getWidth() * 16)),
+            @as(i32, @intCast(world.getHeight() * 16)),
         );
     }
 
     if (world.goal) |goal| {
-        self.camera.view.centerOn(@intCast(i32, goal.world_x), @intCast(i32, goal.world_y));
+        self.camera.view.centerOn(@as(i32, @intCast(goal.world_x)), @as(i32, @intCast(goal.world_y)));
     } else {
         self.camera.view.x = 0;
         self.camera.view.y = 0;
@@ -1418,8 +1418,8 @@ fn createMinimap(
         gl.deleteTextures(1, &t_minimap.handle);
         gl.genTextures(1, &t_minimap.handle);
     }
-    t_minimap.width = @intCast(u32, range.getWidth());
-    t_minimap.height = @intCast(u32, range.getHeight());
+    t_minimap.width = @as(u32, @intCast(range.getWidth()));
+    t_minimap.height = @as(u32, @intCast(range.getHeight()));
 
     var fbo: gl.GLuint = 0;
     gl.genFramebuffers(1, &fbo);
@@ -1431,13 +1431,13 @@ fn createMinimap(
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @intCast(gl.GLsizei, t_minimap.width), @intCast(gl.GLsizei, t_minimap.height), 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @as(gl.GLsizei, @intCast(t_minimap.width)), @as(gl.GLsizei, @intCast(t_minimap.height)), 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t_minimap.handle, 0);
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
         std.log.err("createMinimap: failed to create framebuffer", .{});
         std.process.exit(1);
     }
-    gl.viewport(0, 0, @intCast(c_int, t_minimap.width), @intCast(c_int, t_minimap.height));
+    gl.viewport(0, 0, @as(c_int, @intCast(t_minimap.width)), @as(c_int, @intCast(t_minimap.height)));
     renderers.r_batch.setOutputDimensions(t_minimap.width, t_minimap.height);
     renderers.r_quad.setOutputDimensions(t_minimap.width, t_minimap.height);
     renderMinimapLayer(renderers, world.map, .base, .terrain, range);
@@ -1460,8 +1460,8 @@ fn renderMinimapBlockage(
         while (x <= range.max.x) : (x += 1) {
             const t = map.at2DPtr(.base, x, y);
             const dest = Rectf.init(
-                @floatFromInt(f32, x - range.min.x),
-                @floatFromInt(f32, y - range.min.y),
+                @as(f32, @floatFromInt(x - range.min.x)),
+                @as(f32, @floatFromInt(y - range.min.y)),
                 1.0,
                 1.0,
             );
@@ -1488,7 +1488,7 @@ fn renderMinimapLayer(
         .terrain => renderers.texman.getNamedTexture("terrain.png"),
         .special => renderers.texman.getNamedTexture("special.png"),
     };
-    const n_tiles_wide = @intCast(u16, source_texture.width / 16);
+    const n_tiles_wide = @as(u16, @intCast(source_texture.width / 16));
     renderers.r_batch.begin(.{
         .texture = source_texture,
     });
@@ -1508,8 +1508,8 @@ fn renderMinimapLayer(
                 .h = 16,
             };
             const dest = Rectf.init(
-                @floatFromInt(f32, x - range.min.x),
-                @floatFromInt(f32, y - range.min.y),
+                @as(f32, @floatFromInt(x - range.min.x)),
+                @as(f32, @floatFromInt(y - range.min.y)),
                 1.0,
                 1.0,
             );
@@ -1539,17 +1539,17 @@ fn renderWipe(self: *PlayState, alpha: f64) void {
 
     const t0 = self.fade_timer.invProgressClamped(@max(self.game.frame_counter -| 1, self.fade_timer.frame_start));
     const t1 = self.fade_timer.invProgressClamped(self.game.frame_counter);
-    const tx = zm.lerpV(t0, t1, @floatCast(f32, alpha));
+    const tx = zm.lerpV(t0, t1, @as(f32, @floatCast(alpha)));
 
-    const right = @intFromFloat(i32, zm.lerpV(-wipe_scanline_width, Game.INTERNAL_WIDTH, tx));
-    const a = @intFromFloat(u8, 255.0 * tx);
+    const right = @as(i32, @intFromFloat(zm.lerpV(-wipe_scanline_width, Game.INTERNAL_WIDTH, tx)));
+    const a = @as(u8, @intFromFloat(255.0 * tx));
 
     self.game.renderers.r_imm.beginUntextured();
     self.game.renderers.r_imm.drawQuadRGBA(Rect.init(0, 0, Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT), .{ 0, 0, 0, a });
 
     self.game.renderers.r_quad.begin(.{});
     for (&self.wipe_scanlines, 0..) |*sc, i| {
-        const rect = Rect.init(0, @intCast(i32, i), right + sc.*, 1);
+        const rect = Rect.init(0, @as(i32, @intCast(i)), right + sc.*, 1);
         self.game.renderers.r_quad.drawQuadRGBA(rect, 0, 0, 0, 255);
     }
     self.game.renderers.r_quad.end();
@@ -1591,7 +1591,7 @@ fn updateUpgradeButtons(self: *PlayState) void {
             self.ui_upgrade_states[i].play_state = self;
             self.ui_upgrade_states[i].tower_spec = spec;
             self.ui_upgrade_states[i].tower_id = self.interact_state.select.selected_tower;
-            self.ui_upgrade_states[i].slot = @intCast(u8, i);
+            self.ui_upgrade_states[i].slot = @as(u8, @intCast(i));
             if (self.world.?.canAfford(spec)) {
                 self.ui_upgrade_buttons[i].state = .normal;
             } else {
@@ -1691,20 +1691,20 @@ const ButtonTextureGenerator = struct {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @intCast(gl.GLsizei, button_base.width), @intCast(gl.GLsizei, button_base.height), 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, @as(gl.GLsizei, @intCast(button_base.width)), @as(gl.GLsizei, @intCast(button_base.height)), 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.handle, 0);
         if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) != gl.FRAMEBUFFER_COMPLETE) {
             std.log.err("createButtonWithBadge: failed to create framebuffer", .{});
             std.process.exit(1);
         }
-        gl.viewport(0, 0, @intCast(c_int, t.width), @intCast(c_int, t.height));
+        gl.viewport(0, 0, @as(c_int, @intCast(t.width)), @as(c_int, @intCast(t.height)));
         self.r_batch.setOutputDimensions(t.width, t.height);
         self.r_batch.begin(.{
             .texture = button_base,
         });
         self.r_batch.drawQuad(.{
-            .src = Rect.init(0, 0, @intCast(i32, button_base.width), @intCast(i32, button_base.height)).toRectf(),
-            .dest = Rect.init(0, 0, @intCast(i32, t.width), @intCast(i32, t.height)).toRectf(),
+            .src = Rect.init(0, 0, @as(i32, @intCast(button_base.width)), @as(i32, @intCast(button_base.height))).toRectf(),
+            .dest = Rect.init(0, 0, @as(i32, @intCast(t.width)), @as(i32, @intCast(t.height))).toRectf(),
         });
         self.r_batch.end();
         self.r_batch.begin(.{
@@ -1732,7 +1732,7 @@ fn beginWipe(self: *PlayState) void {
     self.sub = .wipe_fadein;
     self.fade_timer = FrameTimer.initSeconds(self.game.frame_counter, 2);
 
-    var rng = std.rand.DefaultPrng.init(@intCast(u64, std.time.milliTimestamp()));
+    var rng = std.rand.DefaultPrng.init(@as(u64, @intCast(std.time.milliTimestamp())));
     var r = rng.random();
     for (&self.wipe_scanlines) |*sc| {
         sc.* = r.intRangeLessThan(i32, 0, wipe_scanline_width);
@@ -1758,10 +1758,10 @@ fn renderWaveTimer(self: *PlayState, alpha: f64) void {
         .move_to_corner => {
             const t0 = self.wave_timer.state_timer.invProgressClamped(@max(self.world.?.world_frame -| 1, self.wave_timer.state_timer.frame_start));
             const t1 = self.wave_timer.state_timer.invProgressClamped(self.world.?.world_frame);
-            const tx = zm.lerpV(t0, t1, @floatCast(f32, alpha));
+            const tx = zm.lerpV(t0, t1, @as(f32, @floatCast(alpha)));
             const k = 1 - std.math.pow(f32, tx, 3);
-            box_rect.x = @intFromFloat(i32, zm.lerpV(@floatFromInt(f32, box_rect.x), 0.0, k));
-            box_rect.y = @intFromFloat(i32, zm.lerpV(@floatFromInt(f32, box_rect.y), 0.0, k));
+            box_rect.x = @as(i32, @intFromFloat(zm.lerpV(@as(f32, @floatFromInt(box_rect.x)), 0.0, k)));
+            box_rect.y = @as(i32, @intFromFloat(zm.lerpV(@as(f32, @floatFromInt(box_rect.y)), 0.0, k)));
         },
         .corner => {
             box_rect.x = 0;
@@ -1776,14 +1776,14 @@ fn renderWaveTimer(self: *PlayState, alpha: f64) void {
     const sec = next_wave_timer.remainingSecondsUnbounded(self.world.?.world_frame);
     if (sec <= 5) {
         const diff = 5.0 - sec;
-        text_alpha = @intFromFloat(u8, (0.5 * (1.0 + std.math.cos(diff * 8.0))) * 255.0);
+        text_alpha = @as(u8, @intFromFloat((0.5 * (1.0 + std.math.cos(diff * 8.0))) * 255.0));
     }
     if (sec < 0) {
         total_alpha = 1.0 - std.math.clamp(-sec, 0, 2.0) / 2.0;
     }
 
     self.game.renderers.r_quad.begin(.{});
-    self.game.renderers.r_quad.drawQuadRGBA(box_rect, 0, 0, 0, @intFromFloat(u8, total_alpha * 128));
+    self.game.renderers.r_quad.drawQuadRGBA(box_rect, 0, 0, 0, @as(u8, @intFromFloat(total_alpha * 128)));
     self.game.renderers.r_quad.end();
 
     self.game.renderers.r_font.begin(.{
@@ -1792,7 +1792,7 @@ fn renderWaveTimer(self: *PlayState, alpha: f64) void {
     });
     self.game.renderers.r_font.drawText(self.wave_timer.wave_timer_text, .{
         .dest = box_rect,
-        .color = .{ 255, 255, 255, @intFromFloat(u8, total_alpha * @floatFromInt(f32, text_alpha)) },
+        .color = .{ 255, 255, 255, @as(u8, @intFromFloat(total_alpha * @as(f32, @floatFromInt(text_alpha)))) },
         .h_alignment = .center,
         .v_alignment = .middle,
     });

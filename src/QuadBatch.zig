@@ -58,8 +58,8 @@ pub fn create() QuadBatch {
 
     gl.bindVertexArray(self.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @ptrFromInt(?*anyopaque, @offsetOf(Vertex, "x")));
-    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @ptrFromInt(?*anyopaque, @offsetOf(Vertex, "rgba")));
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(@offsetOf(Vertex, "x"))));
+    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(@offsetOf(Vertex, "rgba"))));
     gl.enableVertexAttribArray(0);
     gl.enableVertexAttribArray(1);
 
@@ -73,12 +73,12 @@ fn createIndices(self: *QuadBatch) void {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.index_buffer);
     gl.bufferData(
         gl.ELEMENT_ARRAY_BUFFER,
-        @intCast(gl.GLsizeiptr, @sizeOf(u16) * index_count),
+        @as(gl.GLsizeiptr, @intCast(@sizeOf(u16) * index_count)),
         null,
         gl.STATIC_DRAW,
     );
     const index_mapping = gl.mapBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.WRITE_ONLY);
-    const indices = @ptrCast([*]u16, @alignCast(2, index_mapping))[0..index_count];
+    const indices = @as([*]u16, @ptrCast(@alignCast(index_mapping)))[0..index_count];
 
     var index_head: usize = 0;
     var vertex_base: u16 = 0;
@@ -102,7 +102,7 @@ fn createVertexStorage(self: *QuadBatch) void {
     _ = self;
     gl.bufferData(
         gl.ARRAY_BUFFER,
-        @intCast(gl.GLsizeiptr, @sizeOf(Vertex) * vertex_count),
+        @as(gl.GLsizeiptr, @intCast(@sizeOf(Vertex) * vertex_count)),
         null,
         gl.STREAM_DRAW,
     );
@@ -111,7 +111,7 @@ fn createVertexStorage(self: *QuadBatch) void {
 /// ARRAY_BUFFER should be bound before calling this function.
 fn mapVertexStorage(self: *QuadBatch) void {
     const vertex_mapping = gl.mapBuffer(gl.ARRAY_BUFFER, gl.WRITE_ONLY);
-    self.vertices = @ptrCast([*]Vertex, @alignCast(@alignOf(Vertex), vertex_mapping))[0..vertex_count];
+    self.vertices = @as([*]Vertex, @ptrCast(@alignCast(vertex_mapping)))[0..vertex_count];
 }
 
 /// ARRAY_BUFFER should be bound before calling this function.
@@ -127,8 +127,8 @@ pub fn destroy(self: *QuadBatch) void {
 }
 
 pub fn setOutputDimensions(self: *QuadBatch, w: u32, h: u32) void {
-    const wf = @floatFromInt(f32, w);
-    const hf = @floatFromInt(f32, h);
+    const wf = @as(f32, @floatFromInt(w));
+    const hf = @as(f32, @floatFromInt(h));
     self.transform = zm.orthographicOffCenterRh(0, wf, 0, hf, 0, 1);
 }
 
@@ -153,7 +153,7 @@ fn flush(self: *QuadBatch, remap: bool) void {
     defer if (remap) {
         self.mapVertexStorage();
     };
-    const prim_count = @intCast(gl.GLsizei, self.vertex_head / 4 * 6);
+    const prim_count = @as(gl.GLsizei, @intCast(self.vertex_head / 4 * 6));
     self.vertex_head = 0;
     self.unmapVertexStorage() catch {
         std.log.warn("ARRAY_BUFFER corrupted; no primitives drawn", .{});

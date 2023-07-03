@@ -104,8 +104,8 @@ pub const TextureManager = struct {
             gl.TEXTURE_2D,
             0,
             gl.RGBA,
-            @intCast(gl.GLsizei, t.width),
-            @intCast(gl.GLsizei, t.height),
+            @as(gl.GLsizei, @intCast(t.width)),
+            @as(gl.GLsizei, @intCast(t.height)),
             0,
             gl.RGBA,
             gl.UNSIGNED_BYTE,
@@ -130,8 +130,8 @@ fn loadTexture(filename: [:0]const u8, into: *Texture) !void {
     };
     defer stb_image.stbi_image_free(data);
 
-    into.width = @intCast(u32, width);
-    into.height = @intCast(u32, height);
+    into.width = @as(u32, @intCast(width));
+    into.height = @as(u32, @intCast(height));
 
     gl.bindTexture(gl.TEXTURE_2D, into.handle);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);

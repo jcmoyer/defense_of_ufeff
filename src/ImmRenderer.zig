@@ -57,8 +57,8 @@ pub fn create() ImmRenderer {
     gl.genBuffers(1, &self.buffer);
     gl.bindVertexArray(self.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, self.buffer);
-    gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @ptrFromInt(?*anyopaque, @offsetOf(Vertex, "xyuv")));
-    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @ptrFromInt(?*anyopaque, @offsetOf(Vertex, "rgba")));
+    gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(@offsetOf(Vertex, "xyuv"))));
+    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(@offsetOf(Vertex, "rgba"))));
     gl.enableVertexAttribArray(0);
     gl.enableVertexAttribArray(1);
 
@@ -71,8 +71,8 @@ pub fn destroy(self: *ImmRenderer) void {
 }
 
 pub fn setOutputDimensions(self: *ImmRenderer, w: u32, h: u32) void {
-    const wf = @floatFromInt(f32, w);
-    const hf = @floatFromInt(f32, h);
+    const wf = @as(f32, @floatFromInt(w));
+    const hf = @as(f32, @floatFromInt(h));
     self.transform = zm.orthographicOffCenterRh(0, wf, 0, hf, 0, 1);
 }
 
@@ -92,10 +92,10 @@ pub fn beginUntextured(self: ImmRenderer) void {
 }
 
 pub fn drawQuad(self: ImmRenderer, x: i32, y: i32, w: u32, h: u32, r: u8, g: u8, b: u8) void {
-    const left = @floatFromInt(f32, x);
-    const right = @floatFromInt(f32, x + @intCast(i32, w));
-    const top = @floatFromInt(f32, y);
-    const bottom = @floatFromInt(f32, y + @intCast(i32, h));
+    const left = @as(f32, @floatFromInt(x));
+    const right = @as(f32, @floatFromInt(x + @as(i32, @intCast(w))));
+    const top = @as(f32, @floatFromInt(y));
+    const bottom = @as(f32, @floatFromInt(y + @as(i32, @intCast(h))));
     const rgba = .{ r, g, b, 255 };
 
     const vertices = [4]Vertex{
@@ -137,8 +137,8 @@ pub fn drawRectangle(self: ImmRenderer, p0: zm.Vec, p1: zm.Vec, rgba: [4]u8) voi
 pub fn drawCircle(self: ImmRenderer, comptime segs: comptime_int, p0: zm.Vec, r: f32, rgba: [4]u8) void {
     var vertices: [segs]Vertex = undefined;
     inline for (&vertices, 0..) |*v, i| {
-        const f = @floatFromInt(f32, i) + 1.0;
-        const d = f / @floatFromInt(f32, segs);
+        const f = @as(f32, @floatFromInt(i)) + 1.0;
+        const d = f / @as(f32, @floatFromInt(segs));
         const offset = p0 + zm.f32x4(
             @cos(std.math.tau * d) * r,
             @sin(std.math.tau * d) * r,
@@ -153,10 +153,10 @@ pub fn drawCircle(self: ImmRenderer, comptime segs: comptime_int, p0: zm.Vec, r:
 }
 
 pub fn drawQuadRGBA(self: ImmRenderer, dest: Rect, rgba: [4]u8) void {
-    const left = @floatFromInt(f32, dest.left());
-    const right = @floatFromInt(f32, dest.right());
-    const top = @floatFromInt(f32, dest.top());
-    const bottom = @floatFromInt(f32, dest.bottom());
+    const left = @as(f32, @floatFromInt(dest.left()));
+    const right = @as(f32, @floatFromInt(dest.right()));
+    const top = @as(f32, @floatFromInt(dest.top()));
+    const bottom = @as(f32, @floatFromInt(dest.bottom()));
 
     const vertices = [4]Vertex{
         Vertex{ .xyuv = zm.f32x4(left, top, 0, 1), .rgba = rgba },
@@ -178,15 +178,15 @@ pub fn drawQuadTextured(self: ImmRenderer, src: Rect, dest: Rect) void {
 
     const t = params.texture_manager.getTextureState(params.texture);
 
-    const uv_left = @floatFromInt(f32, src.x) / @floatFromInt(f32, t.width);
-    const uv_right = @floatFromInt(f32, src.right()) / @floatFromInt(f32, t.width);
-    const uv_top = 1 - @floatFromInt(f32, src.y) / @floatFromInt(f32, t.height);
-    const uv_bottom = 1 - @floatFromInt(f32, src.bottom()) / @floatFromInt(f32, t.height);
+    const uv_left = @as(f32, @floatFromInt(src.x)) / @as(f32, @floatFromInt(t.width));
+    const uv_right = @as(f32, @floatFromInt(src.right())) / @as(f32, @floatFromInt(t.width));
+    const uv_top = 1 - @as(f32, @floatFromInt(src.y)) / @as(f32, @floatFromInt(t.height));
+    const uv_bottom = 1 - @as(f32, @floatFromInt(src.bottom())) / @as(f32, @floatFromInt(t.height));
 
-    const left = @floatFromInt(f32, dest.x);
-    const right = @floatFromInt(f32, dest.right());
-    const top = @floatFromInt(f32, dest.y);
-    const bottom = @floatFromInt(f32, dest.bottom());
+    const left = @as(f32, @floatFromInt(dest.x));
+    const right = @as(f32, @floatFromInt(dest.right()));
+    const top = @as(f32, @floatFromInt(dest.y));
+    const bottom = @as(f32, @floatFromInt(dest.bottom()));
     const rgba = .{ 255, 255, 255, 255 };
 
     const vertices = [4]Vertex{

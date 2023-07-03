@@ -8,7 +8,7 @@ pub const FrameTimer = struct {
     pub fn initSeconds(current_frame: u64, sec: f32) FrameTimer {
         return FrameTimer{
             .frame_start = current_frame,
-            .frame_end = current_frame + @intFromFloat(u64, 30.0 * sec),
+            .frame_end = current_frame + @as(u64, @intFromFloat(30.0 * sec)),
         };
     }
 
@@ -24,7 +24,7 @@ pub const FrameTimer = struct {
     }
 
     pub fn durationSeconds(self: FrameTimer) f32 {
-        return @floatFromInt(f32, self.durationFrames()) / 30.0;
+        return @as(f32, @floatFromInt(self.durationFrames())) / 30.0;
     }
 
     pub fn remainingSeconds(self: FrameTimer, current_frame: u64) f32 {
@@ -46,7 +46,7 @@ pub const FrameTimer = struct {
     }
 
     pub fn progress(self: FrameTimer, current_frame: u64) f32 {
-        return @floatFromInt(f32, current_frame - self.frame_start) / @floatFromInt(f32, self.durationFrames());
+        return @as(f32, @floatFromInt(current_frame - self.frame_start)) / @as(f32, @floatFromInt(self.durationFrames()));
     }
 
     pub fn progressClamped(self: FrameTimer, current_frame: u64) f32 {

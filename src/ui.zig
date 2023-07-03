@@ -46,10 +46,9 @@ pub fn EventCallback(comptime ControlT: type) type {
 
         pub fn setCallback(self: *Self, userdata_ptr: anytype, comptime cb: *const fn (*ControlT, @TypeOf(userdata_ptr)) void) void {
             const Ptr = @TypeOf(userdata_ptr);
-            const alignment = @typeInfo(Ptr).Pointer.alignment;
             const Impl = struct {
                 fn callbackImpl(button: *ControlT, userdata: ?*anyopaque) void {
-                    var userdata_ptr_ = @ptrCast(Ptr, @alignCast(alignment, userdata));
+                    var userdata_ptr_ = @as(Ptr, @ptrCast(@alignCast(userdata)));
                     cb(button, userdata_ptr_);
                 }
             };
@@ -287,14 +286,14 @@ pub const Trackbar = struct {
         const p = cr.clampPoint(args.x - cr.left(), args.y - cr.top());
         if (args.buttons.left) {
             const crf = cr.toRectf();
-            const xf = @floatFromInt(f32, p[0]);
+            const xf = @as(f32, @floatFromInt(p[0]));
             // hack: we get to this point because rect.contains() is used for
             // hit testing, but x+w is not considered "inside" the rectangle
             // because it produces strange results with button edges. Need to
             // investigate. For now, subtract 1 so a trackbar can be dragged
             // all the way to the right.
             const percent_x = xf / (crf.w - 1.0);
-            self.value = self.min_value + @intFromFloat(u32, @floatFromInt(f32, self.max_value - self.min_value) * percent_x);
+            self.value = self.min_value + @as(u32, @intFromFloat(@as(f32, @floatFromInt(self.max_value - self.min_value)) * percent_x));
             self.ev_changed.invoke(self);
         }
     }
@@ -313,10 +312,9 @@ pub const Trackbar = struct {
 
     pub fn setPanCallback(self: *Trackbar, userdata_ptr: anytype, comptime cb: *const fn (*Minimap, @TypeOf(userdata_ptr), f32, f32) void) void {
         const Ptr = @TypeOf(userdata_ptr);
-        const alignment = @typeInfo(Ptr).Pointer.alignment;
         const Impl = struct {
             fn callbackImpl(button: *Minimap, userdata: ?*anyopaque, x: f32, y: f32) void {
-                var userdata_ptr_ = @ptrCast(Ptr, @alignCast(alignment, userdata));
+                var userdata_ptr_ = @as(Ptr, @ptrCast(@alignCast(userdata)));
                 cb(button, userdata_ptr_, x, y);
             }
         };
@@ -359,7 +357,7 @@ pub const Trackbar = struct {
     }
 
     pub fn valueAsPercent(self: *Trackbar) f32 {
-        return @floatFromInt(f32, self.value - self.min_value) / @floatFromInt(f32, self.max_value);
+        return @as(f32, @floatFromInt(self.value - self.min_value)) / @as(f32, @floatFromInt(self.max_value));
     }
 
     pub fn customRender(self: *Trackbar, ctx: CustomRenderContext) void {
@@ -405,8 +403,8 @@ pub const Minimap = struct {
         const p = cr.clampPoint(args.x - cr.left(), args.y - cr.top());
         if (args.buttons.left) {
             const crf = cr.toRectf();
-            const xf = @floatFromInt(f32, p[0]);
-            const yf = @floatFromInt(f32, p[1]);
+            const xf = @as(f32, @floatFromInt(p[0]));
+            const yf = @as(f32, @floatFromInt(p[1]));
             const percent_x = xf / crf.w;
             const percent_y = yf / crf.h;
             if (self.pan_callback) |cb| {
@@ -429,10 +427,9 @@ pub const Minimap = struct {
 
     pub fn setPanCallback(self: *Minimap, userdata_ptr: anytype, comptime cb: *const fn (*Minimap, @TypeOf(userdata_ptr), f32, f32) void) void {
         const Ptr = @TypeOf(userdata_ptr);
-        const alignment = @typeInfo(Ptr).Pointer.alignment;
         const Impl = struct {
             fn callbackImpl(button: *Minimap, userdata: ?*anyopaque, x: f32, y: f32) void {
-                var userdata_ptr_ = @ptrCast(Ptr, @alignCast(alignment, userdata));
+                var userdata_ptr_ = @as(Ptr, @ptrCast(@alignCast(userdata)));
                 cb(button, userdata_ptr_, x, y);
             }
         };
@@ -478,7 +475,7 @@ pub const Minimap = struct {
 
         // touch inside of dest rect
         // this is for the minimap, mostly
-        const aspect_ratio = @floatFromInt(f32, t.texture.width) / @floatFromInt(f32, t.texture.height);
+        const aspect_ratio = @as(f32, @floatFromInt(t.texture.width)) / @as(f32, @floatFromInt(t.texture.height));
         const p = render_dest.centerPoint();
 
         // A = aspect ratio, W = width, H = height
@@ -494,11 +491,11 @@ pub const Minimap = struct {
         // doing one of the above transforms for the other axis
         if (aspect_ratio > 1) {
             render_dest.w = rect.w;
-            render_dest.h = @intFromFloat(i32, @floatFromInt(f32, render_dest.w) / aspect_ratio);
+            render_dest.h = @as(i32, @intFromFloat(@as(f32, @floatFromInt(render_dest.w)) / aspect_ratio));
             render_dest.centerOn(p[0], p[1]);
         } else {
             render_dest.h = rect.h;
-            render_dest.w = @intFromFloat(i32, @floatFromInt(f32, render_dest.h) * aspect_ratio);
+            render_dest.w = @as(i32, @intFromFloat(@as(f32, @floatFromInt(render_dest.h)) * aspect_ratio));
             render_dest.centerOn(p[0], p[1]);
         }
 
@@ -585,16 +582,15 @@ pub const Control = struct {
         comptime fns: ControlImpl(@TypeOf(pointer)),
     ) Control {
         const Ptr = @TypeOf(pointer);
-        const alignment = @typeInfo(Ptr).Pointer.alignment;
 
         const Impl = struct {
             fn deinitImpl(ptr: *anyopaque) void {
-                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 fns.deinitFn(inst);
             }
 
             fn handleMouseClickImpl(ptr: *anyopaque, args: MouseEventArgs) void {
-                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 if (fns.handleMouseClickFn) |f| {
                     f(inst, args);
                 }
@@ -605,7 +601,7 @@ pub const Control = struct {
             }
 
             fn interactRectImpl(ptr: *anyopaque) ?Rect {
-                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 const f = fns.interactRectFn orelse interactRectDefault;
                 return f(inst);
             }
@@ -615,13 +611,13 @@ pub const Control = struct {
             }
 
             fn getBackgroundImpl(ptr: *anyopaque) Background {
-                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 const f = fns.getBackgroundFn orelse getBackgroundDefault;
                 return f(inst);
             }
 
             fn getTextImpl(ptr: *anyopaque) ?[]const u8 {
-                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 const f = fns.getTextFn orelse return null;
                 return f(inst);
             }
@@ -631,59 +627,59 @@ pub const Control = struct {
             }
 
             fn getChildrenImpl(ptr: *anyopaque) []Control {
-                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 const f = fns.getChildrenFn orelse getChildrenDefault;
                 return f(inst);
             }
 
             fn handleMouseEnterImpl(ptr: *anyopaque) void {
-                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 const f = fns.handleMouseEnterFn orelse return;
                 return f(inst);
             }
 
             fn handleMouseLeaveImpl(ptr: *anyopaque) void {
-                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 const f = fns.handleMouseLeaveFn orelse return;
                 return f(inst);
             }
 
             fn handleMouseDownImpl(ptr: *anyopaque, args: MouseEventArgs) void {
-                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 if (fns.handleMouseDownFn) |f| {
                     f(inst, args);
                 }
             }
 
             fn handleMouseUpImpl(ptr: *anyopaque, args: MouseEventArgs) void {
-                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 if (fns.handleMouseUpFn) |f| {
                     f(inst, args);
                 }
             }
 
             fn handleMouseMoveImpl(ptr: *anyopaque, args: MouseEventArgs) void {
-                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 if (fns.handleMouseMoveFn) |f| {
                     f(inst, args);
                 }
             }
 
             fn customRenderImpl(ptr: *anyopaque, ctx: CustomRenderContext) void {
-                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 if (fns.customRenderFn) |f| {
                     f(inst, ctx);
                 }
             }
 
             fn getTooltipTextImpl(ptr: *anyopaque) ?[]const u8 {
-                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 const f = fns.getTooltipTextFn orelse return null;
                 return f(inst);
             }
 
             fn isVisibleImpl(ptr: *anyopaque) bool {
-                var inst = @ptrCast(Ptr, @alignCast(alignment, ptr));
+                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 if (fns.isVisibleFn) |f| {
                     return f(inst);
                 } else {
@@ -1129,8 +1125,8 @@ pub const SDLBackend = struct {
     /// `coord_scale_x` and `coord_scale_y`.
     pub fn clientToVirtual(self: SDLBackend, x: i32, y: i32) [2]i32 {
         return [2]i32{
-            @intFromFloat(i32, (@floatFromInt(f64, x - self.client_rect.x)) / self.coord_scale_x),
-            @intFromFloat(i32, (@floatFromInt(f64, y - self.client_rect.y)) / self.coord_scale_y),
+            @as(i32, @intFromFloat((@as(f64, @floatFromInt(x - self.client_rect.x))) / self.coord_scale_x)),
+            @as(i32, @intFromFloat((@as(f64, @floatFromInt(y - self.client_rect.y))) / self.coord_scale_y)),
         };
     }
 
@@ -1149,8 +1145,8 @@ pub const SDLBackend = struct {
         var r = self.clientRect();
         r.x = 0;
         r.y = 0;
-        r.w = @intFromFloat(i32, @floatFromInt(f32, r.w) / self.coord_scale_x);
-        r.h = @intFromFloat(i32, @floatFromInt(f32, r.h) / self.coord_scale_y);
+        r.w = @as(i32, @intFromFloat(@as(f32, @floatFromInt(r.w)) / self.coord_scale_x));
+        r.h = @as(i32, @intFromFloat(@as(f32, @floatFromInt(r.h)) / self.coord_scale_y));
         return r;
     }
 };
@@ -1260,14 +1256,14 @@ fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRe
 
             switch (control.getBackground()) {
                 .texture => |t| {
-                    var render_src = t.texture_rect orelse Rect.init(0, 0, @intCast(i32, t.texture.width), @intCast(i32, t.texture.height));
+                    var render_src = t.texture_rect orelse Rect.init(0, 0, @as(i32, @intCast(t.texture.width)), @as(i32, @intCast(t.texture.height)));
                     opts.r_batch.begin(.{
                         .texture = t.texture,
                     });
 
                     // touch inside of dest rect
                     // this is for the minimap, mostly
-                    const aspect_ratio = @floatFromInt(f32, render_src.w) / @floatFromInt(f32, render_src.h);
+                    const aspect_ratio = @as(f32, @floatFromInt(render_src.w)) / @as(f32, @floatFromInt(render_src.h));
                     const p = render_dest.centerPoint();
 
                     // A = aspect ratio, W = width, H = height
@@ -1283,11 +1279,11 @@ fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRe
                     // doing one of the above transforms for the other axis
                     if (aspect_ratio > 1) {
                         render_dest.w = rect.w;
-                        render_dest.h = @intFromFloat(i32, @floatFromInt(f32, render_dest.w) / aspect_ratio);
+                        render_dest.h = @as(i32, @intFromFloat(@as(f32, @floatFromInt(render_dest.w)) / aspect_ratio));
                         render_dest.centerOn(p[0], p[1]);
                     } else {
                         render_dest.h = rect.h;
-                        render_dest.w = @intFromFloat(i32, @floatFromInt(f32, render_dest.h) * aspect_ratio);
+                        render_dest.w = @as(i32, @intFromFloat(@as(f32, @floatFromInt(render_dest.h)) * aspect_ratio));
                         render_dest.centerOn(p[0], p[1]);
                     }
 
@@ -1328,8 +1324,8 @@ fn renderControl(opts: UIRenderOptions, control: Control, renderstate: ControlRe
 }
 
 fn drawPointRectImpl(ptr: *anyopaque, opts: PointRectOptions) void {
-    var state = @ptrCast(*ControlRenderState, @alignCast(@alignOf(ControlRenderState), ptr));
-    var dest = Rectf.init(@floatFromInt(f32, state.translate_x) + opts.x, @floatFromInt(f32, state.translate_y) + opts.y, 0, 0);
+    var state = @as(*ControlRenderState, @ptrCast(@alignCast(ptr)));
+    var dest = Rectf.init(@as(f32, @floatFromInt(state.translate_x)) + opts.x, @as(f32, @floatFromInt(state.translate_y)) + opts.y, 0, 0);
     dest.inflate(opts.radius, opts.radius);
     if (state.last_draw != .quadbatch) {
         state.finishLastDrawType();
@@ -1343,39 +1339,39 @@ fn drawPointRectImpl(ptr: *anyopaque, opts: PointRectOptions) void {
 }
 
 fn drawLineImpl(ptr: *anyopaque, x0: f32, y0: f32, x1: f32, y1: f32) void {
-    var state = @ptrCast(*ControlRenderState, @alignCast(@alignOf(ControlRenderState), ptr));
+    var state = @as(*ControlRenderState, @ptrCast(@alignCast(ptr)));
     if (state.last_draw != .immediate) {
         state.finishLastDrawType();
         state.opts.r_imm.beginUntextured();
         state.last_draw = .immediate;
     }
     state.opts.r_imm.drawLine(
-        .{ @floatFromInt(f32, state.translate_x) + x0, @floatFromInt(f32, state.translate_y) + y0, 0, 1 },
-        .{ @floatFromInt(f32, state.translate_x) + x1, @floatFromInt(f32, state.translate_y) + y1, 0, 1 },
+        .{ @as(f32, @floatFromInt(state.translate_x)) + x0, @as(f32, @floatFromInt(state.translate_y)) + y0, 0, 1 },
+        .{ @as(f32, @floatFromInt(state.translate_x)) + x1, @as(f32, @floatFromInt(state.translate_y)) + y1, 0, 1 },
         .{ 255, 255, 255, 255 },
     );
 }
 
 fn drawRectangleImpl(ptr: *anyopaque, x0: f32, y0: f32, x1: f32, y1: f32) void {
-    var state = @ptrCast(*ControlRenderState, @alignCast(@alignOf(ControlRenderState), ptr));
+    var state = @as(*ControlRenderState, @ptrCast(@alignCast(ptr)));
     if (state.last_draw != .immediate) {
         state.finishLastDrawType();
         state.opts.r_imm.beginUntextured();
         state.last_draw = .immediate;
     }
-    const tx = @floatFromInt(f32, state.translate_x);
-    const ty = @floatFromInt(f32, state.translate_y);
+    const tx = @as(f32, @floatFromInt(state.translate_x));
+    const ty = @as(f32, @floatFromInt(state.translate_y));
     state.opts.r_imm.drawRectangle(.{ tx + x0, ty + y0, 0, 1 }, .{ tx + x1, ty + y1, 0, 1 }, .{ 255, 255, 255, 255 });
 }
 
 fn drawTextureImpl(ptr: *anyopaque, texture: *const Texture, dest: Rect) void {
-    var state = @ptrCast(*ControlRenderState, @alignCast(@alignOf(ControlRenderState), ptr));
+    var state = @as(*ControlRenderState, @ptrCast(@alignCast(ptr)));
     if (state.last_draw != .spritebatch or (state.last_draw == .spritebatch and state.last_draw.spritebatch != texture)) {
         state.finishLastDrawType();
         state.opts.r_batch.begin(.{ .texture = texture });
         state.last_draw = .{ .spritebatch = texture };
     }
-    const src = Rect.init(0, 0, @intCast(i32, texture.width), @intCast(i32, texture.height));
+    const src = Rect.init(0, 0, @as(i32, @intCast(texture.width)), @as(i32, @intCast(texture.height)));
     var t_dest = dest;
     t_dest.translate(state.translate_x, state.translate_y);
     state.opts.r_batch.drawQuad(.{

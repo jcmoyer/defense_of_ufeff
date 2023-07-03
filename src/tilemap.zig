@@ -8,22 +8,22 @@ pub const TileCoord = struct {
 
     pub fn initWorld(world_x: u32, world_y: u32) TileCoord {
         return .{
-            .x = @intCast(u16, world_x / 16),
-            .y = @intCast(u16, world_y / 16),
+            .x = @as(u16, @intCast(world_x / 16)),
+            .y = @as(u16, @intCast(world_y / 16)),
         };
     }
 
     /// Casts parameters to `u32`. Negative values are invalid.
     pub fn initSignedWorld(world_x: i32, world_y: i32) TileCoord {
-        return initWorld(@intCast(u32, world_x), @intCast(u32, world_y));
+        return initWorld(@as(u32, @intCast(world_x)), @as(u32, @intCast(world_y)));
     }
 
     pub fn worldX(self: TileCoord) u32 {
-        return @intCast(u32, self.x * 16);
+        return @as(u32, @intCast(self.x * 16));
     }
 
     pub fn worldY(self: TileCoord) u32 {
-        return @intCast(u32, self.y * 16);
+        return @as(u32, @intCast(self.y * 16));
     }
 
     pub fn toScalarCoord(self: TileCoord, ref_width: usize) usize {
@@ -31,16 +31,16 @@ pub const TileCoord = struct {
     }
 
     pub fn manhattan(a: TileCoord, b: TileCoord) usize {
-        const dx = @intCast(isize, a.x) - @intCast(isize, b.x);
-        const dy = @intCast(isize, a.y) - @intCast(isize, b.y);
-        return @intCast(usize, std.math.absInt(dx + dy) catch @panic("manhattan distance of TileCoords too big"));
+        const dx = @as(isize, @intCast(a.x)) - @as(isize, @intCast(b.x));
+        const dy = @as(isize, @intCast(a.y)) - @as(isize, @intCast(b.y));
+        return @as(usize, @intCast(std.math.absInt(dx + dy) catch @panic("manhattan distance of TileCoords too big")));
     }
 
     /// This seems to be a better A* heuristic than manhattan distance, as the
     /// resulting path doesn't change by placing obstacles next to it.
     pub fn euclideanDistance(a: TileCoord, b: TileCoord) f32 {
-        const dx = @floatFromInt(f32, a.x) - @floatFromInt(f32, b.x);
-        const dy = @floatFromInt(f32, a.y) - @floatFromInt(f32, b.y);
+        const dx = @as(f32, @floatFromInt(a.x)) - @as(f32, @floatFromInt(b.x));
+        const dy = @as(f32, @floatFromInt(a.y)) - @as(f32, @floatFromInt(b.y));
         return std.math.sqrt(dx * dx + dy * dy);
     }
 
@@ -54,14 +54,14 @@ pub const TileCoord = struct {
     }
 
     pub fn directionToAdjacent(self: TileCoord, to: TileCoord) Direction {
-        const dx = @intCast(isize, self.x) - @intCast(isize, to.x);
+        const dx = @as(isize, @intCast(self.x)) - @as(isize, @intCast(to.x));
         if (dx == 1) {
             return .left;
         }
         if (dx == -1) {
             return .right;
         }
-        const dy = @intCast(isize, self.y) - @intCast(isize, to.y);
+        const dy = @as(isize, @intCast(self.y)) - @as(isize, @intCast(to.y));
         if (dy == 1) {
             return .up;
         }

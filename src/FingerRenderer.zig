@@ -47,7 +47,7 @@ pub fn create() FingerRenderer {
     gl.genBuffers(1, &self.buffer);
     gl.bindVertexArray(self.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, self.buffer);
-    gl.vertexAttribIPointer(0, 1, gl.UNSIGNED_INT, @sizeOf(Vertex), @ptrFromInt(?*anyopaque, @offsetOf(Vertex, "id")));
+    gl.vertexAttribIPointer(0, 1, gl.UNSIGNED_INT, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(@offsetOf(Vertex, "id"))));
     gl.enableVertexAttribArray(0);
 
     return self;
@@ -59,8 +59,8 @@ pub fn destroy(self: *FingerRenderer) void {
 }
 
 pub fn setOutputDimensions(self: *FingerRenderer, w: u32, h: u32) void {
-    const wf = @floatFromInt(f32, w);
-    const hf = @floatFromInt(f32, h);
+    const wf = @as(f32, @floatFromInt(w));
+    const hf = @as(f32, @floatFromInt(h));
     self.transform = zm.orthographicOffCenterRh(0, wf, 0, hf, 0, 1);
 }
 

@@ -68,9 +68,9 @@ pub fn create() SpriteBatch {
 
     gl.bindVertexArray(self.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer);
-    gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @ptrFromInt(?*anyopaque, @offsetOf(Vertex, "xyuv")));
-    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @ptrFromInt(?*anyopaque, @offsetOf(Vertex, "rgba")));
-    gl.vertexAttribPointer(2, 1, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @ptrFromInt(?*anyopaque, @offsetOf(Vertex, "flash")));
+    gl.vertexAttribPointer(0, 4, gl.FLOAT, gl.FALSE, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(@offsetOf(Vertex, "xyuv"))));
+    gl.vertexAttribPointer(1, 4, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(@offsetOf(Vertex, "rgba"))));
+    gl.vertexAttribPointer(2, 1, gl.UNSIGNED_BYTE, gl.TRUE, @sizeOf(Vertex), @as(?*anyopaque, @ptrFromInt(@offsetOf(Vertex, "flash"))));
 
     gl.enableVertexAttribArray(0);
     gl.enableVertexAttribArray(1);
@@ -86,12 +86,12 @@ fn createIndices(self: *SpriteBatch) void {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.index_buffer);
     gl.bufferData(
         gl.ELEMENT_ARRAY_BUFFER,
-        @intCast(gl.GLsizeiptr, @sizeOf(u16) * index_count),
+        @as(gl.GLsizeiptr, @intCast(@sizeOf(u16) * index_count)),
         null,
         gl.STATIC_DRAW,
     );
     const index_mapping = gl.mapBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.WRITE_ONLY);
-    const indices = @ptrCast([*]u16, @alignCast(2, index_mapping))[0..index_count];
+    const indices = @as([*]u16, @ptrCast(@alignCast(index_mapping)))[0..index_count];
 
     var index_head: usize = 0;
     var vertex_base: u16 = 0;
@@ -115,7 +115,7 @@ fn createVertexStorage(self: *SpriteBatch) void {
     _ = self;
     gl.bufferData(
         gl.ARRAY_BUFFER,
-        @intCast(gl.GLsizeiptr, @sizeOf(Vertex) * vertex_count),
+        @as(gl.GLsizeiptr, @intCast(@sizeOf(Vertex) * vertex_count)),
         null,
         gl.STREAM_DRAW,
     );
@@ -124,7 +124,7 @@ fn createVertexStorage(self: *SpriteBatch) void {
 /// ARRAY_BUFFER should be bound before calling this function.
 fn mapVertexStorage(self: *SpriteBatch) void {
     const vertex_mapping = gl.mapBuffer(gl.ARRAY_BUFFER, gl.WRITE_ONLY);
-    self.vertices = @ptrCast([*]Vertex, @alignCast(@alignOf(Vertex), vertex_mapping))[0..vertex_count];
+    self.vertices = @as([*]Vertex, @ptrCast(@alignCast(vertex_mapping)))[0..vertex_count];
 }
 
 /// ARRAY_BUFFER should be bound before calling this function.
@@ -140,8 +140,8 @@ pub fn destroy(self: *SpriteBatch) void {
 }
 
 pub fn setOutputDimensions(self: *SpriteBatch, w: u32, h: u32) void {
-    const wf = @floatFromInt(f32, w);
-    const hf = @floatFromInt(f32, h);
+    const wf = @as(f32, @floatFromInt(w));
+    const hf = @as(f32, @floatFromInt(h));
     self.transform = zm.orthographicOffCenterRh(0, wf, 0, hf, 0, 1);
 }
 
@@ -152,17 +152,17 @@ pub fn begin(self: *SpriteBatch, params: SpriteBatchParams) void {
     gl.uniform1i(self.uniforms.uSampler, 0);
     gl.uniform3f(
         self.uniforms.uFlashRGB,
-        @floatFromInt(f32, params.flash_r) / 255.0,
-        @floatFromInt(f32, params.flash_g) / 255.0,
-        @floatFromInt(f32, params.flash_r) / 255.0,
+        @as(f32, @floatFromInt(params.flash_r)) / 255.0,
+        @as(f32, @floatFromInt(params.flash_g)) / 255.0,
+        @as(f32, @floatFromInt(params.flash_r)) / 255.0,
     );
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, params.texture.handle);
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, self.index_buffer);
 
-    self.ref_width = @floatFromInt(f32, params.texture.width);
-    self.ref_height = @floatFromInt(f32, params.texture.height);
+    self.ref_width = @as(f32, @floatFromInt(params.texture.width));
+    self.ref_height = @as(f32, @floatFromInt(params.texture.height));
 
     self.vertex_head = 0;
     gl.bindBuffer(gl.ARRAY_BUFFER, self.vertex_buffer);
@@ -177,7 +177,7 @@ fn flush(self: *SpriteBatch, remap: bool) void {
     defer if (remap) {
         self.mapVertexStorage();
     };
-    const prim_count = @intCast(gl.GLsizei, self.vertex_head / 4 * 6);
+    const prim_count = @as(gl.GLsizei, @intCast(self.vertex_head / 4 * 6));
     self.vertex_head = 0;
     self.unmapVertexStorage() catch {
         std.log.warn("ARRAY_BUFFER corrupted; no primitives drawn", .{});
@@ -221,7 +221,7 @@ pub fn drawQuad(self: *SpriteBatch, opts: DrawQuadOptions) void {
     p2 = zm.f32x4(right, top, uv_right, uv_top);
     p3 = zm.f32x4(right, bottom, uv_right, uv_bottom);
 
-    const f_val: u8 = if (opts.flash) @intFromFloat(u8, opts.flash_mag * 255) else 0;
+    const f_val: u8 = if (opts.flash) @as(u8, @intFromFloat(opts.flash_mag * 255)) else 0;
 
     self.vertices[self.vertex_head + 0] = .{
         .xyuv = p0,

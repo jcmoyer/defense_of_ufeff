@@ -26,10 +26,10 @@ pub fn lerp(a: Camera, b: Camera, alpha: f64) Camera {
     std.debug.assert(a.view.h == b.view.h);
     std.debug.assert(std.meta.eql(a.bounds, b.bounds));
 
-    const fx = zm.lerpV(@floatFromInt(f64, a.view.x), @floatFromInt(f64, b.view.x), alpha);
-    const fy = zm.lerpV(@floatFromInt(f64, a.view.y), @floatFromInt(f64, b.view.y), alpha);
+    const fx = zm.lerpV(@as(f64, @floatFromInt(a.view.x)), @as(f64, @floatFromInt(b.view.x)), alpha);
+    const fy = zm.lerpV(@as(f64, @floatFromInt(a.view.y)), @as(f64, @floatFromInt(b.view.y)), alpha);
     return Camera{
-        .view = Rect.init(@intFromFloat(i32, fx), @intFromFloat(i32, fy), a.view.w, a.view.h),
+        .view = Rect.init(@as(i32, @intFromFloat(fx)), @as(i32, @intFromFloat(fy)), a.view.w, a.view.h),
         .bounds = a.bounds,
     };
 }

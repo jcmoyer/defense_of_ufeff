@@ -104,7 +104,7 @@ fn renderTilemapLayer(
         .terrain => self.renderers.texman.getNamedTexture("terrain.png"),
         .special => self.renderers.texman.getNamedTexture("special.png"),
     };
-    const n_tiles_wide = @intCast(u16, source_texture.width / 16);
+    const n_tiles_wide = @as(u16, @intCast(source_texture.width / 16));
     self.renderers.r_batch.begin(.{
         .texture = source_texture,
     });
@@ -122,16 +122,16 @@ fn renderTilemapLayer(
             }
             if (t.isWater()) {
                 const dest = Rect{
-                    .x = @intCast(i32, x * 16) + translate_x,
-                    .y = @intCast(i32, y * 16) + translate_y,
+                    .x = @as(i32, @intCast(x * 16)) + translate_x,
+                    .y = @as(i32, @intCast(y * 16)) + translate_y,
                     .w = 16,
                     .h = 16,
                 };
                 self.water_buf[self.n_water] = WaterDraw{
                     .dest = dest,
                     .world_xy = zm.f32x4(
-                        @floatFromInt(f32, x * 16),
-                        @floatFromInt(f32, y * 16),
+                        @as(f32, @floatFromInt(x * 16)),
+                        @as(f32, @floatFromInt(y * 16)),
                         0,
                         0,
                     ),
@@ -155,8 +155,8 @@ fn renderTilemapLayer(
                     .h = 16,
                 };
                 const dest = Rect{
-                    .x = @intCast(i32, x * 16) + translate_x,
-                    .y = @intCast(i32, y * 16) + translate_y,
+                    .x = @as(i32, @intCast(x * 16)) + translate_x,
+                    .y = @as(i32, @intCast(y * 16)) + translate_y,
                     .w = 16,
                     .h = 16,
                 };
@@ -175,20 +175,20 @@ fn renderTilemapLayer(
 pub fn renderTilemap(self: *WorldRenderer, cam: Camera, map: *const Tilemap, frame_count: u64) void {
     self.n_water = 0;
 
-    const min_tile_x = @intCast(usize, cam.view.left()) / 16;
-    const min_tile_y = @intCast(usize, cam.view.top()) / 16;
+    const min_tile_x = @as(usize, @intCast(cam.view.left())) / 16;
+    const min_tile_y = @as(usize, @intCast(cam.view.top())) / 16;
     const max_tile_x = @min(
         map.width,
         // +1 to account for partially transparent UI panel
-        1 + 1 + @intCast(usize, cam.view.right()) / 16,
+        1 + 1 + @as(usize, @intCast(cam.view.right())) / 16,
     );
     const max_tile_y = @min(
         map.height,
-        1 + @intCast(usize, cam.view.bottom()) / 16,
+        1 + @as(usize, @intCast(cam.view.bottom())) / 16,
     );
     const range = TileRange{
-        .min = TileCoord{ .x = @intCast(u16, min_tile_x), .y = @intCast(u16, min_tile_y) },
-        .max = TileCoord{ .x = @intCast(u16, max_tile_x), .y = @intCast(u16, max_tile_y) },
+        .min = TileCoord{ .x = @as(u16, @intCast(min_tile_x)), .y = @as(u16, @intCast(min_tile_y)) },
+        .max = TileCoord{ .x = @as(u16, @intCast(max_tile_x)), .y = @as(u16, @intCast(max_tile_y)) },
     };
 
     self.renderers.r_batch.setOutputDimensions(Game.INTERNAL_WIDTH, Game.INTERNAL_HEIGHT);
@@ -200,7 +200,7 @@ pub fn renderTilemap(self: *WorldRenderer, cam: Camera, map: *const Tilemap, fra
         .water_base = self.renderers.texman.getNamedTexture("water.png"),
         .water_blend = self.renderers.texman.getNamedTexture("water.png"),
         .blend_amount = 0.3,
-        .global_time = @floatFromInt(f32, frame_count) / 30.0,
+        .global_time = @as(f32, @floatFromInt(frame_count)) / 30.0,
         .water_direction = zm.f32x4(0.3, 0.2, 0, 0),
         .water_drift_range = zm.f32x4(0.2, 0.05, 0, 0),
         .water_drift_scale = zm.f32x4(32, 16, 0, 0),

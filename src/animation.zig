@@ -75,11 +75,11 @@ pub const MappedAnimationSet = struct {
     }
 
     fn vGetAnimation(ptr: *const anyopaque, name: []const u8) ?Animation {
-        const this = @ptrCast(*const AnimationSet, @alignCast(@alignOf(*AnimationSet), ptr));
+        const this = @as(*const AnimationSet, @ptrCast(@alignCast(ptr)));
         return getAnimation(this.*, name);
     }
     fn vHasAnimation(ptr: *const anyopaque, name: []const u8) bool {
-        const this = @ptrCast(*const AnimationSet, @alignCast(@alignOf(*AnimationSet), ptr));
+        const this = @as(*const AnimationSet, @ptrCast(@alignCast(ptr)));
         return hasAnimation(this.*, name);
     }
 };
@@ -124,11 +124,11 @@ pub fn StaticAnimationSet(comptime defs: []const StaticAnimationDef) type {
         }
 
         fn vGetAnimation(ptr: *const anyopaque, name: []const u8) ?Animation {
-            const this = @ptrCast(*const Self, ptr);
+            const this = @as(*const Self, @ptrCast(ptr));
             return getAnimation(this.*, name);
         }
         fn vHasAnimation(ptr: *const anyopaque, name: []const u8) bool {
-            const this = @ptrCast(*const Self, ptr);
+            const this = @as(*const Self, @ptrCast(ptr));
             return hasAnimation(this.*, name);
         }
     };

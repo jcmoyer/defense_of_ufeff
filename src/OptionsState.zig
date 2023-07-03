@@ -98,7 +98,7 @@ fn addOptionTrackbar(self: *OptionsState, name: []const u8, cb: anytype, initial
     tb.rect.alignLeft(Game.INTERNAL_WIDTH / 2);
     tb.min_value = 0;
     tb.max_value = 100;
-    tb.value = @intFromFloat(u32, initial_value * 100.0);
+    tb.value = @as(u32, @intFromFloat(initial_value * 100.0));
     tb.ev_changed.setCallback(self, cb);
     try self.ui_root.addChild(tb.control());
 
@@ -164,7 +164,7 @@ fn onScaleChange(button: *ui.Button, self: *OptionsState) void {
     self.game.audio.playSound("assets/sounds/click.ogg", .{}).release();
     self.scale_index = (self.scale_index + 1) % scales.len;
     const new_scale = scales[self.scale_index];
-    self.game.setOutputScale(@floatFromInt(f32, new_scale));
+    self.game.setOutputScale(@as(f32, @floatFromInt(new_scale)));
     self.ui_root.backend.client_rect = self.game.output_rect;
     self.ui_root.backend.coord_scale_x = self.game.output_scale_x;
     self.ui_root.backend.coord_scale_y = self.game.output_scale_y;
@@ -187,7 +187,7 @@ fn onSoundVolumeChange(trackbar: *ui.Trackbar, self: *OptionsState) void {
 fn updateAudioTooltips(self: *OptionsState) void {
     if (self.tb_music.value > 0) {
         self.tb_music.tooltip_text = std.fmt.bufPrint(&self.music_tooltip, "{d}% ({d:.1}db)", .{
-            @intFromFloat(u32, self.tb_music.valueAsPercent() * 100),
+            @as(u32, @intFromFloat(self.tb_music.valueAsPercent() * 100)),
             mathutil.ampScalarToDb(f32, self.tb_music.valueAsPercent()),
         }) catch unreachable;
     } else {
@@ -196,7 +196,7 @@ fn updateAudioTooltips(self: *OptionsState) void {
 
     if (self.tb_sound.value > 0) {
         self.tb_sound.tooltip_text = std.fmt.bufPrint(&self.sound_tooltip, "{d}% ({d:.1}db)", .{
-            @intFromFloat(u32, self.tb_sound.valueAsPercent() * 100),
+            @as(u32, @intFromFloat(self.tb_sound.valueAsPercent() * 100)),
             mathutil.ampScalarToDb(f32, self.tb_sound.valueAsPercent()),
         }) catch unreachable;
     } else {

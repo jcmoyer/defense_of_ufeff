@@ -85,7 +85,7 @@ pub fn create(game: *Game) !*MenuState {
         .game = game,
         .fontspec = undefined,
         .ui_root = ui.Root.init(game.allocator, &game.sdl_backend),
-        .rng = std.rand.DefaultPrng.init(@intCast(u64, std.time.milliTimestamp())),
+        .rng = std.rand.DefaultPrng.init(@as(u64, @intCast(std.time.milliTimestamp()))),
         // Initialized below
         .ui_tip = undefined,
     };
@@ -194,7 +194,7 @@ pub fn render(self: *MenuState, alpha: f64) void {
     self.game.renderers.r_font.drawText("Defense of Ufeff", .{ .dest = Rect.init(0, 0, Game.INTERNAL_WIDTH, 50), .h_alignment = .center });
 
     var measured = self.fontspec.measureText(tips[self.tip_index]);
-    measured.centerOn(Game.INTERNAL_WIDTH / 2, @intFromFloat(i32, 0.8 * Game.INTERNAL_HEIGHT));
+    measured.centerOn(Game.INTERNAL_WIDTH / 2, @as(i32, @intFromFloat(0.8 * Game.INTERNAL_HEIGHT)));
 
     self.game.renderers.r_font.drawText(tips[self.tip_index], .{ .dest = Rect.init(0, 200, 512, 50), .h_alignment = .center });
     self.game.renderers.r_font.end();
@@ -238,7 +238,7 @@ pub fn renderBackground(self: *MenuState, alpha: f64) void {
     const num_x = @divTrunc(Game.INTERNAL_WIDTH, 32) + 1;
     const num_y = @divTrunc(Game.INTERNAL_HEIGHT, 32) + 1;
 
-    const scroll_offset = zm.lerpV(self.p_scroll_offset, self.scroll_offset, @floatCast(f32, alpha));
+    const scroll_offset = zm.lerpV(self.p_scroll_offset, self.scroll_offset, @as(f32, @floatCast(alpha)));
 
     var y: i32 = 0;
     var x: i32 = 0;
@@ -248,8 +248,8 @@ pub fn renderBackground(self: *MenuState, alpha: f64) void {
             self.game.renderers.r_batch.drawQuad(.{
                 .src = src,
                 .dest = Rectf.init(
-                    @floatFromInt(f32, x) * src.w - scroll_offset,
-                    @floatFromInt(f32, y) * src.h - scroll_offset,
+                    @as(f32, @floatFromInt(x)) * src.w - scroll_offset,
+                    @as(f32, @floatFromInt(y)) * src.h - scroll_offset,
                     src.w,
                     src.h,
                 ),

@@ -107,7 +107,7 @@ pub const CircleEmitter = struct {
         const m = rand.float(f32) * self.radius;
         const dx = std.math.cos(a) * m;
         const dy = std.math.sin(a) * m;
-        const init_pos = @bitCast(V2, self.pos) + V2{ dx, dy };
+        const init_pos = @as(V2, @bitCast(self.pos)) + V2{ dx, dy };
 
         self.parent.addParticle(.{
             .pos = init_pos,
@@ -132,7 +132,7 @@ pub const ParticleSystem = struct {
         var self: ParticleSystem = .{
             .allocator = allocator,
             .capacity = capacity,
-            .rng = std.rand.DefaultPrng.init(@intCast(u64, std.time.milliTimestamp())),
+            .rng = std.rand.DefaultPrng.init(@as(u64, @intCast(std.time.milliTimestamp()))),
         };
         try self.particles.resize(allocator, capacity);
         var i: usize = 0;
@@ -186,8 +186,8 @@ pub const ParticleSystem = struct {
                 self.particles.set(i, last);
                 self.num_alive -= 1;
             } else {
-                self.particles.items(.pos)[i] = @bitCast(V2, self.particles.items(.pos)[i]) + @bitCast(V2, self.particles.items(.vel)[i]);
-                self.particles.items(.vel)[i] = (@bitCast(V2, self.particles.items(.vel)[i]) + @bitCast(V2, self.particles.items(.acc)[i])) * @bitCast(V2, self.particles.items(.damp_vel)[i]);
+                self.particles.items(.pos)[i] = @as(V2, @bitCast(self.particles.items(.pos)[i])) + @as(V2, @bitCast(self.particles.items(.vel)[i]));
+                self.particles.items(.vel)[i] = (@as(V2, @bitCast(self.particles.items(.vel)[i])) + @as(V2, @bitCast(self.particles.items(.acc)[i]))) * @as(V2, @bitCast(self.particles.items(.damp_vel)[i]));
                 self.particles.items(.rotation)[i] = self.particles.items(.rotation)[i] + self.particles.items(.angular_vel)[i];
 
                 // TODO: non-hardcoded animation
@@ -197,7 +197,7 @@ pub const ParticleSystem = struct {
                     rgba[0],
                     rgba[1],
                     rgba[2],
-                    @intFromFloat(u8, a),
+                    @as(u8, @intFromFloat(a)),
                 };
                 const s = self.particles.items(.life)[i].invProgressClamped(frame);
                 self.particles.items(.scale)[i] = s;
