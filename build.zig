@@ -46,7 +46,7 @@ pub fn build(b: *std.build.Builder) void {
 }
 
 fn linkSDL2(exe: *std.build.LibExeObjStep) void {
-    exe.addObjectFile("thirdparty/SDL2-2.24.1/x86_64-w64-mingw32/lib/libSDL2.a");
+    exe.addObjectFile(.{ .path = "thirdparty/SDL2-2.24.1/x86_64-w64-mingw32/lib/libSDL2.a" });
     exe.linkLibC();
     // Windows SDL dependencies
     exe.linkSystemLibrary("setupapi");

@@ -14,7 +14,7 @@ pub fn linkImage(b: *std.build.Builder, exe: *std.build.LibExeObjStep) void {
         .source_file = .{ .path = thisDir() ++ "/src/stb_image.zig" },
     });
     exe.addModule("stb_image", m);
-    exe.addCSourceFile(thisDir() ++ "/src/stb_image.c", &[_][]const u8{});
+    exe.addCSourceFile(.{ .file = .{ .path = thisDir() ++ "/src/stb_image.c" }, .flags = &[_][]const u8{} });
 }
 
 pub fn linkVorbis(b: *std.build.Builder, exe: *std.build.LibExeObjStep) void {
@@ -22,5 +22,5 @@ pub fn linkVorbis(b: *std.build.Builder, exe: *std.build.LibExeObjStep) void {
         .source_file = .{ .path = thisDir() ++ "/src/stb_vorbis.zig" },
     });
     exe.addModule("stb_vorbis", m);
-    exe.addCSourceFile(thisDir() ++ "/src/stb_vorbis.c", &[_][]const u8{});
+    exe.addCSourceFile(.{ .file = .{ .path = thisDir() ++ "/src/stb_vorbis.c" }, .flags = &[_][]const u8{} });
 }
