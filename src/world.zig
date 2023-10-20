@@ -1103,7 +1103,7 @@ pub const Tower = struct {
         const sin_r = std.math.sin(r);
 
         if (self.animator) |*animator| {
-            if (std.math.fabs(sin_r) < 0.7) {
+            if (@abs(sin_r) < 0.7) {
                 if (cos_r < 0) {
                     animator.setAnimation("left");
                 } else {
