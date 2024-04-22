@@ -29,7 +29,7 @@ pub const BitmapFontSpec = struct {
         var map = std.AutoArrayHashMapUnmanaged(u8, Rect){};
         errdefer map.deinit(allocator);
         for (doc.glyphs) |g| {
-            var gop = try map.getOrPut(allocator, g.glyph[0]);
+            const gop = try map.getOrPut(allocator, g.glyph[0]);
             if (gop.found_existing) {
                 std.log.warn("Duplicate glyph: `{c}`; ignoring", .{g.glyph[0]});
             } else {
@@ -80,7 +80,7 @@ pub const BitmapFontSpec = struct {
     pub fn loadFromFile(allocator: std.mem.Allocator, filename: []const u8) !BitmapFontSpec {
         var font_file = try std.fs.cwd().openFile(filename, .{});
         defer font_file.close();
-        var spec_json = try font_file.readToEndAlloc(allocator, 1024 * 1024);
+        const spec_json = try font_file.readToEndAlloc(allocator, 1024 * 1024);
         defer allocator.free(spec_json);
         return try BitmapFontSpec.initJson(allocator, spec_json);
     }
@@ -192,7 +192,7 @@ pub const BitmapFont = struct {
     }
 
     pub fn drawText(self: BitmapFont, text: []const u8, opts: DrawTextOptions) void {
-        var dims = self.fontspec.measureText(text);
+        const dims = self.fontspec.measureText(text);
         var dx: i32 = 0;
         var dy = getYStart(opts.v_alignment, opts.dest, dims);
         if (std.mem.indexOfScalar(u8, text, '\n')) |linebreak| {

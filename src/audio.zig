@@ -8,7 +8,7 @@ const Buffer = struct {
     sample_rate: c_int = 0,
     channels: c_int = 0,
     samples: ?[*]i16 = null,
-    sample_count: std.atomic.Atomic(u32) = .{ .value = 0 },
+    sample_count: std.atomic.Value(u32) = .{ .raw = 0 },
 
     fn destroy(self: *Buffer, allocator: Allocator) void {
         if (self.samples) |ptr| {
@@ -21,15 +21,15 @@ const Buffer = struct {
 
 pub const AudioParameters = struct {
     allocator: Allocator,
-    refcount: std.atomic.Atomic(u32) = .{ .value = 1 },
-    volume: std.atomic.Atomic(f32) = .{ .value = 1 },
-    pan: std.atomic.Atomic(f32) = .{ .value = 0.5 },
-    done: std.atomic.Atomic(bool) = .{ .value = false },
-    paused: std.atomic.Atomic(bool) = .{ .value = false },
-    loaded: std.atomic.Atomic(bool) = .{ .value = false },
+    refcount: std.atomic.Value(u32) = .{ .raw = 1 },
+    volume: std.atomic.Value(f32) = .{ .raw = 1 },
+    pan: std.atomic.Value(f32) = .{ .raw = 0.5 },
+    done: std.atomic.Value(bool) = .{ .raw = false },
+    paused: std.atomic.Value(bool) = .{ .raw = false },
+    loaded: std.atomic.Value(bool) = .{ .raw = false },
 
     fn create(allocator: Allocator) !*AudioParameters {
-        var ptr = try allocator.create(AudioParameters);
+        const ptr = try allocator.create(AudioParameters);
         ptr.* = .{
             .allocator = allocator,
         };
@@ -37,13 +37,13 @@ pub const AudioParameters = struct {
     }
 
     pub fn addRef(self: *AudioParameters) *AudioParameters {
-        _ = self.refcount.fetchAdd(1, .Monotonic);
+        _ = self.refcount.fetchAdd(1, .monotonic);
         return self;
     }
 
     pub fn release(self: *AudioParameters) void {
-        if (self.refcount.fetchSub(1, .Release) == 1) {
-            self.refcount.fence(.Acquire);
+        if (self.refcount.fetchSub(1, .release) == 1) {
+            self.refcount.fence(.acquire);
             self.allocator.destroy(self);
         }
     }
@@ -164,7 +164,7 @@ const AudioDecodeThread = struct {
                     .parameters = req.parameters,
                     .kind = req.kind,
                 };
-                req.parameters.loaded.store(true, .SeqCst);
+                req.parameters.loaded.store(true, .seq_cst);
                 self.system.tracks_m.lock();
                 defer self.system.tracks_m.unlock();
                 self.system.tracks.append(self.allocator, t) catch |err| {
@@ -176,7 +176,7 @@ const AudioDecodeThread = struct {
     }
 };
 
-pub const AtomicF32 = std.atomic.Atomic(f32);
+pub const AtomicF32 = std.atomic.Value(f32);
 
 pub const AudioSystem = struct {
     pub var instance: *AudioSystem = undefined;
@@ -278,7 +278,7 @@ pub const AudioSystem = struct {
 
     fn getOrLoad(self: *AudioSystem, filename: [:0]const u8) *Buffer {
         self.cache_m.lock();
-        var gop = self.cache.getOrPut(self.allocator, filename) catch |err| {
+        const gop = self.cache.getOrPut(self.allocator, filename) catch |err| {
             log.err("Failed to allocate space in cache: {!}", .{err});
             std.process.exit(1);
         };
@@ -293,7 +293,7 @@ pub const AudioSystem = struct {
             };
 
             log.info("Sound load start '{s}'", .{filename});
-            var ptr = self.allocator.create(Buffer) catch |err| {
+            const ptr = self.allocator.create(Buffer) catch |err| {
                 log.err("Failed to allocate audio buffer: {!}", .{err});
                 std.process.exit(1);
             };
@@ -318,7 +318,7 @@ pub const AudioSystem = struct {
             &samples,
         );
         buffer.samples = samples;
-        buffer.sample_count.store(@intCast(sample_count), .SeqCst);
+        buffer.sample_count.store(@intCast(sample_count), .seq_cst);
     }
 
     fn fillBuffer(self: *AudioSystem, buffer: []i16) void {
@@ -330,26 +330,26 @@ pub const AudioSystem = struct {
 
         for (self.tracks.items) |*track| {
             const volume_coef = if (track.kind == .music)
-                self.mix_music_coef.load(.SeqCst)
+                self.mix_music_coef.load(.seq_cst)
             else
-                self.mix_sound_coef.load(.SeqCst);
+                self.mix_sound_coef.load(.seq_cst);
 
             const input_buffer = track.buffer;
-            const volume = volume_coef * track.parameters.volume.load(.SeqCst);
-            const pan = track.parameters.pan.load(.SeqCst);
+            const volume = volume_coef * track.parameters.volume.load(.seq_cst);
+            const pan = track.parameters.pan.load(.seq_cst);
 
-            if (track.parameters.paused.load(.SeqCst)) {
+            if (track.parameters.paused.load(.seq_cst)) {
                 continue;
             }
 
-            if (input_buffer.sample_count.load(.SeqCst) == 0) {
+            if (input_buffer.sample_count.load(.seq_cst) == 0) {
                 continue;
             }
 
             // Next loop is hot, so hoist the atomic load out to this point.
             // NOTE: We always multiply by 2 because we assume all sounds are
             // stereo. This may need to change in the future.
-            const buffer_sample_count = 2 * input_buffer.sample_count.load(.SeqCst);
+            const buffer_sample_count = 2 * input_buffer.sample_count.load(.seq_cst);
 
             const m_left = 1 - pan;
             const m_right = pan;
@@ -386,7 +386,7 @@ pub const AudioSystem = struct {
         // erase finished tracks
         var i: usize = self.tracks.items.len -% 1;
         while (i < self.tracks.items.len) {
-            if (self.tracks.items[i].done or self.tracks.items[i].parameters.done.load(.SeqCst)) {
+            if (self.tracks.items[i].done or self.tracks.items[i].parameters.done.load(.seq_cst)) {
                 var t = self.tracks.swapRemove(i);
                 t.deinit();
             } else {
@@ -412,10 +412,10 @@ pub const AudioSystem = struct {
             log.err("Failed to dupe filename for music: {!}", .{err});
             std.process.exit(1);
         };
-        parameters.volume.storeUnchecked(opts.initial_volume);
-        parameters.pan.storeUnchecked(opts.initial_pan);
-        parameters.paused.storeUnchecked(opts.start_paused);
-        var req = DecodeRequest{
+        parameters.volume.store(opts.initial_volume, .unordered);
+        parameters.pan.store(opts.initial_pan, .unordered);
+        parameters.paused.store(opts.start_paused, .unordered);
+        const req = DecodeRequest{
             .filename = dup_filename,
             .loop = true,
             .parameters = parameters,
@@ -435,10 +435,10 @@ pub const AudioSystem = struct {
             log.err("Failed to dupe filename for sound: {!}", .{err});
             std.process.exit(1);
         };
-        parameters.volume.storeUnchecked(opts.initial_volume);
-        parameters.pan.storeUnchecked(opts.initial_pan);
-        parameters.paused.storeUnchecked(opts.start_paused);
-        var req = DecodeRequest{
+        parameters.volume.store(opts.initial_volume, .unordered);
+        parameters.pan.store(opts.initial_pan, .unordered);
+        parameters.paused.store(opts.start_paused, .unordered);
+        const req = DecodeRequest{
             .filename = dup_filename,
             .loop = false,
             .parameters = parameters,

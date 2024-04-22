@@ -246,7 +246,7 @@ pub const Tilemap = struct {
     tiles: []Tile = &[_]Tile{},
 
     pub fn init(allocator: Allocator, width: usize, height: usize) !Tilemap {
-        var tiles = try allocator.alloc(Tile, 2 * width * height);
+        const tiles = try allocator.alloc(Tile, 2 * width * height);
         return Tilemap{
             .width = width,
             .height = height,
@@ -338,6 +338,6 @@ pub const Tilemap = struct {
 
     pub fn copyInto(self: Tilemap, dest: *Tilemap) void {
         std.debug.assert(self.width == dest.width and self.height == dest.height);
-        std.mem.copy(Tile, dest.tiles, self.tiles);
+        @memcpy(dest.tiles, self.tiles);
     }
 };

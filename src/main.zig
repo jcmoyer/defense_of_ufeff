@@ -5,7 +5,7 @@ pub const log_level: std.log.Level = .info;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
-    var allocator = gpa.allocator();
+    const allocator = gpa.allocator();
     defer _ = gpa.deinit();
 
     var g = try Game.create(allocator);

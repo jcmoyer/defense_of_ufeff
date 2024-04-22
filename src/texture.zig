@@ -41,7 +41,7 @@ pub const TextureManager = struct {
     }
 
     pub fn getNamedTexture(self: *TextureManager, name: [:0]const u8) *const Texture {
-        var gop = self.cache.getOrPut(self.allocator, name) catch |err| {
+        const gop = self.cache.getOrPut(self.allocator, name) catch |err| {
             log.err("Failed to put texture name '{s}': {!}", .{ name, err });
             std.process.exit(1);
         };

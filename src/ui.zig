@@ -48,7 +48,7 @@ pub fn EventCallback(comptime ControlT: type) type {
             const Ptr = @TypeOf(userdata_ptr);
             const Impl = struct {
                 fn callbackImpl(button: *ControlT, userdata: ?*anyopaque) void {
-                    var userdata_ptr_ = @as(Ptr, @ptrCast(@alignCast(userdata)));
+                    const userdata_ptr_ = @as(Ptr, @ptrCast(@alignCast(userdata)));
                     cb(button, userdata_ptr_);
                 }
             };
@@ -314,7 +314,7 @@ pub const Trackbar = struct {
         const Ptr = @TypeOf(userdata_ptr);
         const Impl = struct {
             fn callbackImpl(button: *Minimap, userdata: ?*anyopaque, x: f32, y: f32) void {
-                var userdata_ptr_ = @as(Ptr, @ptrCast(@alignCast(userdata)));
+                const userdata_ptr_ = @as(Ptr, @ptrCast(@alignCast(userdata)));
                 cb(button, userdata_ptr_, x, y);
             }
         };
@@ -429,7 +429,7 @@ pub const Minimap = struct {
         const Ptr = @TypeOf(userdata_ptr);
         const Impl = struct {
             fn callbackImpl(button: *Minimap, userdata: ?*anyopaque, x: f32, y: f32) void {
-                var userdata_ptr_ = @as(Ptr, @ptrCast(@alignCast(userdata)));
+                const userdata_ptr_ = @as(Ptr, @ptrCast(@alignCast(userdata)));
                 cb(button, userdata_ptr_, x, y);
             }
         };
@@ -585,12 +585,12 @@ pub const Control = struct {
 
         const Impl = struct {
             fn deinitImpl(ptr: *anyopaque) void {
-                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
+                const inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 fns.deinitFn(inst);
             }
 
             fn handleMouseClickImpl(ptr: *anyopaque, args: MouseEventArgs) void {
-                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
+                const inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 if (fns.handleMouseClickFn) |f| {
                     f(inst, args);
                 }
@@ -601,7 +601,7 @@ pub const Control = struct {
             }
 
             fn interactRectImpl(ptr: *anyopaque) ?Rect {
-                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
+                const inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 const f = fns.interactRectFn orelse interactRectDefault;
                 return f(inst);
             }
@@ -611,13 +611,13 @@ pub const Control = struct {
             }
 
             fn getBackgroundImpl(ptr: *anyopaque) Background {
-                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
+                const inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 const f = fns.getBackgroundFn orelse getBackgroundDefault;
                 return f(inst);
             }
 
             fn getTextImpl(ptr: *anyopaque) ?[]const u8 {
-                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
+                const inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 const f = fns.getTextFn orelse return null;
                 return f(inst);
             }
@@ -627,59 +627,59 @@ pub const Control = struct {
             }
 
             fn getChildrenImpl(ptr: *anyopaque) []Control {
-                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
+                const inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 const f = fns.getChildrenFn orelse getChildrenDefault;
                 return f(inst);
             }
 
             fn handleMouseEnterImpl(ptr: *anyopaque) void {
-                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
+                const inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 const f = fns.handleMouseEnterFn orelse return;
                 return f(inst);
             }
 
             fn handleMouseLeaveImpl(ptr: *anyopaque) void {
-                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
+                const inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 const f = fns.handleMouseLeaveFn orelse return;
                 return f(inst);
             }
 
             fn handleMouseDownImpl(ptr: *anyopaque, args: MouseEventArgs) void {
-                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
+                const inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 if (fns.handleMouseDownFn) |f| {
                     f(inst, args);
                 }
             }
 
             fn handleMouseUpImpl(ptr: *anyopaque, args: MouseEventArgs) void {
-                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
+                const inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 if (fns.handleMouseUpFn) |f| {
                     f(inst, args);
                 }
             }
 
             fn handleMouseMoveImpl(ptr: *anyopaque, args: MouseEventArgs) void {
-                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
+                const inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 if (fns.handleMouseMoveFn) |f| {
                     f(inst, args);
                 }
             }
 
             fn customRenderImpl(ptr: *anyopaque, ctx: CustomRenderContext) void {
-                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
+                const inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 if (fns.customRenderFn) |f| {
                     f(inst, ctx);
                 }
             }
 
             fn getTooltipTextImpl(ptr: *anyopaque) ?[]const u8 {
-                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
+                const inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 const f = fns.getTooltipTextFn orelse return null;
                 return f(inst);
             }
 
             fn isVisibleImpl(ptr: *anyopaque) bool {
-                var inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
+                const inst = @as(Ptr, @ptrCast(@alignCast(ptr)));
                 if (fns.isVisibleFn) |f| {
                     return f(inst);
                 } else {
@@ -1388,7 +1388,7 @@ const CRVTable = CustomRenderContext.VTable{
 };
 
 pub fn renderUI(opts: UIRenderOptions, ui_root: Root) void {
-    var state = ControlRenderState{
+    const state = ControlRenderState{
         .opts = &opts,
     };
 
@@ -1400,7 +1400,7 @@ pub fn renderUI(opts: UIRenderOptions, ui_root: Root) void {
         const tooltip_padding = 4;
 
         var text_rect = opts.font_spec.measureText(text);
-        var m = ui_root.backend.mouseVirtual();
+        const m = ui_root.backend.mouseVirtual();
 
         var frame_rect = text_rect;
         frame_rect.inflate(tooltip_padding, tooltip_padding);

@@ -189,7 +189,7 @@ pub fn renderTilemap(self: *WorldRenderer, cam: Camera, map: *const Tilemap, fra
     self.renderTilemapLayer(map, .base, .special, range, -cam.view.left(), -cam.view.top());
 
     // water_direction, water_drift, speed set on a per-map basis?
-    var water_params = WaterRenderer.WaterRendererParams{
+    const water_params = WaterRenderer.WaterRendererParams{
         .water_base = self.renderers.texman.getNamedTexture("water.png"),
         .water_blend = self.renderers.texman.getNamedTexture("water.png"),
         .blend_amount = 0.3,

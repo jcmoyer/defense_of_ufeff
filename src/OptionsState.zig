@@ -128,10 +128,10 @@ pub fn create(game: *Game) !*OptionsState {
     b_back.setTexture(self.game.texman.getNamedTexture("button_base.png"));
     try self.ui_root.addChild(b_back.control());
 
-    const music_coef = self.game.audio.mix_music_coef.load(.SeqCst);
-    const sound_coef = self.game.audio.mix_sound_coef.load(.SeqCst);
+    const music_coef = self.game.audio.mix_music_coef.load(.seq_cst);
+    const sound_coef = self.game.audio.mix_sound_coef.load(.seq_cst);
 
-    var fullscreen = try self.addOption("Fullscreen", onFullscreenChange, "no", "Alt+Enter anywhere");
+    const fullscreen = try self.addOption("Fullscreen", onFullscreenChange, "no", "Alt+Enter anywhere");
     self.btn_fullscreen = fullscreen.button;
     _ = try self.addOption("Scale", onScaleChange, "2", "Windowed only");
     self.tb_music = try self.addOptionTrackbar("Music", onMusicVolumeChange, music_coef);
@@ -175,12 +175,12 @@ fn onScaleChange(button: *ui.Button, self: *OptionsState) void {
 }
 
 fn onMusicVolumeChange(trackbar: *ui.Trackbar, self: *OptionsState) void {
-    self.game.audio.mix_music_coef.store(trackbar.valueAsPercent(), .SeqCst);
+    self.game.audio.mix_music_coef.store(trackbar.valueAsPercent(), .seq_cst);
     self.updateAudioTooltips();
 }
 
 fn onSoundVolumeChange(trackbar: *ui.Trackbar, self: *OptionsState) void {
-    self.game.audio.mix_sound_coef.store(trackbar.valueAsPercent(), .SeqCst);
+    self.game.audio.mix_sound_coef.store(trackbar.valueAsPercent(), .seq_cst);
     self.updateAudioTooltips();
 }
 

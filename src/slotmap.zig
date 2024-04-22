@@ -86,7 +86,7 @@ pub fn SlotMap(comptime T: type) type {
                 self.free_first = self.free_last;
             }
 
-            var index = self.indices.items[handle];
+            const index = self.indices.items[handle];
             self.items.swapRemove(index.item_index);
 
             // if the element being removed is also the last element, there's nothing to update
@@ -105,7 +105,7 @@ pub fn SlotMap(comptime T: type) type {
 }
 
 test "slotmap" {
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     var map = SlotMap([]const u8){};
     defer map.deinit(allocator);
 
@@ -236,7 +236,7 @@ pub fn IntrusiveSlotMap(comptime T: type) type {
                 self.free_first = self.free_last;
             }
 
-            var index = self.indices.items[handle];
+            const index = self.indices.items[handle];
             _ = self.items.swapRemove(index.item_index);
 
             // if the element being removed is also the last element, there's nothing to update
@@ -259,7 +259,7 @@ test "intrusive slotmap" {
         id: u32 = undefined,
         value: []const u8,
     };
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     var map = IntrusiveSlotMap(Obj){};
     defer map.deinit(allocator);
 
@@ -424,7 +424,7 @@ pub fn IntrusiveGenSlotMap(comptime T: type) type {
                 self.free_first = self.free_last;
             }
 
-            var index = self.indices.items[handle.index];
+            const index = self.indices.items[handle.index];
             self.indices.items[handle.index].generation +%= 1;
             _ = self.items.swapRemove(index.item_index);
 
@@ -449,7 +449,7 @@ test "IntrusiveGenSlotMap" {
         value: []const u8,
     };
 
-    var allocator = std.testing.allocator;
+    const allocator = std.testing.allocator;
     var map = IntrusiveGenSlotMap(Obj){};
     defer map.deinit(allocator);
 

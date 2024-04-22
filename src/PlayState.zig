@@ -214,8 +214,8 @@ pub fn create(game: *Game) !*PlayState {
 
     self.button_generator = ButtonTextureGenerator.init(&game.texman, &self.game.renderers.r_batch);
 
-    var button_base = self.game.texman.getNamedTexture("button_base.png");
-    var button_badges = self.game.texman.getNamedTexture("button_badges.png");
+    const button_base = self.game.texman.getNamedTexture("button_base.png");
+    const button_badges = self.game.texman.getNamedTexture("button_badges.png");
     const white = .{ 255, 255, 255, 255 };
     self.t_demolish = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(0, 0, 32, 32), white);
     self.t_fast_off = self.button_generator.createButtonWithBadge(button_base, button_badges, Rect.init(32, 0, 32, 32), white);
@@ -422,7 +422,7 @@ pub fn enter(self: *PlayState, from: ?Game.StateId) void {
         self.beginWipe();
     }
     if (self.music_params) |params| {
-        params.paused.store(false, .SeqCst);
+        params.paused.store(false, .seq_cst);
     }
 }
 
@@ -438,7 +438,7 @@ pub fn update(self: *PlayState) void {
     if (!arena_was_reset) {
         std.log.warn("PlayState.update: frame_arena not reset!", .{});
     }
-    var arena = self.frame_arena.allocator();
+    const arena = self.frame_arena.allocator();
 
     self.prev_camera = self.camera;
 
@@ -482,11 +482,11 @@ pub fn update(self: *PlayState) void {
 
     if (self.sub == .gamelose_fadeout or self.sub == .gamewin_fadeout) {
         if (self.music_params) |params| {
-            params.volume.store(self.fade_timer.invProgressClamped(self.game.frame_counter), .SeqCst);
+            params.volume.store(self.fade_timer.invProgressClamped(self.game.frame_counter), .seq_cst);
         }
         if (self.fade_timer.expired(self.game.frame_counter)) {
             if (self.music_params) |params| {
-                params.done.store(true, .SeqCst);
+                params.done.store(true, .seq_cst);
                 params.release();
                 self.music_params = null;
             }
@@ -501,7 +501,7 @@ pub fn update(self: *PlayState) void {
 
     if (self.music_params) |params| {
         if (is_debug) {} else {
-            if (self.sub == .wipe_fadein and !params.loaded.load(.SeqCst)) {
+            if (self.sub == .wipe_fadein and !params.loaded.load(.seq_cst)) {
                 self.beginWipe();
             }
         }
@@ -549,11 +549,11 @@ fn updateUI(self: *PlayState) void {
 
     self.minimap_elements.clearRetainingCapacity();
     for (world.monsters.slice()) |*m| {
-        var p = m.getWorldCollisionRect().centerPoint();
+        const p = m.getWorldCollisionRect().centerPoint();
         self.addMinimapElement(@intCast(p[0]), @intCast(p[1]), .{ 255, 0, 0, 255 });
     }
     for (world.towers.slice()) |*t| {
-        var p = t.getWorldCollisionRect().centerPoint();
+        const p = t.getWorldCollisionRect().centerPoint();
         self.addMinimapElement(@intCast(p[0]), @intCast(p[1]), .{ 0, 255, 0, 255 });
     }
     self.ui_minimap.elements = self.minimap_elements.items;
@@ -578,7 +578,7 @@ fn addMinimapElement(self: *PlayState, world_x: u32, world_y: u32, color: [4]u8)
     const nx = ox / ww;
     const ny = oy / wh;
 
-    var element = self.minimap_elements.addOne(self.game.allocator) catch |err| {
+    const element = self.minimap_elements.addOne(self.game.allocator) catch |err| {
         std.log.err("Failed to allocate minimap_elements: {!}\n", .{err});
         std.process.exit(1);
     };
@@ -617,7 +617,7 @@ pub fn render(self: *PlayState, alpha: f64) void {
     }
     var arena = self.frame_arena.allocator();
 
-    var draw_queue = arena.alloc(DrawQuadCommand, world.monsters.slice().len) catch |err| {
+    const draw_queue = arena.alloc(DrawQuadCommand, world.monsters.slice().len) catch |err| {
         std.log.err("Failed to allocate draw_queue storage: {!}", .{err});
         std.process.exit(1);
     };
@@ -901,7 +901,7 @@ fn renderProjectiles(
             t = zm.mul(t, zm.rotationZ(p.angle));
         }
         t = zm.mul(t, zm.translation(dx, dy, 0));
-        var color_a = if (p.fadeout_timer) |timer| @as(u8, @intFromFloat(timer.invProgressClamped(world.world_frame) * 255)) else 255;
+        const color_a = if (p.fadeout_timer) |timer| @as(u8, @intFromFloat(timer.invProgressClamped(world.world_frame) * 255)) else 255;
         renderers.r_batch.drawQuadTransformed(.{
             .src = animator.getCurrentRect().toRectf(),
             .transform = t,
@@ -951,7 +951,7 @@ fn renderTowerBases(
     selected_tower: ?wo.TowerId,
 ) void {
     const t_special = renderers.texman.getNamedTexture("special.png");
-    var highlight_mag = @as(f32, @floatCast(0.5 * (1.0 + std.math.sin(@as(f64, @floatFromInt(std.time.milliTimestamp())) / 500.0))));
+    const highlight_mag = @as(f32, @floatCast(0.5 * (1.0 + std.math.sin(@as(f64, @floatFromInt(std.time.milliTimestamp())) / 500.0))));
 
     // render tower bases
     renderers.r_batch.begin(.{
@@ -979,7 +979,7 @@ fn renderTowers(
 ) void {
     const t_characters = renderers.texman.getNamedTexture("characters.png");
 
-    var highlight_mag = @as(f32, @floatCast(0.5 * (1.0 + std.math.sin(@as(f64, @floatFromInt(std.time.milliTimestamp())) / 500.0))));
+    const highlight_mag = @as(f32, @floatCast(0.5 * (1.0 + std.math.sin(@as(f64, @floatFromInt(std.time.milliTimestamp())) / 500.0))));
 
     // render tower characters
     renderers.r_batch.begin(.{
@@ -1098,9 +1098,9 @@ fn renderGrid(
     renderers: *RenderServices,
     cam: Camera,
 ) void {
-    var offset_x = @as(f32, @floatFromInt(@mod(cam.view.x, 16)));
-    var offset_y = @as(f32, @floatFromInt(@mod(cam.view.y, 16)));
-    var viewf = cam.view.toRectf();
+    const offset_x = @as(f32, @floatFromInt(@mod(cam.view.x, 16)));
+    const offset_y = @as(f32, @floatFromInt(@mod(cam.view.y, 16)));
+    const viewf = cam.view.toRectf();
 
     const width = @as(f32, @floatFromInt(renderers.output_width));
     const height = @as(f32, @floatFromInt(renderers.output_height));
@@ -1336,7 +1336,7 @@ pub fn loadWorld(self: *PlayState, mapid: u32) void {
         self.world = null;
     }
     if (self.music_params) |params| {
-        params.done.store(true, .SeqCst);
+        params.done.store(true, .seq_cst);
         params.release();
         self.music_params = null;
     }
@@ -1591,7 +1591,7 @@ fn updateUpgradeButtons(self: *PlayState) void {
 }
 
 fn getCachedUpgradeButtonTexture(self: *PlayState, spec: *const wo.TowerSpec) *const Texture {
-    var gop = self.upgrade_texture_cache.getOrPut(self.game.allocator, spec) catch unreachable;
+    const gop = self.upgrade_texture_cache.getOrPut(self.game.allocator, spec) catch unreachable;
     if (!gop.found_existing) {
         const base_texture = self.game.texman.getNamedTexture("button_base.png");
         const spec_texture = self.game.texman.getNamedTexture("characters.png");
@@ -1633,7 +1633,7 @@ fn renderTooltipString(allocator: std.mem.Allocator, spec: *const wo.TowerSpec) 
 }
 
 fn getCachedTooltip(self: *PlayState, spec: *const wo.TowerSpec) []const u8 {
-    var gop = self.tooltip_cache.getOrPut(self.game.allocator, spec) catch unreachable;
+    const gop = self.tooltip_cache.getOrPut(self.game.allocator, spec) catch unreachable;
     if (!gop.found_existing) {
         gop.value_ptr.* = renderTooltipString(self.game.allocator, spec) catch |err| {
             std.log.warn("Failed to render tooltip string: {!}; template: `{s}`", .{ err, spec.tooltip orelse "[no tooltip]" });

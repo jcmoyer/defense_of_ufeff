@@ -14,9 +14,9 @@ inline fn thisDir() []const u8 {
     return comptime std.fs.path.dirname(@src().file) orelse ".";
 }
 
-pub fn link(b: *std.build.Builder, exe: *std.build.LibExeObjStep) void {
+pub fn link(b: *std.Build, exe: *std.Build.Step.Compile) void {
     const m = b.addModule("gl33", .{
-        .source_file = .{ .path = thisDir() ++ "/src/gl_3v3.zig" },
+        .root_source_file = .{ .path = thisDir() ++ "/src/gl_3v3.zig" },
     });
-    exe.addModule("gl33", m);
+    exe.root_module.addImport("gl33", m);
 }

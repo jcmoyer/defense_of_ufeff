@@ -1,9 +1,8 @@
 const std = @import("std");
-const zmath = @import("thirdparty/zmath/build.zig");
 const stb = @import("thirdparty/stb/build.zig");
 const opengl = @import("thirdparty/zig-opengl/build.zig");
 
-pub fn build(b: *std.build.Builder) void {
+pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -15,8 +14,9 @@ pub fn build(b: *std.build.Builder) void {
     });
     linkSDL2(exe);
 
-    const zmath_pkg = zmath.package(b, target, optimize, .{});
-    zmath_pkg.link(exe);
+    const zmath = b.dependency("zmath", .{});
+    exe.root_module.addImport("zmath", zmath.module("root"));
+
     opengl.link(b, exe);
     stb.linkImage(b, exe);
     stb.linkVorbis(b, exe);
@@ -45,7 +45,7 @@ pub fn build(b: *std.build.Builder) void {
     test_step.dependOn(&exe_tests.step);
 }
 
-fn linkSDL2(exe: *std.build.LibExeObjStep) void {
+fn linkSDL2(exe: *std.Build.Step.Compile) void {
     exe.addObjectFile(.{ .path = "thirdparty/SDL2-2.24.1/x86_64-w64-mingw32/lib/libSDL2.a" });
     exe.linkLibC();
     // Windows SDL dependencies
@@ -116,7 +116,7 @@ const extra = [_][]const u8{
 };
 const all_assets = maps ++ music ++ sounds ++ textures ++ tables ++ extra;
 
-fn installAssets(b: *std.build.Builder) void {
+fn installAssets(b: *std.Build) void {
     for (all_assets) |path| {
         b.installFile(path, path);
     }

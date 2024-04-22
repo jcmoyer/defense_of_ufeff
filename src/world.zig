@@ -117,7 +117,7 @@ pub const Projectile = struct {
             updateFn(self, frame);
         }
         if (self.spec.rotation == .rotation_from_velocity) {
-            self.angle = std.math.atan2(f32, self.vel_y, self.vel_x);
+            self.angle = std.math.atan2(self.vel_y, self.vel_x);
         } else if (self.spec.rotation == .angular_velocity) {
             self.angle += self.angle_vel;
         }
@@ -500,7 +500,7 @@ pub const Monster = struct {
         }
         self.hurtDirectional(hopts.amount, hopts.direction);
         const se_id = self.world.spawnSpriteEffect(&se_hurt_generic, p[0], p[1]) catch unreachable;
-        self.world.sprite_effects.getPtr(se_id).angle = std.math.atan2(f32, hopts.direction[1], hopts.direction[0]);
+        self.world.sprite_effects.getPtr(se_id).angle = std.math.atan2(hopts.direction[1], hopts.direction[0]);
         self.world.sprite_effects.getPtr(se_id).world_x -= std.math.cos(self.world.sprite_effects.getPtr(se_id).angle) * 8.0;
         self.world.sprite_effects.getPtr(se_id).world_y -= std.math.sin(self.world.sprite_effects.getPtr(se_id).angle) * 8.0;
     }
@@ -524,7 +524,7 @@ pub const Monster = struct {
     }
 
     pub fn hurtDelayed(self: *Monster, hopts: HurtOptions, frame_count: u32) void {
-        var dd = self.world.createDelayedDamage();
+        const dd = self.world.createDelayedDamage();
         dd.* = DelayedDamage{
             .monster = self.id,
             .hurt_options = hopts,
@@ -1090,7 +1090,7 @@ pub const Tower = struct {
     }
 
     pub fn angleTo(self: *Tower, world_x: i32, world_y: i32) f32 {
-        var r = mu.angleBetween(
+        const r = mu.angleBetween(
             [2]f32{ @floatFromInt(self.world_x + 8), @floatFromInt(self.world_y + 8) },
             [2]f32{ @floatFromInt(world_x), @floatFromInt(world_y) },
         );
@@ -1385,7 +1385,7 @@ pub const Goal = struct {
     emitter: particle.PointEmitter,
 
     fn init(world: *World, world_x: u32, world_y: u32) Goal {
-        var self = Goal{
+        const self = Goal{
             .world = world,
             .world_x = world_x,
             .world_y = world_y,
@@ -1846,7 +1846,7 @@ pub const World = struct {
             .vel_y = 0,
         });
         var ptr = self.floating_text.getPtr(id);
-        std.mem.copy(u8, &ptr.text, text);
+        std.mem.copyForwards(u8, &ptr.text, text);
         ptr.textlen = @intCast(text.len);
         return id;
     }
@@ -1875,7 +1875,7 @@ pub const World = struct {
             self.towers.erase(id);
         }
         self.map.at2DPtr(.base, coord.x, coord.y).flags.contains_tower = true;
-        var id = try self.spawnTowerWorld(
+        const id = try self.spawnTowerWorld(
             spec,
             @intCast(coord.x * 16),
             @intCast(coord.y * 16),
@@ -1913,7 +1913,7 @@ pub const World = struct {
 
     /// Returned pointer is valid for the current frame only.
     pub fn spawnProjectile(self: *World, spec: *const ProjectileSpec, world_x: i32, world_y: i32) !*Projectile {
-        var ptr = try self.pending_projectiles.addOne(self.allocator);
+        const ptr = try self.pending_projectiles.addOne(self.allocator);
         ptr.* = Projectile{
             .world = self,
             .spec = spec,
@@ -1930,7 +1930,7 @@ pub const World = struct {
     }
 
     pub fn spawnProjectileDelayed(self: *World, spec: *const ProjectileSpec, world_x: i32, world_y: i32, frames: u32) !*Projectile {
-        var ptr = try self.pending_projectiles.addOne(self.allocator);
+        const ptr = try self.pending_projectiles.addOne(self.allocator);
         ptr.* = Projectile{
             .world = self,
             .spec = spec,
@@ -2029,7 +2029,7 @@ pub const World = struct {
     }
 
     fn spawnTowerWorld(self: *World, spec: *const TowerSpec, world_x: u32, world_y: u32) !TowerId {
-        var id = try self.towers.put(self.allocator, Tower{
+        const id = try self.towers.put(self.allocator, Tower{
             .world = self,
             .spec = spec,
             .world_x = world_x,
@@ -2399,7 +2399,7 @@ const PathfindingCache = struct {
 
     fn init(allocator: Allocator) PathfindingCache {
         _ = allocator;
-        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        const arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         return .{
             .arena = arena,
         };
@@ -2410,7 +2410,7 @@ const PathfindingCache = struct {
     }
 
     fn reserve(self: *PathfindingCache, coord_count: usize) !void {
-        var allocator = self.arena.allocator();
+        const allocator = self.arena.allocator();
         try self.entries.ensureTotalCapacity(allocator, coord_count);
     }
 
@@ -2418,7 +2418,7 @@ const PathfindingCache = struct {
         const my_cap = self.entries.capacity();
         self.arena.deinit();
         self.arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-        var allocator = self.arena.allocator();
+        const allocator = self.arena.allocator();
         self.entries = .{};
         self.entries.ensureTotalCapacity(allocator, my_cap) catch unreachable;
     }
@@ -2435,7 +2435,7 @@ const PathfindingCache = struct {
                 .start = start,
                 .end = coords.end,
             };
-            var gop = self.entries.getOrPutAssumeCapacity(key);
+            const gop = self.entries.getOrPutAssumeCapacity(key);
             if (!gop.found_existing) {
                 gop.value_ptr.* = my_path[i..];
             }
@@ -2729,7 +2729,7 @@ const JsonSpawnPointWaitEvent = struct {
 
 pub fn loadWavesFromJson(allocator: Allocator, filename: []const u8, world: *World) !WaveList {
     var arena = std.heap.ArenaAllocator.init(allocator);
-    var arena_allocator = arena.allocator();
+    const arena_allocator = arena.allocator();
     defer arena.deinit();
 
     var file = try std.fs.cwd().openFile(filename, .{});
@@ -2783,7 +2783,7 @@ pub fn loadWavesFromJson(allocator: Allocator, filename: []const u8, world: *Wor
 
 pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !*World {
     var arena = std.heap.ArenaAllocator.init(allocator);
-    var arena_allocator = arena.allocator();
+    const arena_allocator = arena.allocator();
     defer arena.deinit();
 
     var file = try std.fs.cwd().openFile(filename, .{});
@@ -2888,7 +2888,7 @@ pub fn loadWorldFromJson(allocator: Allocator, filename: []const u8) !*World {
 
 pub fn loadWorldRawJson(allocator: Allocator, filename: []const u8) !TiledDoc {
     var arena = std.heap.ArenaAllocator.init(allocator);
-    var arena_allocator = arena.allocator();
+    const arena_allocator = arena.allocator();
     defer arena.deinit();
 
     var file = try std.fs.cwd().openFile(filename, .{});
@@ -2976,21 +2976,22 @@ fn loadObjectGroup(layer: TiledObjectGroup, ctx: LoadContext) !void {
 
 fn b64decompressLayer(allocator: Allocator, data: []const u8) ![]u32 {
     const b64_decode_size = try std.base64.standard.Decoder.calcSizeForSlice(data);
-    var b64_decode_buffer = try allocator.alloc(u8, b64_decode_size);
+    const b64_decode_buffer = try allocator.alloc(u8, b64_decode_size);
     defer allocator.free(b64_decode_buffer);
 
     try std.base64.standard.Decoder.decode(b64_decode_buffer, data);
 
     var fbs = std.io.fixedBufferStream(b64_decode_buffer);
-    var b64_reader = fbs.reader();
+    const b64_reader = fbs.reader();
 
-    var zstream = try std.compress.zlib.decompressStream(allocator, b64_reader);
+    var zstream = std.compress.zlib.decompressor(b64_reader);
     var zreader = zstream.reader();
 
     // enough for a 512x512 map
-    const layer_bytes = try zreader.readAllAlloc(allocator, 1024 * 1024);
-    // TODO: looks weird, maybe we should explicitly allocate an aligned buffer instead of using readAllAlloc?
-    return std.mem.bytesAsSlice(u32, @as([]align(4) u8, @alignCast(layer_bytes)));
+    const layer_bytes = try allocator.alignedAlloc(u8, 4, 1024 * 1024);
+    const n_read = try zreader.readAll(layer_bytes);
+
+    return std.mem.bytesAsSlice(u32, layer_bytes[0..n_read]);
 }
 
 // for tiled tilesets

@@ -196,7 +196,7 @@ pub fn destroy(self: *LevelSelectState) void {
 
 fn createButtonForRect(self: *LevelSelectState, rect: Rect, mapid: u32) !void {
     var btn = try self.ui_root.createButton();
-    var allocator = self.arena.allocator();
+    const allocator = self.arena.allocator();
     self.button_states[self.num_buttons] = .{
         .mapid = mapid,
         .state = self,
@@ -250,7 +250,7 @@ fn onLevelButtonClick(button: *ui.Button, state: *MapButtonState) void {
 
 pub fn enter(self: *LevelSelectState, from: ?Game.StateId) void {
     if (self.music_params) |params| {
-        params.paused.store(false, .SeqCst);
+        params.paused.store(false, .seq_cst);
     }
     self.beginFadeIn();
 
@@ -288,7 +288,7 @@ pub fn enter(self: *LevelSelectState, from: ?Game.StateId) void {
 pub fn leave(self: *LevelSelectState, to: ?Game.StateId) void {
     _ = to;
     if (self.music_params) |params| {
-        params.paused.store(true, .SeqCst);
+        params.paused.store(true, .seq_cst);
     }
     self.ui_root.clearTransientState();
 }
@@ -297,9 +297,9 @@ pub fn update(self: *LevelSelectState) void {
     if (self.music_params) |params| {
         const t = self.fade_timer.progressClamped(self.game.frame_counter);
         if (self.sub == .fadein or self.sub == .none) {
-            params.volume.store(t, .SeqCst);
+            params.volume.store(t, .seq_cst);
         } else if (self.sub == .fadeout or self.sub == .fadeout_to_menu) {
-            params.volume.store(1 - t, .SeqCst);
+            params.volume.store(1 - t, .seq_cst);
         }
     }
     if (self.sub == .fadein and self.fade_timer.expired(self.game.frame_counter)) {

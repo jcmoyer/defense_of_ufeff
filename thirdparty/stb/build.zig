@@ -9,18 +9,18 @@ pub fn build(b: *std.build.Builder) void {
     _ = b;
 }
 
-pub fn linkImage(b: *std.build.Builder, exe: *std.build.LibExeObjStep) void {
+pub fn linkImage(b: *std.Build, exe: *std.Build.Step.Compile) void {
     const m = b.addModule("stb_image", .{
-        .source_file = .{ .path = thisDir() ++ "/src/stb_image.zig" },
+        .root_source_file = .{ .path = thisDir() ++ "/src/stb_image.zig" },
     });
-    exe.addModule("stb_image", m);
+    exe.root_module.addImport("stb_image", m);
     exe.addCSourceFile(.{ .file = .{ .path = thisDir() ++ "/src/stb_image.c" }, .flags = &[_][]const u8{} });
 }
 
-pub fn linkVorbis(b: *std.build.Builder, exe: *std.build.LibExeObjStep) void {
+pub fn linkVorbis(b: *std.Build, exe: *std.Build.Step.Compile) void {
     const m = b.addModule("stb_vorbis", .{
-        .source_file = .{ .path = thisDir() ++ "/src/stb_vorbis.zig" },
+        .root_source_file = .{ .path = thisDir() ++ "/src/stb_vorbis.zig" },
     });
-    exe.addModule("stb_vorbis", m);
+    exe.root_module.addImport("stb_vorbis", m);
     exe.addCSourceFile(.{ .file = .{ .path = thisDir() ++ "/src/stb_vorbis.c" }, .flags = &[_][]const u8{} });
 }

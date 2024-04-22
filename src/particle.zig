@@ -156,18 +156,15 @@ pub const ParticleSystem = struct {
     }
 
     pub fn preUpdate(self: *ParticleSystem) void {
-        std.mem.copy(
-            [2]f32,
+        @memcpy(
             self.particles.items(.prev_pos)[0..self.num_alive],
             self.particles.items(.pos)[0..self.num_alive],
         );
-        std.mem.copy(
-            f32,
+        @memcpy(
             self.particles.items(.prev_rotation)[0..self.num_alive],
             self.particles.items(.rotation)[0..self.num_alive],
         );
-        std.mem.copy(
-            f32,
+        @memcpy(
             self.particles.items(.prev_scale)[0..self.num_alive],
             self.particles.items(.scale)[0..self.num_alive],
         );
