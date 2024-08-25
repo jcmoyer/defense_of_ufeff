@@ -1,6 +1,4 @@
 const std = @import("std");
-const stb = @import("thirdparty/stb/build.zig");
-const opengl = @import("thirdparty/zig-opengl/build.zig");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -8,18 +6,22 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "defense",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    linkSDL2(exe);
+    linkSDL2(b, exe);
 
     const zmath = b.dependency("zmath", .{});
     exe.root_module.addImport("zmath", zmath.module("root"));
 
-    opengl.link(b, exe);
-    stb.linkImage(b, exe);
-    stb.linkVorbis(b, exe);
+    const opengl = b.dependency("gl33", .{});
+    exe.root_module.addImport("gl33", opengl.module("gl33"));
+
+    const stb = b.dependency("stb", .{});
+    exe.root_module.addImport("stb_vorbis", stb.module("stb_vorbis"));
+    exe.root_module.addImport("stb_image", stb.module("stb_image"));
+
     b.installArtifact(exe);
 
     installAssets(b);
@@ -34,9 +36,7 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     const exe_tests = b.addTest(.{
-        .root_source_file = .{
-            .path = "src/main.zig",
-        },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -45,8 +45,8 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&exe_tests.step);
 }
 
-fn linkSDL2(exe: *std.Build.Step.Compile) void {
-    exe.addObjectFile(.{ .path = "thirdparty/SDL2-2.24.1/x86_64-w64-mingw32/lib/libSDL2.a" });
+fn linkSDL2(b: *std.Build, exe: *std.Build.Step.Compile) void {
+    exe.addObjectFile(b.path("thirdparty/SDL2-2.24.1/x86_64-w64-mingw32/lib/libSDL2.a"));
     exe.linkLibC();
     // Windows SDL dependencies
     exe.linkSystemLibrary("setupapi");

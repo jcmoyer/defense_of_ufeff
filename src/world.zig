@@ -2522,7 +2522,7 @@ const PathfindingState = struct {
         const width = map.width;
 
         // sus, upstream interface needs some love
-        self.frontier.len = 0;
+        self.frontier.items.len = 0;
         self.frontier.context = Context{
             .map = map,
             .score_map = self.score_map,
@@ -2593,7 +2593,7 @@ const PathfindingState = struct {
         const width = map.width;
 
         // sus, upstream interface needs some love
-        self.frontier.len = 0;
+        self.frontier.items.len = 0;
         self.frontier.context = Context{
             .map = map,
             .score_map = self.score_map,
